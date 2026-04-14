@@ -1,0 +1,12 @@
+<resources>
+    <string name="app_name">Mishka</string>
+    <string name="tab_home">主页</string>
+    <string name="tab_proxy">代理</string>
+    <string name="tab_settings">设置</string>
+    <string name="status_running">运行中</string>
+    <string name="status_stopped">已停止</string>
+    <string name="action_start">启动</string>
+    <string name="action_stop">停止</string>
+    <string name="action_restart">重启</string>
+    <string name="action_reload">重载</string>
+</resources>

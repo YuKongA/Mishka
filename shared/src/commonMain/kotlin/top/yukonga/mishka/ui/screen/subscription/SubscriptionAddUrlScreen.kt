@@ -1,0 +1,179 @@
+package top.yukonga.mishka.ui.screen.subscription
+
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import top.yukonga.miuix.kmp.utils.overScrollVertical
+import top.yukonga.miuix.kmp.utils.scrollEndHaptic
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import top.yukonga.mishka.viewmodel.SubscriptionViewModel
+import top.yukonga.miuix.kmp.basic.ButtonDefaults
+import top.yukonga.miuix.kmp.basic.Card
+import top.yukonga.miuix.kmp.basic.Icon
+import top.yukonga.miuix.kmp.basic.IconButton
+import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
+import top.yukonga.miuix.kmp.basic.Scaffold
+import top.yukonga.miuix.kmp.basic.SmallTitle
+import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.basic.TextButton
+import top.yukonga.miuix.kmp.basic.TextField
+import top.yukonga.miuix.kmp.basic.TopAppBar
+import top.yukonga.miuix.kmp.icon.MiuixIcons
+import top.yukonga.miuix.kmp.icon.extended.Back
+import top.yukonga.miuix.kmp.icon.extended.Info
+import top.yukonga.miuix.kmp.theme.MiuixTheme
+
+/**
+ * URL 导入配置页面
+ */
+@Composable
+fun SubscriptionAddUrlScreen(
+    viewModel: SubscriptionViewModel,
+    onBack: () -> Unit = {},
+    onSaved: () -> Unit = {},
+    bottomPadding: Dp = 0.dp,
+) {
+    val uiState by viewModel.uiState.collectAsState()
+    val scrollBehavior = MiuixScrollBehavior()
+    var inputName by remember { mutableStateOf("新配置") }
+    var inputUrl by remember { mutableStateOf("") }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = "配置",
+                scrollBehavior = scrollBehavior,
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(
+                            imageVector = MiuixIcons.Back,
+                            contentDescription = "返回",
+                            tint = MiuixTheme.colorScheme.onSurface,
+                        )
+                    }
+                },
+            )
+        },
+    ) { innerPadding ->
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .scrollEndHaptic()
+                .overScrollVertical()
+                .nestedScroll(scrollBehavior.nestedScrollConnection),
+            contentPadding = PaddingValues(
+                top = innerPadding.calculateTopPadding(),
+                bottom = bottomPadding,
+            ),
+        ) {
+            item(key = "hint") {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp)
+                        .padding(top = 12.dp, bottom = 6.dp),
+                    insideMargin = PaddingValues(16.dp),
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Icon(
+                            imageVector = MiuixIcons.Info,
+                            contentDescription = null,
+                            tint = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                        )
+                        Text(
+                            text = "仅接受 mihomo 配置文件(包含代理/规则)",
+                            fontSize = 14.sp,
+                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                        )
+                    }
+                }
+            }
+            item(key = "name_title") {
+                SmallTitle(text = "名称")
+            }
+            item(key = "name_field") {
+                TextField(
+                    value = inputName,
+                    onValueChange = { inputName = it },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp)
+                        .padding(bottom = 12.dp),
+                )
+            }
+            item(key = "url_title") {
+                SmallTitle(text = "URL")
+            }
+            item(key = "url_field") {
+                TextField(
+                    value = inputUrl,
+                    onValueChange = { inputUrl = it },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp)
+                        .padding(bottom = 12.dp),
+                    label = "仅接受 http(s) 和 content 类型",
+                    useLabelAsPlaceholder = true,
+                )
+            }
+            item(key = "save") {
+                TextButton(
+                    text = "保存",
+                    onClick = {
+                        viewModel.addSubscription(
+                            name = inputName.ifBlank { "新配置" },
+                            url = inputUrl,
+                            onComplete = onSaved,
+                        )
+                    },
+                    enabled = inputUrl.isNotBlank() && !uiState.isLoading,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp)
+                        .padding(vertical = 6.dp),
+                    colors = ButtonDefaults.textButtonColorsPrimary(),
+                )
+            }
+            if (uiState.error.isNotEmpty()) {
+                item(key = "error") {
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp)
+                            .padding(bottom = 6.dp),
+                        insideMargin = PaddingValues(16.dp),
+                    ) {
+                        Text(
+                            text = uiState.error,
+                            fontSize = 14.sp,
+                            color = MiuixTheme.colorScheme.primary,
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    ImportProgressDialog(
+        show = uiState.isLoading,
+        step = uiState.importProgress?.step ?: "处理中...",
+    )
+}

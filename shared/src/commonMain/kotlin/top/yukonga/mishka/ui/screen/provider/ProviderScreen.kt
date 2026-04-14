@@ -1,0 +1,212 @@
+package top.yukonga.mishka.ui.screen.provider
+
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import top.yukonga.miuix.kmp.utils.overScrollVertical
+import top.yukonga.miuix.kmp.utils.scrollEndHaptic
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import top.yukonga.mishka.viewmodel.ProviderItemUi
+import top.yukonga.mishka.viewmodel.ProviderViewModel
+import top.yukonga.miuix.kmp.basic.BasicComponent
+import top.yukonga.miuix.kmp.basic.Card
+import top.yukonga.miuix.kmp.basic.Icon
+import top.yukonga.miuix.kmp.basic.IconButton
+import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
+import top.yukonga.miuix.kmp.basic.Scaffold
+import top.yukonga.miuix.kmp.basic.SmallTitle
+import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.basic.TopAppBar
+import top.yukonga.miuix.kmp.icon.MiuixIcons
+import top.yukonga.miuix.kmp.icon.extended.Back
+import top.yukonga.miuix.kmp.icon.extended.Refresh
+import top.yukonga.miuix.kmp.theme.MiuixTheme
+
+@Composable
+fun ProviderScreen(
+    viewModel: ProviderViewModel,
+    onBack: () -> Unit = {},
+    bottomPadding: Dp = 0.dp,
+) {
+    val uiState by viewModel.uiState.collectAsState()
+    val scrollBehavior = MiuixScrollBehavior()
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = "外部资源",
+                scrollBehavior = scrollBehavior,
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(
+                            imageVector = MiuixIcons.Back,
+                            contentDescription = "返回",
+                            tint = MiuixTheme.colorScheme.onSurface,
+                        )
+                    }
+                },
+                actions = {
+                    IconButton(onClick = { viewModel.updateAll() }) {
+                        Icon(
+                            imageVector = MiuixIcons.Refresh,
+                            contentDescription = "全部更新",
+                            tint = MiuixTheme.colorScheme.onSurface,
+                        )
+                    }
+                },
+            )
+        },
+    ) { innerPadding ->
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .scrollEndHaptic()
+                .overScrollVertical()
+                .nestedScroll(scrollBehavior.nestedScrollConnection),
+            contentPadding = PaddingValues(
+                top = innerPadding.calculateTopPadding(),
+                bottom = bottomPadding,
+            ),
+        ) {
+            if (uiState.error.isNotEmpty()) {
+                item(key = "error") {
+                    Card(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp).padding(top = 12.dp, bottom = 6.dp),
+                        insideMargin = PaddingValues(16.dp),
+                    ) {
+                        Text(
+                            text = uiState.error,
+                            color = Color(0xFFE53935),
+                        )
+                    }
+                }
+            }
+
+            if (uiState.providers.isEmpty() && !uiState.isLoading) {
+                item(key = "empty") {
+                    Column(
+                        modifier = Modifier.fillParentMaxSize(),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center,
+                    ) {
+                        Text(
+                            text = "暂无外部资源",
+                            fontSize = 16.sp,
+                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                        )
+                        Text(
+                            text = "请先启动代理服务",
+                            modifier = Modifier.padding(top = 6.dp),
+                            fontSize = 14.sp,
+                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                        )
+                    }
+                }
+            }
+
+            if (uiState.providers.isNotEmpty()) {
+                item(key = "provider_title") {
+                    SmallTitle(text = "资源列表")
+                }
+
+                item(key = "provider_card") {
+                    Card(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp).padding(bottom = 12.dp),
+                    ) {
+                        uiState.providers.forEach { provider ->
+                            ProviderItem(
+                                provider = provider,
+                                onUpdate = {
+                                    val isRule = provider.type.startsWith("规则")
+                                    viewModel.updateProvider(provider.name, isRule)
+                                },
+                            )
+                        }
+                    }
+                }
+            }
+
+            item(key = "bottom_spacer") {
+                androidx.compose.foundation.layout.Spacer(Modifier.navigationBarsPadding())
+            }
+        }
+    }
+}
+
+@Composable
+private fun ProviderItem(
+    provider: ProviderItemUi,
+    onUpdate: () -> Unit,
+) {
+    BasicComponent(
+        title = provider.name,
+        summary = provider.type,
+        endActions = {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text(
+                    text = formatUpdatedAt(provider.updatedAt),
+                    fontSize = 12.sp,
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                )
+                Image(
+                    modifier = Modifier
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            role = Role.Button,
+                            onClick = onUpdate,
+                        ),
+                    imageVector = MiuixIcons.Refresh,
+                    contentDescription = "更新",
+                    colorFilter = ColorFilter.tint(MiuixTheme.colorScheme.onSurfaceVariantSummary)
+                )
+            }
+        },
+    )
+}
+
+private fun formatUpdatedAt(isoTime: String): String {
+    if (isoTime.isBlank()) return ""
+    return try {
+        // Go 零值时间 "0001-01-01T00:00:00Z" 表示未更新
+        if (isoTime.startsWith("0001-")) return "未更新"
+
+        // mihomo 返回 ISO 8601 格式如 "2025-04-14T16:51:30.123456+08:00"
+        // 提取为 "04-14 16:51"
+        val dateTime = isoTime.substringBefore(".").substringBefore("+").substringBefore("Z")
+        val parts = dateTime.split("T")
+        if (parts.size == 2) {
+            val datePart = parts[0].substringAfter("-") // "04-14"
+            val timePart = parts[1].substringBeforeLast(":") // "16:51"
+            "$datePart $timePart"
+        } else {
+            isoTime
+        }
+    } catch (_: Exception) {
+        isoTime
+    }
+}
