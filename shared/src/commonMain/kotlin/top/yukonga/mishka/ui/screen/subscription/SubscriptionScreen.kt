@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -30,6 +31,22 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import mishka.shared.generated.resources.Res
+import mishka.shared.generated.resources.common_back
+import mishka.shared.generated.resources.common_delete
+import mishka.shared.generated.resources.common_edit
+import mishka.shared.generated.resources.common_update
+import mishka.shared.generated.resources.subscription_add
+import mishka.shared.generated.resources.subscription_config
+import mishka.shared.generated.resources.subscription_in_use
+import mishka.shared.generated.resources.subscription_no_config
+import mishka.shared.generated.resources.subscription_no_traffic
+import mishka.shared.generated.resources.subscription_tap_add
+import mishka.shared.generated.resources.subscription_title
+import mishka.shared.generated.resources.subscription_update_all
+import mishka.shared.generated.resources.subscription_updated_at
+import mishka.shared.generated.resources.subscription_used_traffic
+import org.jetbrains.compose.resources.stringResource
 import top.yukonga.mishka.data.model.Subscription
 import top.yukonga.mishka.util.FormatUtils
 import top.yukonga.mishka.viewmodel.SubscriptionViewModel
@@ -39,7 +56,6 @@ import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.Scaffold
-import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TopAppBar
 import top.yukonga.miuix.kmp.icon.MiuixIcons
@@ -53,9 +69,6 @@ import top.yukonga.miuix.kmp.theme.miuixShape
 import top.yukonga.miuix.kmp.utils.PressFeedbackType
 import top.yukonga.miuix.kmp.utils.overScrollVertical
 import top.yukonga.miuix.kmp.utils.scrollEndHaptic
-import mishka.shared.generated.resources.Res
-import mishka.shared.generated.resources.*
-import org.jetbrains.compose.resources.stringResource
 
 /**
  * 订阅列表页面
@@ -67,7 +80,6 @@ fun SubscriptionScreen(
     onBack: (() -> Unit)? = null,
     onNavigateAdd: () -> Unit = {},
     onNavigateEdit: (uuid: String) -> Unit = {},
-    onDuplicate: (uuid: String) -> Unit = {},
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val scrollBehavior = MiuixScrollBehavior()
@@ -166,8 +178,8 @@ fun SubscriptionScreen(
             }
 
             if (uiState.subscriptions.isNotEmpty()) {
-                item(key = "sub_title") {
-                    SmallTitle(text = stringResource(Res.string.subscription_config_list))
+                item(key = "top_padding") {
+                    Spacer(modifier = Modifier.height(12.dp))
                 }
             }
 
@@ -179,7 +191,6 @@ fun SubscriptionScreen(
                     onRefresh = { viewModel.fetchSubscription(sub.id) },
                     onDelete = { viewModel.removeSubscription(sub.id) },
                     onEdit = { onNavigateEdit(sub.id) },
-                    onDuplicate = { onDuplicate(sub.id) },
                 )
             }
         }
@@ -194,7 +205,6 @@ private fun SubscriptionItem(
     onRefresh: () -> Unit,
     onDelete: () -> Unit,
     onEdit: () -> Unit,
-    onDuplicate: () -> Unit,
 ) {
     Card(
         modifier = Modifier
@@ -251,7 +261,11 @@ private fun SubscriptionItem(
                 if (subscription.total > 0) {
                     val used = subscription.upload + subscription.download
                     Text(
-                        text = stringResource(Res.string.subscription_used_traffic, FormatUtils.formatBytes(used), FormatUtils.formatBytes(subscription.total)),
+                        text = stringResource(
+                            Res.string.subscription_used_traffic,
+                            FormatUtils.formatBytes(used),
+                            FormatUtils.formatBytes(subscription.total)
+                        ),
                         modifier = Modifier.padding(top = 2.dp),
                         fontSize = 12.sp,
                         color = MiuixTheme.colorScheme.onSurfaceVariantSummary,

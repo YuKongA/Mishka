@@ -29,6 +29,16 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import mishka.shared.generated.resources.Res
+import mishka.shared.generated.resources.common_cancel
+import mishka.shared.generated.resources.common_confirm
+import mishka.shared.generated.resources.home_mode
+import mishka.shared.generated.resources.home_running
+import mishka.shared.generated.resources.home_starting
+import mishka.shared.generated.resources.home_stopped
+import mishka.shared.generated.resources.home_switch_mode
+import mishka.shared.generated.resources.home_switch_tun_stack
+import org.jetbrains.compose.resources.stringResource
 import top.yukonga.mishka.viewmodel.HomeUiState
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Card
@@ -39,9 +49,6 @@ import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.PressFeedbackType
 import top.yukonga.miuix.kmp.window.WindowDialog
-import mishka.shared.generated.resources.Res
-import mishka.shared.generated.resources.*
-import org.jetbrains.compose.resources.stringResource
 
 fun LazyListScope.statusSection(
     state: HomeUiState = HomeUiState(),

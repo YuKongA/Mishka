@@ -17,15 +17,20 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import mishka.shared.generated.resources.Res
+import mishka.shared.generated.resources.home_address
+import mishka.shared.generated.resources.home_download
+import mishka.shared.generated.resources.home_interface
+import mishka.shared.generated.resources.home_network
+import mishka.shared.generated.resources.home_speed
+import mishka.shared.generated.resources.home_upload
+import org.jetbrains.compose.resources.stringResource
 import top.yukonga.mishka.viewmodel.HomeUiState
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.theme.miuixShape
-import mishka.shared.generated.resources.Res
-import mishka.shared.generated.resources.*
-import org.jetbrains.compose.resources.stringResource
 
 fun LazyListScope.networkInfoSection(state: HomeUiState = HomeUiState()) {
     item(key = "network_title") {

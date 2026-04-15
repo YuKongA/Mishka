@@ -62,13 +62,13 @@ class MishkaRootService : Service() {
             val existingSecret = storage.getString(StorageKeys.ROOT_MIHOMO_SECRET, "")
             if (existingPid > 0 && existingSecret.isNotEmpty()) {
                 if (runner.attachToExisting(existingPid, existingSecret, subscriptionId)) {
-                    Log.i(TAG, "重连已有 mihomo 进程: pid=$existingPid")
+                    Log.i(TAG, "Reconnected to existing mihomo: pid=$existingPid")
                     ProxyServiceBridge.updateState(ProxyServiceStatus(ProxyState.Running, secret = existingSecret, tunMode = TunMode.Root))
                     dynamicNotification.startOrFallbackStatic(storage, existingSecret)
                     storage.putString(StorageKeys.SERVICE_WAS_RUNNING, "true")
                     return@launch
                 }
-                Log.i(TAG, "已有进程 pid=$existingPid 不再存活，重新启动")
+                Log.i(TAG, "Existing process pid=$existingPid no longer alive, restarting")
                 clearPersistedState(storage)
             }
 
@@ -77,7 +77,7 @@ class MishkaRootService : Service() {
 
             // 3. 检查 ROOT 权限
             if (!RootHelper.hasRootAccess()) {
-                Log.e(TAG, "无法获取 Root 权限")
+                Log.e(TAG, "Failed to obtain root access")
                 ProxyServiceBridge.updateState(
                     ProxyServiceStatus(ProxyState.Error, errorMessage = getString(R.string.error_root_failed), tunMode = TunMode.Root)
                 )

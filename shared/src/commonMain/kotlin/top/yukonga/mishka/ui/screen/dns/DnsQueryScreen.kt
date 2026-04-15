@@ -34,6 +34,20 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import mishka.shared.generated.resources.Res
+import mishka.shared.generated.resources.common_back
+import mishka.shared.generated.resources.dns_clear_cache
+import mishka.shared.generated.resources.dns_clear_dns
+import mishka.shared.generated.resources.dns_clear_fakeip
+import mishka.shared.generated.resources.dns_domain
+import mishka.shared.generated.resources.dns_no_record
+import mishka.shared.generated.resources.dns_query
+import mishka.shared.generated.resources.dns_querying
+import mishka.shared.generated.resources.dns_results
+import mishka.shared.generated.resources.dns_title
+import org.jetbrains.compose.resources.stringResource
+import top.yukonga.mishka.data.model.DnsAnswer
+import top.yukonga.mishka.viewmodel.DnsQueryViewModel
 import top.yukonga.miuix.kmp.basic.BasicComponent
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Card
@@ -54,11 +68,6 @@ import top.yukonga.miuix.kmp.theme.miuixShape
 import top.yukonga.miuix.kmp.utils.overScrollVertical
 import top.yukonga.miuix.kmp.utils.scrollEndHaptic
 import top.yukonga.miuix.kmp.window.WindowDialog
-import top.yukonga.mishka.data.model.DnsAnswer
-import top.yukonga.mishka.viewmodel.DnsQueryViewModel
-import mishka.shared.generated.resources.Res
-import mishka.shared.generated.resources.*
-import org.jetbrains.compose.resources.stringResource
 
 @Composable
 fun DnsQueryScreen(

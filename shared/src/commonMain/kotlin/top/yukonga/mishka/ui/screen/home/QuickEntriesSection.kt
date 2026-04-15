@@ -12,13 +12,20 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import mishka.shared.generated.resources.Res
+import mishka.shared.generated.resources.home_connections
+import mishka.shared.generated.resources.home_connections_subtitle
+import mishka.shared.generated.resources.home_dns
+import mishka.shared.generated.resources.home_dns_subtitle
+import mishka.shared.generated.resources.home_logs
+import mishka.shared.generated.resources.home_logs_subtitle
+import mishka.shared.generated.resources.home_providers
+import mishka.shared.generated.resources.home_providers_subtitle
+import org.jetbrains.compose.resources.stringResource
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.PressFeedbackType
-import mishka.shared.generated.resources.Res
-import mishka.shared.generated.resources.*
-import org.jetbrains.compose.resources.stringResource
 
 fun LazyListScope.quickEntriesSection(
     onNavigateLog: () -> Unit = {},

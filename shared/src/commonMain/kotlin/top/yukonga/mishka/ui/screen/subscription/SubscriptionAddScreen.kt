@@ -12,12 +12,22 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalLayoutDirection
-import top.yukonga.miuix.kmp.utils.overScrollVertical
-import top.yukonga.miuix.kmp.utils.scrollEndHaptic
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import mishka.shared.generated.resources.Res
+import mishka.shared.generated.resources.common_back
+import mishka.shared.generated.resources.common_processing
+import mishka.shared.generated.resources.subscription_create
+import mishka.shared.generated.resources.subscription_file
+import mishka.shared.generated.resources.subscription_file_summary
+import mishka.shared.generated.resources.subscription_qr
+import mishka.shared.generated.resources.subscription_qr_summary
+import mishka.shared.generated.resources.subscription_url
+import mishka.shared.generated.resources.subscription_url_summary
+import org.jetbrains.compose.resources.stringResource
+import top.yukonga.mishka.viewmodel.SubscriptionViewModel
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
@@ -29,10 +39,8 @@ import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Back
 import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
-import top.yukonga.mishka.viewmodel.SubscriptionViewModel
-import mishka.shared.generated.resources.Res
-import mishka.shared.generated.resources.*
-import org.jetbrains.compose.resources.stringResource
+import top.yukonga.miuix.kmp.utils.overScrollVertical
+import top.yukonga.miuix.kmp.utils.scrollEndHaptic
 
 /**
  * 创建配置 —— 选择添加方式（文件 / URL）

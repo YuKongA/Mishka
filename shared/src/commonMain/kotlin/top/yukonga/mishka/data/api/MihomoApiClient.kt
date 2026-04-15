@@ -20,11 +20,11 @@ import top.yukonga.mishka.data.model.ConfigPatch
 import top.yukonga.mishka.data.model.ConnectionsResponse
 import top.yukonga.mishka.data.model.DelayResult
 import top.yukonga.mishka.data.model.DnsQueryResponse
+import top.yukonga.mishka.data.model.GroupsResponse
 import top.yukonga.mishka.data.model.MihomoConfig
 import top.yukonga.mishka.data.model.MihomoVersion
-import top.yukonga.mishka.data.model.GroupsResponse
-import top.yukonga.mishka.data.model.ProxiesResponse
 import top.yukonga.mishka.data.model.ProvidersResponse
+import top.yukonga.mishka.data.model.ProxiesResponse
 import top.yukonga.mishka.data.model.ProxyNode
 import top.yukonga.mishka.data.model.RuleProvidersResponse
 import top.yukonga.mishka.data.model.RulesResponse

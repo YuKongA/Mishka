@@ -1,10 +1,12 @@
 package top.yukonga.mishka.ui.component
 
 import androidx.compose.runtime.Composable
-import top.yukonga.miuix.kmp.preference.OverlayDropdownPreference
 import mishka.shared.generated.resources.Res
-import mishka.shared.generated.resources.*
+import mishka.shared.generated.resources.common_disabled
+import mishka.shared.generated.resources.common_enabled
+import mishka.shared.generated.resources.common_not_modified
 import org.jetbrains.compose.resources.stringResource
+import top.yukonga.miuix.kmp.preference.OverlayDropdownPreference
 
 /**
  * 三态偏好组件，用于覆写设置中的三态 Boolean。

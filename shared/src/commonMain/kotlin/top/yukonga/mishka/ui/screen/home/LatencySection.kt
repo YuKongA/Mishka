@@ -28,6 +28,18 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import mishka.shared.generated.resources.Res
+import mishka.shared.generated.resources.common_cancel
+import mishka.shared.generated.resources.common_confirm
+import mishka.shared.generated.resources.common_refresh
+import mishka.shared.generated.resources.home_latency
+import mishka.shared.generated.resources.home_latency_abnormal
+import mishka.shared.generated.resources.home_latency_normal
+import mishka.shared.generated.resources.home_latency_partial
+import mishka.shared.generated.resources.home_latency_untested
+import mishka.shared.generated.resources.home_select_proxy_group
+import mishka.shared.generated.resources.home_switch
+import org.jetbrains.compose.resources.stringResource
 import top.yukonga.mishka.util.FormatUtils
 import top.yukonga.mishka.viewmodel.HomeUiState
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
@@ -41,9 +53,6 @@ import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Refresh
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.window.WindowDialog
-import mishka.shared.generated.resources.Res
-import mishka.shared.generated.resources.*
-import org.jetbrains.compose.resources.stringResource
 
 fun LazyListScope.latencySection(
     state: HomeUiState = HomeUiState(),

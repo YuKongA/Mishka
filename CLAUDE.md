@@ -46,6 +46,9 @@ Mishka/
 │   │   │   └── screen/               16 个页面（home/ proxy/ subscription/ settings/ log/ provider/ dns/ connection/）
 │   │   ├── viewmodel/                10 个 ViewModel
 │   │   └── util/                     FormatUtils
+│   ├── commonMain/composeResources/
+│   │   ├── values/strings.xml        英文默认字符串（~180 key）
+│   │   └── values-zh-rCN/strings.xml 中文字符串
 │   ├── androidMain/                  actual 实现 + AppDatabaseBuilder
 │   └── desktopMain/                  actual 桩实现 + AppDatabaseBuilder
 ├── android/src/main/
@@ -53,6 +56,9 @@ Mishka/
 │   │   ├── MainActivity.kt           应用入口
 │   │   ├── MishkaApplication.kt      全局初始化（通知渠道 + 预测性返回手势）
 │   │   └── service/                  15 个服务组件（含 ROOT 模式）
+│   ├── res/
+│   │   ├── values/strings.xml        Android 层英文字符串（通知/Tile）
+│   │   └── values-zh-rCN/strings.xml Android 层中文字符串
 │   ├── cpp/                          process_helper.c（JNI fork+exec）
 │   └── jniLibs/arm64-v8a/            libmihomo.so
 └── desktop/                          Desktop 预留入口
@@ -89,6 +95,10 @@ MainActivity → App → AppNavigation
 - **数据持久化**：Room 3.0 KMP（结构化数据）+ PlatformStorage（简单偏好设置）+ StorageKeys（key 常量）
 - **订阅管理**：Pending/Imported 两阶段编辑模型（对齐 CMFA ProfileManager）
 - **配置校验**：mihomo -t 进程完整校验（ProcessBuilder，不需要 TUN fd）
+- **国际化**：默认英文 + 中文（zh-rCN），Compose Resources `stringResource()` + Android `getString()`
+  - Compose 层：`shared/src/commonMain/composeResources/values/strings.xml`（~180 key）
+  - Android 层：`android/src/main/res/values/strings.xml`（通知/Tile/错误）
+  - 日志消息英文，代码注释中文
 
 ## 数据库架构（Room 3.0 KMP）
 
@@ -242,3 +252,7 @@ ConnectionInfo, DelayResult, DnsQuery, LogMessage, MemoryData, MihomoConfig, Pro
 - LazyColumn 必须加 `.scrollEndHaptic().overScrollVertical().nestedScroll(scrollBehavior.nestedScrollConnection)`
 - Badge：`clip(miuixShape(3.dp))` + 9.sp Bold Monospace
 - 操作 IconButton：`minHeight/minWidth = 35.dp, backgroundColor = secondaryContainer`
+- **i18n**：所有面向用户的字符串必须使用 `stringResource(Res.string.xxx)`（Compose）或 `getString(R.string.xxx)`（Android Service），禁止硬编码
+  - 新增字符串需同时添加到 `values/strings.xml`（英文）和 `values-zh-rCN/strings.xml`（中文）
+  - key 命名：`{页面}_{描述}`，通用按钮用 `common_` 前缀
+  - 日志消息用英文，代码注释保留中文

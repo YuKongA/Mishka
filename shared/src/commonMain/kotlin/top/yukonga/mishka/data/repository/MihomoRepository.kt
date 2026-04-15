@@ -11,8 +11,8 @@ import top.yukonga.mishka.data.model.LogMessage
 import top.yukonga.mishka.data.model.MemoryData
 import top.yukonga.mishka.data.model.MihomoConfig
 import top.yukonga.mishka.data.model.MihomoVersion
-import top.yukonga.mishka.data.model.ProxiesResponse
 import top.yukonga.mishka.data.model.ProvidersResponse
+import top.yukonga.mishka.data.model.ProxiesResponse
 import top.yukonga.mishka.data.model.RulesResponse
 import top.yukonga.mishka.data.model.TrafficData
 

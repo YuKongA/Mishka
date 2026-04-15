@@ -28,7 +28,7 @@ class MihomoRunner(private val context: Context) {
         isRootMode = true
         this.secret = secret
         activeSubscriptionId = subscriptionId
-        Log.i(TAG, "已接管现有 mihomo 进程: pid=$pid")
+        Log.i(TAG, "Attached to existing mihomo process: pid=$pid")
         return true
     }
 

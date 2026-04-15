@@ -30,7 +30,7 @@ object RootHelper {
     fun startAsRoot(binary: String, args: Array<String>, workDir: String, logFile: String): Int {
         val argsStr = args.joinToString(" ") { "\"$it\"" }
         val command = "cd \"$workDir\" && \"$binary\" $argsStr > \"$logFile\" 2>&1 & echo \$!"
-        Log.i(TAG, "以 root 启动: su -c \"$command\"")
+        Log.i(TAG, "Starting as root: su -c \"$command\"")
         return try {
             val process = ProcessBuilder("su", "-c", command)
                 .redirectErrorStream(true)
@@ -38,11 +38,11 @@ object RootHelper {
             val reader = process.inputStream.bufferedReader()
             val pidLine = reader.readLine()?.trim() ?: ""
             val pid = pidLine.toIntOrNull() ?: -1
-            Log.i(TAG, "mihomo 实际 PID: $pid")
+            Log.i(TAG, "mihomo actual PID: $pid")
             process.inputStream.close()
             pid
         } catch (e: Exception) {
-            Log.e(TAG, "以 root 启动失败: ${e.message}")
+            Log.e(TAG, "Failed to start as root: ${e.message}")
             -1
         }
     }
@@ -74,13 +74,13 @@ object RootHelper {
 
     fun killAsRoot(pid: Int) {
         try {
-            Log.i(TAG, "以 root 终止进程: pid=$pid")
+            Log.i(TAG, "Killing root process: pid=$pid")
             val process = ProcessBuilder("su", "-c", "kill $pid")
                 .redirectErrorStream(true)
                 .start()
             process.waitFor(3, TimeUnit.SECONDS)
         } catch (e: Exception) {
-            Log.w(TAG, "以 root 终止进程失败: ${e.message}")
+            Log.w(TAG, "Failed to kill root process: ${e.message}")
         }
     }
 

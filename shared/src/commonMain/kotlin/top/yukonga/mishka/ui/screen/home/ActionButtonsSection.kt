@@ -10,12 +10,16 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import mishka.shared.generated.resources.Res
+import mishka.shared.generated.resources.home_reload
+import mishka.shared.generated.resources.home_restart
+import mishka.shared.generated.resources.home_start
+import mishka.shared.generated.resources.home_starting_btn
+import mishka.shared.generated.resources.home_stop
+import org.jetbrains.compose.resources.stringResource
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.basic.TextButtonColors
-import mishka.shared.generated.resources.Res
-import mishka.shared.generated.resources.*
-import org.jetbrains.compose.resources.stringResource
 
 fun LazyListScope.actionButtonsSection(
     onRestart: () -> Unit = {},

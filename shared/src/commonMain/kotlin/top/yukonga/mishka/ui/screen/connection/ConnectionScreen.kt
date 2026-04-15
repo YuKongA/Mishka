@@ -34,6 +34,25 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import mishka.shared.generated.resources.Res
+import mishka.shared.generated.resources.common_back
+import mishka.shared.generated.resources.common_cancel
+import mishka.shared.generated.resources.common_close
+import mishka.shared.generated.resources.common_confirm
+import mishka.shared.generated.resources.common_search
+import mishka.shared.generated.resources.connection_active
+import mishka.shared.generated.resources.connection_close_all
+import mishka.shared.generated.resources.connection_close_all_summary
+import mishka.shared.generated.resources.connection_close_all_title
+import mishka.shared.generated.resources.connection_download_total
+import mishka.shared.generated.resources.connection_list
+import mishka.shared.generated.resources.connection_no_active
+import mishka.shared.generated.resources.connection_no_match
+import mishka.shared.generated.resources.connection_search
+import mishka.shared.generated.resources.connection_start_first
+import mishka.shared.generated.resources.connection_title
+import mishka.shared.generated.resources.connection_upload_total
+import org.jetbrains.compose.resources.stringResource
 import top.yukonga.mishka.data.model.ConnectionInfo
 import top.yukonga.mishka.util.FormatUtils
 import top.yukonga.mishka.viewmodel.ConnectionViewModel
@@ -57,9 +76,6 @@ import top.yukonga.miuix.kmp.theme.miuixShape
 import top.yukonga.miuix.kmp.utils.overScrollVertical
 import top.yukonga.miuix.kmp.utils.scrollEndHaptic
 import top.yukonga.miuix.kmp.window.WindowDialog
-import mishka.shared.generated.resources.Res
-import mishka.shared.generated.resources.*
-import org.jetbrains.compose.resources.stringResource
 
 @Composable
 fun ConnectionScreen(

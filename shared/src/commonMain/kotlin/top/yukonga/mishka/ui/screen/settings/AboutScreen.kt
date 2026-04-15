@@ -40,6 +40,15 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.flow.onEach
+import mishka.shared.generated.resources.Res
+import mishka.shared.generated.resources.about_app_version
+import mishka.shared.generated.resources.about_build_version
+import mishka.shared.generated.resources.about_info
+import mishka.shared.generated.resources.about_mihomo_version
+import mishka.shared.generated.resources.about_project
+import mishka.shared.generated.resources.about_title
+import mishka.shared.generated.resources.common_back
+import org.jetbrains.compose.resources.stringResource
 import top.yukonga.mishka.ui.component.effect.BgEffectBackground
 import top.yukonga.miuix.kmp.basic.BasicComponent
 import top.yukonga.miuix.kmp.basic.Card
@@ -68,9 +77,6 @@ import top.yukonga.miuix.kmp.shapes.SmoothRoundedCornerShape
 import top.yukonga.miuix.kmp.theme.MiuixTheme.colorScheme
 import top.yukonga.miuix.kmp.utils.overScrollVertical
 import top.yukonga.miuix.kmp.utils.scrollEndHaptic
-import mishka.shared.generated.resources.Res
-import mishka.shared.generated.resources.*
-import org.jetbrains.compose.resources.stringResource
 
 @Composable
 fun AboutScreen(

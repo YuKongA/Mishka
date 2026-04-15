@@ -17,6 +17,23 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import mishka.shared.generated.resources.Res
+import mishka.shared.generated.resources.common_back
+import mishka.shared.generated.resources.vpn_allow_bypass
+import mishka.shared.generated.resources.vpn_allow_bypass_summary
+import mishka.shared.generated.resources.vpn_allow_ipv6
+import mishka.shared.generated.resources.vpn_allow_ipv6_summary
+import mishka.shared.generated.resources.vpn_bypass_private
+import mishka.shared.generated.resources.vpn_bypass_private_summary
+import mishka.shared.generated.resources.vpn_dns_hijacking
+import mishka.shared.generated.resources.vpn_dns_hijacking_summary
+import mishka.shared.generated.resources.vpn_settings_title
+import mishka.shared.generated.resources.vpn_system_proxy
+import mishka.shared.generated.resources.vpn_system_proxy_summary
+import mishka.shared.generated.resources.vpn_tunnel
+import org.jetbrains.compose.resources.stringResource
+import top.yukonga.mishka.platform.PlatformStorage
+import top.yukonga.mishka.platform.StorageKeys
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
@@ -30,11 +47,6 @@ import top.yukonga.miuix.kmp.preference.SwitchPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.overScrollVertical
 import top.yukonga.miuix.kmp.utils.scrollEndHaptic
-import top.yukonga.mishka.platform.PlatformStorage
-import top.yukonga.mishka.platform.StorageKeys
-import mishka.shared.generated.resources.Res
-import mishka.shared.generated.resources.*
-import org.jetbrains.compose.resources.stringResource
 
 @Composable
 fun VpnSettingsScreen(

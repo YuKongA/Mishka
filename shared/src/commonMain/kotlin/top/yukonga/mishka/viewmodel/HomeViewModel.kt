@@ -11,11 +11,11 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.launch
 import top.yukonga.mishka.data.api.MihomoApiClient
 import top.yukonga.mishka.data.api.MihomoWebSocket
+import top.yukonga.mishka.data.model.ConfigPatch
 import top.yukonga.mishka.data.model.MemoryData
+import top.yukonga.mishka.data.model.MihomoConfig
 import top.yukonga.mishka.data.model.SubscriptionInfo
 import top.yukonga.mishka.data.model.TrafficData
-import top.yukonga.mishka.data.model.ConfigPatch
-import top.yukonga.mishka.data.model.MihomoConfig
 import top.yukonga.mishka.data.model.TunPatch
 import top.yukonga.mishka.data.repository.MihomoRepository
 import top.yukonga.mishka.platform.PlatformSystemInfo

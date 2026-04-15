@@ -21,6 +21,29 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import mishka.shared.generated.resources.Res
+import mishka.shared.generated.resources.common_back
+import mishka.shared.generated.resources.common_cleared
+import mishka.shared.generated.resources.common_items_count
+import mishka.shared.generated.resources.common_not_modified
+import mishka.shared.generated.resources.meta_basic
+import mishka.shared.generated.resources.meta_find_process_mode
+import mishka.shared.generated.resources.meta_geodata_mode
+import mishka.shared.generated.resources.meta_settings_title
+import mishka.shared.generated.resources.meta_sniffer
+import mishka.shared.generated.resources.meta_sniffer_enable
+import mishka.shared.generated.resources.meta_sniffer_force_dns_mapping
+import mishka.shared.generated.resources.meta_sniffer_force_domain
+import mishka.shared.generated.resources.meta_sniffer_override_dest
+import mishka.shared.generated.resources.meta_sniffer_parse_pure_ip
+import mishka.shared.generated.resources.meta_sniffer_skip_domain
+import mishka.shared.generated.resources.meta_tcp_concurrent
+import mishka.shared.generated.resources.meta_unified_delay
+import org.jetbrains.compose.resources.stringResource
+import top.yukonga.mishka.data.repository.OverrideStorageHelper
+import top.yukonga.mishka.ui.component.ListEditDialog
+import top.yukonga.mishka.ui.component.TriStatePreference
+import top.yukonga.mishka.viewmodel.OverrideSettingsViewModel
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
@@ -35,13 +58,6 @@ import top.yukonga.miuix.kmp.preference.OverlayDropdownPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.overScrollVertical
 import top.yukonga.miuix.kmp.utils.scrollEndHaptic
-import top.yukonga.mishka.data.repository.OverrideStorageHelper
-import top.yukonga.mishka.ui.component.ListEditDialog
-import top.yukonga.mishka.ui.component.TriStatePreference
-import top.yukonga.mishka.viewmodel.OverrideSettingsViewModel
-import mishka.shared.generated.resources.Res
-import mishka.shared.generated.resources.*
-import org.jetbrains.compose.resources.stringResource
 
 @Composable
 fun MetaSettingsScreen(

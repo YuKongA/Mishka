@@ -1,7 +1,6 @@
 package top.yukonga.mishka.platform
 
 import android.Manifest
-import android.content.Context
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import kotlinx.coroutines.Dispatchers

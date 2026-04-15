@@ -17,15 +17,18 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import mishka.shared.generated.resources.Res
+import mishka.shared.generated.resources.home_subscription
+import mishka.shared.generated.resources.home_system
+import mishka.shared.generated.resources.home_total
+import mishka.shared.generated.resources.home_used
+import org.jetbrains.compose.resources.stringResource
 import top.yukonga.mishka.util.FormatUtils
 import top.yukonga.mishka.viewmodel.HomeUiState
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.theme.miuixShape
-import mishka.shared.generated.resources.Res
-import mishka.shared.generated.resources.*
-import org.jetbrains.compose.resources.stringResource
 
 fun LazyListScope.bottomCardsSection(
     state: HomeUiState = HomeUiState(),

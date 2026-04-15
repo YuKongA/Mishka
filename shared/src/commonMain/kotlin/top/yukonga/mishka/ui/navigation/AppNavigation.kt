@@ -38,6 +38,12 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
+import mishka.shared.generated.resources.Res
+import mishka.shared.generated.resources.nav_home
+import mishka.shared.generated.resources.nav_proxy
+import mishka.shared.generated.resources.nav_settings
+import mishka.shared.generated.resources.nav_subscription
+import org.jetbrains.compose.resources.stringResource
 import top.yukonga.mishka.platform.BootStartManager
 import top.yukonga.mishka.platform.FilePicker
 import top.yukonga.mishka.platform.PlatformStorage
@@ -78,9 +84,6 @@ import top.yukonga.miuix.kmp.icon.extended.Settings
 import top.yukonga.miuix.kmp.icon.extended.Sidebar
 import top.yukonga.miuix.kmp.icon.extended.Tune
 import top.yukonga.miuix.kmp.icon.extended.UploadCloud
-import mishka.shared.generated.resources.Res
-import mishka.shared.generated.resources.*
-import org.jetbrains.compose.resources.stringResource
 import kotlin.math.abs
 
 val LocalMainPagerState = staticCompositionLocalOf<MainPagerState> {
@@ -146,9 +149,6 @@ fun AppNavigation(
                         onBack = { navigator.pop() },
                         onNavigateAdd = { navigator.push(Route.SubscriptionAdd) },
                         onNavigateEdit = { uuid -> navigator.push(Route.SubscriptionEdit(uuid)) },
-                        onDuplicate = { uuid ->
-                            subscriptionViewModel.duplicateSubscription(uuid)
-                        },
                     )
                 }
             }
@@ -379,9 +379,6 @@ private fun MainPage(
                         bottomPadding = bottomPadding,
                         onNavigateAdd = { navigator.push(Route.SubscriptionAdd) },
                         onNavigateEdit = { uuid -> navigator.push(Route.SubscriptionEdit(uuid)) },
-                        onDuplicate = { uuid ->
-                            subscriptionViewModel.duplicateSubscription(uuid)
-                        },
                     )
                 }
 

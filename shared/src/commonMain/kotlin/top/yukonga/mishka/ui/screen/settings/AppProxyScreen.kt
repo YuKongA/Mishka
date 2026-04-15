@@ -40,6 +40,29 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import mishka.shared.generated.resources.Res
+import mishka.shared.generated.resources.app_proxy_allow_all
+import mishka.shared.generated.resources.app_proxy_allow_all_summary
+import mishka.shared.generated.resources.app_proxy_allow_selected
+import mishka.shared.generated.resources.app_proxy_allow_selected_summary
+import mishka.shared.generated.resources.app_proxy_app_list
+import mishka.shared.generated.resources.app_proxy_deny_selected
+import mishka.shared.generated.resources.app_proxy_deny_selected_summary
+import mishka.shared.generated.resources.app_proxy_deselect_all
+import mishka.shared.generated.resources.app_proxy_export
+import mishka.shared.generated.resources.app_proxy_hide_system
+import mishka.shared.generated.resources.app_proxy_import
+import mishka.shared.generated.resources.app_proxy_invert
+import mishka.shared.generated.resources.app_proxy_mode
+import mishka.shared.generated.resources.app_proxy_no_match
+import mishka.shared.generated.resources.app_proxy_running_hint
+import mishka.shared.generated.resources.app_proxy_search
+import mishka.shared.generated.resources.app_proxy_select_all
+import mishka.shared.generated.resources.app_proxy_show_system
+import mishka.shared.generated.resources.app_proxy_title
+import mishka.shared.generated.resources.common_back
+import mishka.shared.generated.resources.common_more
+import org.jetbrains.compose.resources.stringResource
 import top.yukonga.mishka.platform.AppIcon
 import top.yukonga.mishka.platform.ProxyServiceBridge
 import top.yukonga.mishka.platform.ProxyState
@@ -51,7 +74,6 @@ import top.yukonga.mishka.ui.component.SearchStatus
 import top.yukonga.mishka.ui.util.rememberContentReady
 import top.yukonga.mishka.viewmodel.AppProxyMode
 import top.yukonga.mishka.viewmodel.AppProxyViewModel
-import top.yukonga.miuix.kmp.basic.InfiniteProgressIndicator
 import top.yukonga.miuix.kmp.basic.BasicComponent
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Checkbox
@@ -59,6 +81,7 @@ import top.yukonga.miuix.kmp.basic.DropdownImpl
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
+import top.yukonga.miuix.kmp.basic.InfiniteProgressIndicator
 import top.yukonga.miuix.kmp.basic.ListPopupColumn
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.PopupPositionProvider
@@ -74,9 +97,6 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.overScrollVertical
 import top.yukonga.miuix.kmp.utils.scrollEndHaptic
 import top.yukonga.miuix.kmp.window.WindowListPopup
-import mishka.shared.generated.resources.Res
-import mishka.shared.generated.resources.*
-import org.jetbrains.compose.resources.stringResource
 
 @Composable
 fun AppProxyScreen(
