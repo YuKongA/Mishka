@@ -233,6 +233,8 @@ class SubscriptionRepository(
     fun setActive(id: String) {
         _activeUuid.value = id
         storage.putString("active_profile_uuid", id)
+        val name = _subscriptions.value.find { it.id == id }?.name ?: ""
+        storage.putString("active_profile_name", name)
     }
 
     fun getActive(): Subscription? {

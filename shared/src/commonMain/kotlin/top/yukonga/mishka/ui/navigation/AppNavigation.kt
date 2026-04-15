@@ -24,6 +24,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberDecoratedNavEntries
@@ -37,7 +38,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
+import top.yukonga.mishka.platform.BootStartManager
 import top.yukonga.mishka.platform.FilePicker
+import top.yukonga.mishka.platform.PlatformStorage
 import top.yukonga.mishka.ui.navigation3.LocalNavigator
 import top.yukonga.mishka.ui.navigation3.Navigator
 import top.yukonga.mishka.ui.navigation3.Route
@@ -63,9 +66,9 @@ import top.yukonga.mishka.viewmodel.DnsQueryViewModel
 import top.yukonga.mishka.viewmodel.HomeUiState
 import top.yukonga.mishka.viewmodel.HomeViewModel
 import top.yukonga.mishka.viewmodel.LogViewModel
+import top.yukonga.mishka.viewmodel.OverrideSettingsViewModel
 import top.yukonga.mishka.viewmodel.ProviderViewModel
 import top.yukonga.mishka.viewmodel.ProxyViewModel
-import top.yukonga.mishka.viewmodel.OverrideSettingsViewModel
 import top.yukonga.mishka.viewmodel.SubscriptionViewModel
 import top.yukonga.miuix.kmp.basic.NavigationBar
 import top.yukonga.miuix.kmp.basic.NavigationBarItem
@@ -95,10 +98,11 @@ fun AppNavigation(
     overrideSettingsViewModel: OverrideSettingsViewModel? = null,
     appProxyViewModel: AppProxyViewModel? = null,
     filePicker: FilePicker? = null,
-    storage: top.yukonga.mishka.platform.PlatformStorage? = null,
-    bootStartManager: top.yukonga.mishka.platform.BootStartManager? = null,
+    storage: PlatformStorage? = null,
+    bootStartManager: BootStartManager? = null,
     mihomoVersion: String = "",
     onScanQR: ((callback: (String?) -> Unit) -> Unit)? = null,
+    onPredictiveBackChange: ((Boolean) -> Unit)? = null,
 ) {
     val backStack = remember { mutableStateListOf<NavKey>(Route.Main) }
     val navigator = remember { Navigator(backStack) }
@@ -117,7 +121,18 @@ fun AppNavigation(
     ) {
         val provider = entryProvider<NavKey> {
             entry<Route.Main> {
-                MainPage(homeViewModel, proxyViewModel, subscriptionViewModel, navigator, mainPagerState, bootStartManager, colorMode, onColorModeChange, storage)
+                MainPage(
+                    homeViewModel,
+                    proxyViewModel,
+                    subscriptionViewModel,
+                    navigator,
+                    mainPagerState,
+                    bootStartManager,
+                    colorMode,
+                    onColorModeChange,
+                    storage,
+                    onPredictiveBackChange
+                )
             }
             entry<Route.Subscription> {
                 subscriptionViewModel?.let {
@@ -252,9 +267,11 @@ fun AppNavigation(
                 }
             }
             entry<Route.About> {
+                val uriHandler = LocalUriHandler.current
                 AboutScreen(
                     onBack = { navigator.pop() },
                     mihomoVersion = mihomoVersion,
+                    onOpenUrl = { url -> uriHandler.openUri(url) },
                 )
             }
         }
@@ -288,6 +305,7 @@ private fun MainPage(
     colorMode: Int = 0,
     onColorModeChange: (Int) -> Unit = {},
     storage: top.yukonga.mishka.platform.PlatformStorage? = null,
+    onPredictiveBackChange: ((Boolean) -> Unit)? = null,
 ) {
     val homeUiState = homeViewModel?.uiState?.collectAsState()?.value ?: HomeUiState()
     val selectedPage = mainPagerState.selectedPage
@@ -328,7 +346,6 @@ private fun MainPage(
         HorizontalPager(
             state = mainPagerState.pagerState,
             verticalAlignment = Alignment.Top,
-            userScrollEnabled = false,
             beyondViewportPageCount = 3,
         ) { page ->
             when (page) {
@@ -373,6 +390,7 @@ private fun MainPage(
                     colorMode = colorMode,
                     onColorModeChange = onColorModeChange,
                     storage = storage,
+                    onPredictiveBackChange = onPredictiveBackChange,
                 )
             }
         }

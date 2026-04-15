@@ -1,16 +1,25 @@
 package top.yukonga.mishka.service
 
+import android.app.NotificationManager
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.net.VpnService
 import android.os.Binder
 import android.os.IBinder
+import android.os.PowerManager
 import android.util.Log
 import top.yukonga.mishka.R
+import top.yukonga.mishka.data.api.MihomoApiClient
+import top.yukonga.mishka.data.api.MihomoWebSocket
+import top.yukonga.mishka.util.FormatUtils
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.launch
 import top.yukonga.mishka.platform.PlatformStorage
 import top.yukonga.mishka.platform.ProxyServiceBridge
@@ -22,6 +31,8 @@ class MishkaTunService : VpnService() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val runner by lazy { MihomoRunner(this) }
     private var tunFd: Int = -1
+    private var trafficJob: Job? = null
+    private var screenReceiver: BroadcastReceiver? = null
 
     inner class LocalBinder : Binder() {
         val service: MishkaTunService get() = this@MishkaTunService
@@ -57,8 +68,8 @@ class MishkaTunService : VpnService() {
             ProxyServiceBridge.updateState(ProxyServiceStatus(ProxyState.Starting))
 
             // 1. 建立 VPN 接口，获取 fd
+            val storage = PlatformStorage(this@MishkaTunService)
             val fd = try {
-                val storage = PlatformStorage(this@MishkaTunService)
                 Builder().apply {
                     addAddress(TUN_GATEWAY, TUN_SUBNET_PREFIX)
                     setMtu(TUN_MTU)
@@ -207,19 +218,73 @@ class MishkaTunService : VpnService() {
             }
 
             // 4. 更新通知和状态
-            val notification = NotificationHelper.buildRunningNotification(this@MishkaTunService)
-            getSystemService(android.app.NotificationManager::class.java)
-                ?.notify(NotificationHelper.NOTIFICATION_ID_VALUE, notification)
-
             ProxyServiceBridge.updateState(ProxyServiceStatus(ProxyState.Running, secret = runner.secret))
+
+            val isDynamic = storage.getString("dynamic_notification", "true") == "true"
+            if (isDynamic) {
+                startDynamicNotification(storage, runner.secret)
+            } else {
+                val notification = NotificationHelper.buildRunningNotification(this@MishkaTunService)
+                getSystemService(NotificationManager::class.java)
+                    ?.notify(NotificationHelper.NOTIFICATION_ID_VPN, notification)
+            }
             // 记录运行状态，用于开机自启判断
             PlatformStorage(this@MishkaTunService).putString("service_was_running", "true")
             Log.i(TAG, "Proxy running, fd=$fd")
         }
     }
 
+    private fun startDynamicNotification(storage: PlatformStorage, secret: String) {
+        val profileName = storage.getString("active_profile_name", "Mishka")
+        val notificationManager = getSystemService(NotificationManager::class.java)
+        val apiClient = MihomoApiClient(secret = secret)
+        val webSocket = MihomoWebSocket(apiClient)
+
+        var isScreenOn = getSystemService(PowerManager::class.java)?.isInteractive ?: true
+
+        screenReceiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context?, intent: Intent?) {
+                isScreenOn = intent?.action == Intent.ACTION_SCREEN_ON
+            }
+        }
+        registerReceiver(
+            screenReceiver,
+            IntentFilter().apply {
+                addAction(Intent.ACTION_SCREEN_ON)
+                addAction(Intent.ACTION_SCREEN_OFF)
+            },
+        )
+
+        trafficJob = scope.launch {
+            webSocket.trafficFlow()
+                .catch { Log.w(TAG, "Traffic flow error: $it") }
+                .collect { traffic ->
+                    if (!isScreenOn) return@collect
+                    val notification = NotificationHelper.buildDynamicNotification(
+                        context = this@MishkaTunService,
+                        profileName = profileName,
+                        uploadTotal = FormatUtils.formatBytes(traffic.upTotal),
+                        downloadTotal = FormatUtils.formatBytes(traffic.downTotal),
+                        uploadSpeed = FormatUtils.formatSpeed(traffic.up),
+                        downloadSpeed = FormatUtils.formatSpeed(traffic.down),
+                    )
+                    notificationManager?.notify(NotificationHelper.NOTIFICATION_ID_VPN, notification)
+                }
+        }
+    }
+
+    private fun stopDynamicNotification() {
+        trafficJob?.cancel()
+        trafficJob = null
+        screenReceiver?.let {
+            try { unregisterReceiver(it) } catch (_: Exception) {}
+        }
+        screenReceiver = null
+    }
+
     private fun stopProxy() {
         Log.i(TAG, "Stopping proxy...")
+        stopDynamicNotification()
         runner.stop()
         closeTunFd()
         ProxyServiceBridge.updateState(ProxyServiceStatus(ProxyState.Stopped))
@@ -245,6 +310,7 @@ class MishkaTunService : VpnService() {
     }
 
     override fun onDestroy() {
+        stopDynamicNotification()
         runner.stop()
         closeTunFd()
         ProxyServiceBridge.updateState(ProxyServiceStatus(ProxyState.Stopped))

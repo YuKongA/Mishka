@@ -39,6 +39,7 @@ fun App(
     bootStartManager: BootStartManager? = null,
     mihomoVersion: String = "",
     onScanQR: ((callback: (String?) -> Unit) -> Unit)? = null,
+    onPredictiveBackChange: ((Boolean) -> Unit)? = null,
 ) {
     val controller = remember(colorMode) {
         when (colorMode) {
@@ -72,6 +73,7 @@ fun App(
                 bootStartManager = bootStartManager,
                 mihomoVersion = mihomoVersion,
                 onScanQR = onScanQR,
+                onPredictiveBackChange = onPredictiveBackChange,
             )
         }
     }

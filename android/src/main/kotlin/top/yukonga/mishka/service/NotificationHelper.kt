@@ -88,6 +88,35 @@ object NotificationHelper {
         return buildNotification(context, "Mishka 运行中", "模式: $mode")
     }
 
+    fun buildDynamicNotification(
+        context: Context,
+        profileName: String,
+        uploadTotal: String,
+        downloadTotal: String,
+        uploadSpeed: String,
+        downloadSpeed: String,
+    ): Notification {
+        val intent = Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP
+        }
+        val pendingIntent = PendingIntent.getActivity(
+            context, 0, intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+
+        return Notification.Builder(context, CHANNEL_VPN)
+            .setContentTitle("$profileName • $uploadTotal↑ $downloadTotal↓")
+            .setContentText("$uploadSpeed↑ $downloadSpeed↓")
+            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setContentIntent(pendingIntent)
+            .setOngoing(true)
+            .setOnlyAlertOnce(true)
+            .setShowWhen(false)
+            .setCategory(Notification.CATEGORY_SERVICE)
+            .setForegroundServiceBehavior(Notification.FOREGROUND_SERVICE_IMMEDIATE)
+            .build()
+    }
+
     @Deprecated("Use NOTIFICATION_ID_VPN", ReplaceWith("NOTIFICATION_ID_VPN"))
     const val NOTIFICATION_ID_VALUE = NOTIFICATION_ID_VPN
 

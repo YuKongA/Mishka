@@ -41,10 +41,17 @@ fun SettingsScreen(
     colorMode: Int = 0,
     onColorModeChange: (Int) -> Unit = {},
     storage: PlatformStorage? = null,
+    onPredictiveBackChange: ((Boolean) -> Unit)? = null,
 ) {
     val scrollBehavior = MiuixScrollBehavior()
     var isAutoStartEnabled by remember {
         mutableStateOf(bootStartManager?.isEnabled() ?: false)
+    }
+    var isPredictiveBackEnabled by remember {
+        mutableStateOf(storage?.getString("predictive_back", "false") == "true")
+    }
+    var isDynamicNotificationEnabled by remember {
+        mutableStateOf(storage?.getString("dynamic_notification", "true") != "false")
     }
 
     val themeItems = listOf("跟随系统", "浅色模式", "深色模式")
@@ -111,6 +118,15 @@ fun SettingsScreen(
                         .padding(horizontal = 12.dp)
                         .padding(bottom = 6.dp),
                 ) {
+                    SwitchPreference(
+                        title = "动态通知",
+                        summary = "在通知栏显示实时网速和流量",
+                        checked = isDynamicNotificationEnabled,
+                        onCheckedChange = { checked ->
+                            storage?.putString("dynamic_notification", if (checked) "true" else "false")
+                            isDynamicNotificationEnabled = checked
+                        },
+                    )
                     if (bootStartManager != null) {
                         SwitchPreference(
                             title = "自动重启",
@@ -137,6 +153,18 @@ fun SettingsScreen(
                             storage?.putString("dark_mode", value)
                         },
                     )
+                    if (onPredictiveBackChange != null) {
+                        SwitchPreference(
+                            title = "预测性返回手势",
+                            summary = "启用预测性返回动画效果",
+                            checked = isPredictiveBackEnabled,
+                            onCheckedChange = { checked ->
+                                storage?.putString("predictive_back", if (checked) "true" else "false")
+                                isPredictiveBackEnabled = checked
+                                onPredictiveBackChange(checked)
+                            },
+                        )
+                    }
                     ArrowPreference(
                         title = "关于",
                         summary = "Mishka v${misc.VersionInfo.VERSION_NAME}",

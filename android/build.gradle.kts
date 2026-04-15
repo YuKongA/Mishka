@@ -9,6 +9,7 @@ dependencies {
     implementation(projects.shared)
     implementation(libs.androidx.activity)
     implementation(libs.quickie.bundled)
+    implementation(libs.hiddenapibypass)
 }
 
 
