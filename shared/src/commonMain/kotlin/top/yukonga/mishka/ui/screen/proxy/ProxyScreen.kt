@@ -1,54 +1,73 @@
 package top.yukonga.mishka.ui.screen.proxy
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.pager.HorizontalPager
-import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.nestedScroll
-import top.yukonga.miuix.kmp.utils.overScrollVertical
-import top.yukonga.miuix.kmp.utils.scrollEndHaptic
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import kotlinx.coroutines.launch
+import io.ktor.client.HttpClient
+import io.ktor.client.request.get
+import io.ktor.client.statement.readRawBytes
+import org.jetbrains.compose.resources.decodeToImageBitmap
 import top.yukonga.mishka.viewmodel.ProxyGroupUi
 import top.yukonga.mishka.viewmodel.ProxyUiState
 import top.yukonga.mishka.viewmodel.ProxyViewModel
-import top.yukonga.miuix.kmp.basic.BasicComponent
-import top.yukonga.miuix.kmp.basic.BasicComponentDefaults
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.Scaffold
-import top.yukonga.miuix.kmp.basic.ScrollBehavior
-import top.yukonga.miuix.kmp.basic.TabRow
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TopAppBar
 import top.yukonga.miuix.kmp.icon.MiuixIcons
+import top.yukonga.miuix.kmp.icon.basic.ArrowRight
 import top.yukonga.miuix.kmp.icon.extended.Refresh
 import top.yukonga.miuix.kmp.theme.MiuixTheme
+import top.yukonga.miuix.kmp.theme.miuixShape
+import top.yukonga.miuix.kmp.utils.overScrollVertical
+import top.yukonga.miuix.kmp.utils.scrollEndHaptic
 
 @Composable
 fun ProxyScreen(
@@ -58,61 +77,26 @@ fun ProxyScreen(
 ) {
     val uiState = viewModel?.uiState?.collectAsState()?.value ?: ProxyUiState()
     val scrollBehavior = MiuixScrollBehavior()
-    val coroutineScope = rememberCoroutineScope()
-
-    val dynamicTopPadding by remember {
-        derivedStateOf { 12.dp * (1f - scrollBehavior.state.collapsedFraction) }
-    }
-
     val groups = uiState.groups
-    val tabNames = remember(groups) { groups.map { it.name } }
 
-    val pagerState = rememberPagerState(pageCount = { groups.size.coerceAtLeast(1) })
-    val tabRowHeight by remember { mutableStateOf(40.dp) }
+    var expandedGroups by remember { mutableStateOf(setOf<String>()) }
 
     Scaffold(
         modifier = modifier,
         topBar = {
             TopAppBar(
-                title = "代理",
+                title = "代理组",
                 scrollBehavior = scrollBehavior,
                 actions = {
                     if (groups.isNotEmpty()) {
                         IconButton(
-                            onClick = {
-                                val currentGroup = groups.getOrNull(pagerState.currentPage)
-                                if (currentGroup != null) {
-                                    viewModel?.testGroupDelay(currentGroup.name)
-                                }
-                            },
+                            onClick = { viewModel?.loadProxies() },
                             enabled = !uiState.isTesting,
                         ) {
                             Icon(
                                 imageVector = MiuixIcons.Refresh,
-                                contentDescription = "测速",
+                                contentDescription = "刷新",
                                 tint = MiuixTheme.colorScheme.onSurface,
-                            )
-                        }
-                    }
-                },
-                bottomContent = {
-                    if (tabNames.isNotEmpty()) {
-                        Column(
-                            modifier = Modifier
-                                .padding(horizontal = 12.dp)
-                                .padding(top = dynamicTopPadding, bottom = 6.dp),
-                        ) {
-                            TabRow(
-                                tabs = tabNames,
-                                selectedTabIndex = pagerState.currentPage.coerceIn(0, tabNames.lastIndex.coerceAtLeast(0)),
-                                onTabSelected = { index ->
-                                    coroutineScope.launch {
-                                        pagerState.animateScrollToPage(index)
-                                    }
-                                },
-                                minWidth = 120.dp,
-                                maxWidth = 200.dp,
-                                height = tabRowHeight,
                             )
                         }
                     }
@@ -141,103 +125,263 @@ fun ProxyScreen(
                 )
             }
         } else {
-            HorizontalPager(
-                state = pagerState,
-                modifier = Modifier.fillMaxSize(),
-            ) { page ->
-                val group = groups.getOrNull(page) ?: return@HorizontalPager
-                ProxyGroupPage(
-                    group = group,
-                    topPadding = innerPadding.calculateTopPadding(),
-                    bottomPadding = bottomPadding,
-                    scrollBehavior = scrollBehavior,
-                    onSelect = { proxyName ->
-                        if (group.type.lowercase() == "selector") {
-                            viewModel?.selectProxy(group.name, proxyName)
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .scrollEndHaptic()
+                    .overScrollVertical()
+                    .nestedScroll(scrollBehavior.nestedScrollConnection),
+                contentPadding = PaddingValues(
+                    top = innerPadding.calculateTopPadding(),
+                    bottom = bottomPadding,
+                ),
+            ) {
+                item(key = "proxy_groups") {
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp)
+                            .padding(top = 12.dp),
+                    ) {
+                        groups.forEach { group ->
+                            val isExpanded = group.name in expandedGroups
+
+                            ProxyGroupHeader(
+                                group = group,
+                                isExpanded = isExpanded,
+                                onToggle = {
+                                    expandedGroups = if (isExpanded) {
+                                        expandedGroups - group.name
+                                    } else {
+                                        expandedGroups + group.name
+                                    }
+                                },
+                            )
+
+                            AnimatedVisibility(
+                                visible = isExpanded,
+                                enter = expandVertically(),
+                                exit = shrinkVertically(),
+                            ) {
+                                ProxyNodeGrid(
+                                    group = group,
+                                    onSelect = { proxyName ->
+                                        if (group.type.lowercase() == "selector") {
+                                            viewModel?.selectProxy(group.name, proxyName)
+                                        }
+                                    },
+                                )
+                            }
                         }
-                    },
+                    }
+                }
+
+                item(key = "bottom_spacer") {
+                    Spacer(Modifier.navigationBarsPadding())
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ProxyGroupHeader(
+    group: ProxyGroupUi,
+    isExpanded: Boolean,
+    onToggle: () -> Unit,
+) {
+    val rotation by animateFloatAsState(
+        targetValue = if (isExpanded) 90f else 0f,
+        animationSpec = tween(300),
+    )
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onToggle)
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        // 左侧图标
+        GroupIcon(
+            icon = group.icon,
+            name = group.name,
+        )
+
+        Spacer(Modifier.width(12.dp))
+
+        // 中间：组名 + 当前节点
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = group.name,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Medium,
+                color = MiuixTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            if (group.now.isNotEmpty()) {
+                Text(
+                    text = group.now,
+                    fontSize = 12.sp,
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
         }
+
+        // 右侧：当前节点延迟 + 节点数 + 箭头
+        val nowDelay = group.delays[group.now]
+        if (nowDelay != null) {
+            val delayText = if (nowDelay < 0) "超时" else "${nowDelay}ms"
+            val delayColor = when {
+                nowDelay < 0 -> Color(0xFFE53935)
+                nowDelay < 200 -> Color(0xFF4CAF50)
+                nowDelay < 500 -> Color(0xFFFFC107)
+                else -> Color(0xFFE53935)
+            }
+            Text(
+                text = delayText,
+                fontSize = 12.sp,
+                color = delayColor,
+            )
+            Spacer(Modifier.width(8.dp))
+        }
+        Text(
+            text = "${group.all.size}",
+            fontSize = 14.sp,
+            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+        )
+        Spacer(Modifier.width(8.dp))
+        val layoutDirection = LocalLayoutDirection.current
+        Image(
+            imageVector = MiuixIcons.Basic.ArrowRight,
+            contentDescription = null,
+            modifier = Modifier
+                .size(width = 10.dp, height = 16.dp)
+                .graphicsLayer {
+                    scaleX = if (layoutDirection == LayoutDirection.Rtl) -1f else 1f
+                }
+                .rotate(rotation),
+            colorFilter = ColorFilter.tint(MiuixTheme.colorScheme.onSurfaceVariantSummary),
+        )
     }
 }
 
 @Composable
-private fun ProxyGroupPage(
+private fun GroupIcon(
+    icon: String,
+    name: String,
+) {
+    if (icon.isNotEmpty()) {
+        // 加载网络图标
+        var bitmap by remember(icon) { mutableStateOf<ImageBitmap?>(null) }
+
+        LaunchedEffect(icon) {
+            try {
+                val client = HttpClient()
+                val bytes = client.get(icon).readRawBytes()
+                client.close()
+                bitmap = bytes.decodeToImageBitmap()
+            } catch (_: Exception) {
+                // 加载失败，保持 null，显示默认图标
+            }
+        }
+
+        if (bitmap != null) {
+            Image(
+                bitmap = bitmap!!,
+                contentDescription = name,
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(miuixShape(8.dp)),
+            )
+        } else {
+            DefaultGroupIcon(name)
+        }
+    } else {
+        DefaultGroupIcon(name)
+    }
+}
+
+@Composable
+private fun DefaultGroupIcon(name: String) {
+    Box(
+        modifier = Modifier
+            .size(36.dp)
+            .clip(miuixShape(8.dp))
+            .background(MiuixTheme.colorScheme.primary.copy(alpha = 0.1f)),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = name.firstOrNull()?.toString() ?: "",
+            fontSize = 16.sp,
+            fontWeight = FontWeight.Bold,
+            color = MiuixTheme.colorScheme.primary.copy(0.8f),
+        )
+    }
+}
+
+@Composable
+private fun ProxyNodeGrid(
     group: ProxyGroupUi,
-    topPadding: Dp,
-    bottomPadding: Dp,
-    scrollBehavior: ScrollBehavior,
     onSelect: (String) -> Unit,
 ) {
-    LazyColumn(
+    val isDark = isSystemInDarkTheme()
+
+    Column(
         modifier = Modifier
-            .fillMaxSize()
-            .scrollEndHaptic()
-            .overScrollVertical()
-            .nestedScroll(scrollBehavior.nestedScrollConnection),
-        contentPadding = PaddingValues(
-            top = topPadding,
-            bottom = bottomPadding,
-        ),
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp)
+            .padding(bottom = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        if (group.all.isEmpty()) {
-            item(key = "empty") {
-                Column(
-                    modifier = Modifier.fillParentMaxSize(),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center,
-                ) {
-                    Text(
-                        text = "该组暂无节点",
-                        fontSize = 16.sp,
-                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+        group.all.chunked(2).forEach { row ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                row.forEach { proxyName ->
+                    val isSelected = proxyName == group.now
+                    val delay = group.delays[proxyName]
+                    val nodeType = group.nodeTypes[proxyName] ?: ""
+                    val isSelectable = group.type.lowercase() == "selector"
+
+                    ProxyNodeCard(
+                        name = proxyName,
+                        type = nodeType,
+                        delay = delay,
+                        isSelected = isSelected,
+                        isSelectable = isSelectable,
+                        isDark = isDark,
+                        onClick = { onSelect(proxyName) },
+                        modifier = Modifier.weight(1f),
                     )
                 }
-            }
-        } else {
-            item(key = "nodes") {
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 12.dp)
-                        .padding(top = 6.dp),
-                ) {
-                    group.all.forEach { proxyName ->
-                        val isSelected = proxyName == group.now
-                        val delay = group.delays[proxyName]
-                        val isSelectable = group.type.lowercase() == "selector"
-
-                        ProxyNodeItem(
-                            name = proxyName,
-                            isSelected = isSelected,
-                            delay = delay,
-                            isSelectable = isSelectable,
-                            onClick = { onSelect(proxyName) },
-                        )
-                    }
+                if (row.size == 1) {
+                    Spacer(Modifier.weight(1f))
                 }
-            }
-
-            item(key = "bottom_spacer") {
-                androidx.compose.foundation.layout.Spacer(Modifier.navigationBarsPadding())
             }
         }
     }
 }
 
 @Composable
-private fun ProxyNodeItem(
+private fun ProxyNodeCard(
     name: String,
-    isSelected: Boolean,
+    type: String,
     delay: Int?,
+    isSelected: Boolean,
     isSelectable: Boolean,
+    isDark: Boolean,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val delayText = when {
         delay == null -> null
         delay < 0 -> "超时"
-        else -> "${delay}ms"
+        else -> "$delay"
     }
     val delayColor = when {
         delay == null -> Color(0xFF9E9E9E)
@@ -247,33 +391,68 @@ private fun ProxyNodeItem(
         else -> Color(0xFFE53935)
     }
 
-    BasicComponent(
-        title = name,
-        titleColor = if (isSelected) {
-            BasicComponentDefaults.titleColor(color = MiuixTheme.colorScheme.primary)
-        } else {
-            BasicComponentDefaults.titleColor()
-        },
-        startAction = if (isSelected) {
-            {
+    val backgroundColor = if (isSelected) {
+        if (isDark) Color(0xFF1A3040) else Color(0xFFE3F2FD)
+    } else {
+        MiuixTheme.colorScheme.surfaceVariant
+    }
+
+    Box(
+        modifier = modifier
+            .clip(miuixShape(12.dp))
+            .background(backgroundColor)
+            .then(
+                if (isSelectable) Modifier.clickable(onClick = onClick) else Modifier
+            )
+            .padding(12.dp),
+    ) {
+        Column {
+            // 第一行：节点名 + 延迟
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = name,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = MiuixTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false),
+                )
+                if (delayText != null) {
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        text = delayText,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = delayColor,
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(6.dp))
+
+            // 第二行：协议类型 Badge
+            if (type.isNotEmpty()) {
                 Box(
                     modifier = Modifier
-                        .padding(end = 10.dp)
-                        .size(8.dp)
-                        .clip(CircleShape)
-                        .background(MiuixTheme.colorScheme.primary),
-                )
+                        .clip(miuixShape(3.dp))
+                        .background(MiuixTheme.colorScheme.onSurface.copy(alpha = 0.08f))
+                        .padding(horizontal = 5.dp, vertical = 1.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = type,
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Monospace,
+                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                    )
+                }
             }
-        } else null,
-        endActions = if (delayText != null) {
-            {
-                Text(
-                    text = delayText,
-                    fontSize = 13.sp,
-                    color = delayColor,
-                )
-            }
-        } else null,
-        onClick = if (isSelectable) onClick else null,
-    )
+        }
+    }
 }

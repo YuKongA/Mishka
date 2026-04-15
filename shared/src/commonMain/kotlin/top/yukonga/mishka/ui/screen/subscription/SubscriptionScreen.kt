@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.Composable
@@ -21,13 +22,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
-import top.yukonga.miuix.kmp.utils.overScrollVertical
-import top.yukonga.miuix.kmp.utils.scrollEndHaptic
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import top.yukonga.mishka.data.model.Subscription
+import top.yukonga.mishka.util.FormatUtils
+import top.yukonga.mishka.viewmodel.SubscriptionViewModel
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
 import top.yukonga.miuix.kmp.basic.Icon
@@ -45,9 +47,8 @@ import top.yukonga.miuix.kmp.icon.extended.Refresh
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.theme.miuixShape
 import top.yukonga.miuix.kmp.utils.PressFeedbackType
-import top.yukonga.mishka.data.model.Subscription
-import top.yukonga.mishka.util.FormatUtils
-import top.yukonga.mishka.viewmodel.SubscriptionViewModel
+import top.yukonga.miuix.kmp.utils.overScrollVertical
+import top.yukonga.miuix.kmp.utils.scrollEndHaptic
 
 /**
  * 订阅列表页面
@@ -211,29 +212,44 @@ private fun SubscriptionItem(
             )
         }
 
-        if (subscription.total > 0) {
-            val used = subscription.upload + subscription.download
-            Text(
-                text = "已用 ${FormatUtils.formatBytes(used)} / ${FormatUtils.formatBytes(subscription.total)}",
-                modifier = Modifier.padding(top = 2.dp),
-                fontSize = 12.sp,
-                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-            )
-        }
-
-        if (subscription.updatedAt > 0) {
-            Text(
-                text = "更新于 ${formatTime(subscription.updatedAt)}",
-                modifier = Modifier.padding(top = 2.dp),
-                fontSize = 12.sp,
-                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-            )
-        }
-
         HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
 
         Row {
+
+            Column(
+                modifier = Modifier.wrapContentSize()
+            ) {
+                if (subscription.total > 0) {
+                    val used = subscription.upload + subscription.download
+                    Text(
+                        text = "已用 ${FormatUtils.formatBytes(used)} / ${FormatUtils.formatBytes(subscription.total)}",
+                        modifier = Modifier.padding(top = 2.dp),
+                        fontSize = 12.sp,
+                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                    )
+                } else {
+                    Text(
+                        text = "未获取到流量信息",
+                        modifier = Modifier.padding(top = 2.dp),
+                        fontSize = 12.sp,
+                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                    )
+                }
+
+                Spacer(Modifier.weight(1f))
+
+                if (subscription.updatedAt > 0) {
+                    Text(
+                        text = "更新于 ${formatTime(subscription.updatedAt)}",
+                        modifier = Modifier.padding(top = 2.dp),
+                        fontSize = 12.sp,
+                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                    )
+                }
+            }
+
             Spacer(Modifier.weight(1f))
+
             IconButton(
                 onClick = onRefresh,
                 enabled = !isLoading,

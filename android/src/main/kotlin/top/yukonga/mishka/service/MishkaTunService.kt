@@ -68,22 +68,25 @@ class MishkaTunService : VpnService() {
                     // 应用代理设置
                     val storage = PlatformStorage(this@MishkaTunService)
                     val proxyMode = storage.getString("app_proxy_mode", "AllowAll")
-                    val packagesStr = storage.getString("app_proxy_packages", "")
-                    val packages = if (packagesStr.isBlank()) emptySet()
-                    else packagesStr.split(",").filter { it.isNotBlank() }.toSet()
+                    val packages = storage.getStringSet("app_proxy_packages", emptySet())
 
                     when (proxyMode) {
                         "AllowSelected" -> {
-                            // 仅允许选中应用经过代理
+                            // 白名单模式：允许选中应用 + 自身（自身必须在白名单内才能连接 mihomo API）
+                            addAllowedApplication(packageName)
                             packages.forEach { pkg ->
-                                try { addAllowedApplication(pkg) } catch (_: Exception) {}
+                                if (pkg != packageName) {
+                                    try { addAllowedApplication(pkg) } catch (_: Exception) {}
+                                }
                             }
                         }
                         "DenySelected" -> {
-                            // 排除选中应用 + 排除自身
+                            // 黑名单模式：排除选中应用 + 排除自身
                             addDisallowedApplication(packageName)
                             packages.forEach { pkg ->
-                                try { addDisallowedApplication(pkg) } catch (_: Exception) {}
+                                if (pkg != packageName) {
+                                    try { addDisallowedApplication(pkg) } catch (_: Exception) {}
+                                }
                             }
                         }
                         else -> {

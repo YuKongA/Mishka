@@ -24,16 +24,21 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.state.ToggleableState
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import top.yukonga.mishka.platform.AppIcon
+import top.yukonga.mishka.platform.ProxyServiceBridge
+import top.yukonga.mishka.platform.ProxyState
 import top.yukonga.mishka.ui.component.ListPopupDefaults.MenuPositionProvider
 import top.yukonga.mishka.ui.component.SearchBarFake
 import top.yukonga.mishka.ui.component.SearchBox
@@ -71,9 +76,12 @@ fun AppProxyScreen(
     bottomPadding: Dp = 0.dp,
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val proxyState by ProxyServiceBridge.state.collectAsState()
+    val isProxyRunning = proxyState.state == ProxyState.Running || proxyState.state == ProxyState.Starting
     val scrollBehavior = MiuixScrollBehavior()
     val showPopup = remember { mutableStateOf(false) }
     val density = LocalDensity.current
+    val clipboardManager = LocalClipboardManager.current
 
     var searchStatus by remember { mutableStateOf(SearchStatus(label = "搜索应用")) }
 
@@ -136,7 +144,7 @@ fun AppProxyScreen(
                             ListPopupColumn {
                                 DropdownImpl(
                                     text = "全选",
-                                    optionSize = 4,
+                                    optionSize = 6,
                                     isSelected = false,
                                     index = 0,
                                     onSelectedIndexChange = {
@@ -146,7 +154,7 @@ fun AppProxyScreen(
                                 )
                                 DropdownImpl(
                                     text = "全不选",
-                                    optionSize = 4,
+                                    optionSize = 6,
                                     isSelected = false,
                                     index = 1,
                                     onSelectedIndexChange = {
@@ -156,7 +164,7 @@ fun AppProxyScreen(
                                 )
                                 DropdownImpl(
                                     text = "反选",
-                                    optionSize = 4,
+                                    optionSize = 6,
                                     isSelected = false,
                                     index = 2,
                                     onSelectedIndexChange = {
@@ -171,11 +179,42 @@ fun AppProxyScreen(
                                 )
                                 DropdownImpl(
                                     text = if (uiState.showSystemApps) "隐藏系统应用" else "显示系统应用",
-                                    optionSize = 4,
+                                    optionSize = 6,
                                     isSelected = uiState.showSystemApps,
                                     index = 3,
                                     onSelectedIndexChange = {
                                         viewModel.setShowSystemApps(!uiState.showSystemApps)
+                                        showPopup.value = false
+                                    },
+                                )
+                                HorizontalDivider(
+                                    modifier = Modifier
+                                        .padding(horizontal = 20.dp)
+                                        .fillMaxWidth(),
+                                )
+                                DropdownImpl(
+                                    text = "导入",
+                                    optionSize = 6,
+                                    isSelected = false,
+                                    index = 4,
+                                    onSelectedIndexChange = {
+                                        val text = clipboardManager.getText()?.text
+                                        if (!text.isNullOrBlank()) {
+                                            viewModel.importPackages(text)
+                                        }
+                                        showPopup.value = false
+                                    },
+                                )
+                                DropdownImpl(
+                                    text = "导出",
+                                    optionSize = 6,
+                                    isSelected = false,
+                                    index = 5,
+                                    onSelectedIndexChange = {
+                                        val exported = viewModel.exportPackages()
+                                        if (exported.isNotEmpty()) {
+                                            clipboardManager.setText(AnnotatedString(exported))
+                                        }
                                         showPopup.value = false
                                     },
                                 )
@@ -281,6 +320,24 @@ fun AppProxyScreen(
                     bottom = bottomPadding,
                 ),
             ) {
+                // 运行中提示
+                if (isProxyRunning) {
+                    item(key = "running_hint") {
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 12.dp, vertical = 6.dp),
+                            insideMargin = PaddingValues(16.dp),
+                        ) {
+                            Text(
+                                text = "修改将在重启代理后生效",
+                                fontSize = 13.sp,
+                                color = Color(0xFFFFA726),
+                            )
+                        }
+                    }
+                }
+
                 // 代理模式
                 item(key = "mode_title") { SmallTitle(text = "代理模式") }
                 item(key = "mode_card") {
@@ -372,7 +429,7 @@ private fun AppItem(
         startAction = {
             AppIcon(
                 packageName = packageName,
-                modifier = Modifier.padding(end = 12.dp),
+                modifier = Modifier.padding(end = 6.dp),
                 size = 40.dp,
             )
         },

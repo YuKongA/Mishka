@@ -14,6 +14,8 @@ data class ProxyGroupUi(
     val now: String = "",
     val all: List<String> = emptyList(),
     val delays: Map<String, Int> = emptyMap(),
+    val nodeTypes: Map<String, String> = emptyMap(),
+    val icon: String = "",
 )
 
 data class ProxyUiState(
@@ -63,11 +65,23 @@ class ProxyViewModel : ViewModel() {
                     .sortedBy { orderMap[it.name] ?: Int.MAX_VALUE }
                     .map { node ->
                         val delays = mutableMapOf<String, Int>()
+                        val nodeTypes = mutableMapOf<String, String>()
                         node.all.forEach { proxyName ->
                             val proxy = allProxies[proxyName]
                             val lastDelay = proxy?.history?.lastOrNull()?.delay
                             if (lastDelay != null && lastDelay > 0) {
                                 delays[proxyName] = lastDelay
+                            } else if (proxy != null && proxy.now.isNotEmpty()) {
+                                // 子组（URLTest/Selector/Fallback）自身可能没有 history，
+                                // 取其当前选中节点的延迟
+                                val nowProxy = allProxies[proxy.now]
+                                val nowDelay = nowProxy?.history?.lastOrNull()?.delay
+                                if (nowDelay != null && nowDelay > 0) {
+                                    delays[proxyName] = nowDelay
+                                }
+                            }
+                            if (proxy != null && proxy.type.isNotEmpty()) {
+                                nodeTypes[proxyName] = proxy.type
                             }
                         }
                         ProxyGroupUi(
@@ -76,6 +90,8 @@ class ProxyViewModel : ViewModel() {
                             now = node.now,
                             all = node.all,
                             delays = delays,
+                            nodeTypes = nodeTypes,
+                            icon = node.icon,
                         )
                     }
                 _uiState.value = _uiState.value.copy(

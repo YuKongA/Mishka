@@ -38,9 +38,7 @@ class AppProxyViewModel(
         val modeStr = storage.getString("app_proxy_mode", "AllowAll")
         val mode = try { AppProxyMode.valueOf(modeStr) } catch (_: Exception) { AppProxyMode.AllowAll }
 
-        val packagesStr = storage.getString("app_proxy_packages", "")
-        val packages = if (packagesStr.isBlank()) emptySet()
-        else packagesStr.split(",").filter { it.isNotBlank() }.toSet()
+        val packages = storage.getStringSet("app_proxy_packages", emptySet())
 
         _uiState.value = _uiState.value.copy(mode = mode, selectedPackages = packages)
     }
@@ -113,8 +111,17 @@ class AppProxyViewModel(
         _uiState.value = _uiState.value.copy(showSystemApps = show)
     }
 
+    fun exportPackages(): String {
+        return _uiState.value.selectedPackages.sorted().joinToString("\n")
+    }
+
+    fun importPackages(text: String) {
+        val packages = text.lines().map { it.trim() }.filter { it.isNotEmpty() }.toSet()
+        _uiState.value = _uiState.value.copy(selectedPackages = packages)
+        savePackages(packages)
+    }
+
     private fun savePackages(packages: Set<String>) {
-        // 简单用逗号分隔序列化，避免复杂的序列化依赖
-        storage.putString("app_proxy_packages", packages.joinToString(","))
+        storage.putStringSet("app_proxy_packages", packages)
     }
 }

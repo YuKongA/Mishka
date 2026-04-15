@@ -13,6 +13,7 @@ data class ProxyNode(
     val udp: Boolean = false,
     val xudp: Boolean = false,
     val tfo: Boolean = false,
+    val icon: String = "",
 )
 
 @Serializable

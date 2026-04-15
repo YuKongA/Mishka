@@ -14,4 +14,23 @@ actual class PlatformStorage(context: Context) {
     actual fun putString(key: String, value: String) {
         prefs.edit { putString(key, value) }
     }
+
+    actual fun getStringSet(key: String, default: Set<String>): Set<String> {
+        return try {
+            prefs.getStringSet(key, default) ?: default
+        } catch (_: ClassCastException) {
+            // 兼容旧版逗号分隔 String 格式，读取后自动迁移为 StringSet
+            val raw = prefs.getString(key, null) ?: return default
+            val migrated = raw.split(",").filter { it.isNotBlank() }.toSet()
+            prefs.edit {
+                remove(key)
+                putStringSet(key, migrated)
+            }
+            migrated
+        }
+    }
+
+    actual fun putStringSet(key: String, value: Set<String>) {
+        prefs.edit { putStringSet(key, value) }
+    }
 }
