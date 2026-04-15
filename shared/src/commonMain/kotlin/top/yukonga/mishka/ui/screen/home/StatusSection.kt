@@ -1,6 +1,5 @@
 package top.yukonga.mishka.ui.screen.home
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -17,7 +16,6 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyListScope
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CheckCircleOutline
 import androidx.compose.runtime.Composable
@@ -27,7 +25,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -111,42 +108,27 @@ private fun StatusContent(
                         .fillMaxSize()
                         .padding(all = 16.dp),
                 ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(10.dp)
-                                .clip(CircleShape)
-                                .background(
-                                    if (isStarting) Color(0xFFFFA726)
-                                    else if (isRunning) Color(0xFF4CAF50)
-                                    else Color(0xFFE53935)
-                                ),
-                        )
-                        Text(
-                            text = if (isStarting) "启动中..." else if (isRunning) "运行中" else "已停止",
-                            fontSize = 20.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = if (isStarting) {
-                                if (isDark) Color(0xFFFFCC80) else Color(0xFFE65100)
-                            } else if (isRunning) {
-                                if (isDark) Color(0xFF81C784) else Color(0xFF4CAF50)
-                            } else {
-                                if (isDark) Color(0xFFEF9A9A) else Color(0xFFE53935)
-                            },
-                        )
-                    }
+                    Text(
+                        text = if (isStarting) "启动中" else if (isRunning) "运行中" else "已停止",
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = if (isStarting) {
+                            if (isDark) Color(0xFFFFCC80) else Color(0xFFE65100)
+                        } else if (isRunning) {
+                            if (isDark) Color(0xFF81C784) else Color(0xFF4CAF50)
+                        } else {
+                            if (isDark) Color(0xFFEF9A9A) else Color(0xFFE53935)
+                        },
+                    )
                     Spacer(Modifier.height(2.dp))
                     Text(
-                        text = state.uptime,
+                        text = state.version,
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Medium,
                         color = if (isDark) Color(0xFFAAAAAA) else Color(0xFF666666),
                     )
                     Text(
-                        text = state.version.ifEmpty { "" },
+                        text = state.uptime,
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Medium,
                         color = if (isDark) Color(0xFFAAAAAA) else Color(0xFF666666),

@@ -1,0 +1,109 @@
+package top.yukonga.mishka.service
+
+import android.content.Context
+import java.io.File
+
+/**
+ * 订阅文件操作：两阶段目录结构（imported/pending/processing）的文件管理。
+ * 从 ConfigGenerator 拆分，专注于订阅配置文件的 CRUD 和生命周期。
+ */
+object ProfileFileOps {
+
+    private fun getWorkDir(context: Context): File {
+        val dir = File(context.filesDir, "mihomo")
+        if (!dir.exists()) dir.mkdirs()
+        return dir
+    }
+
+    // === 目录访问 ===
+
+    fun getImportedDir(context: Context, uuid: String): File {
+        val dir = File(getWorkDir(context), "imported/$uuid")
+        if (!dir.exists()) dir.mkdirs()
+        return dir
+    }
+
+    fun getPendingDir(context: Context, uuid: String): File {
+        val dir = File(getWorkDir(context), "pending/$uuid")
+        if (!dir.exists()) dir.mkdirs()
+        return dir
+    }
+
+    fun getProcessingDir(context: Context): File {
+        val dir = File(getWorkDir(context), "processing")
+        if (!dir.exists()) dir.mkdirs()
+        return dir
+    }
+
+    fun getSubscriptionDir(context: Context, uuid: String): File =
+        getImportedDir(context, uuid)
+
+    fun getSubscriptionConfigFile(context: Context, uuid: String): File =
+        File(getImportedDir(context, uuid), "config.yaml")
+
+    // === 配置保存 ===
+
+    fun saveSubscriptionConfig(context: Context, uuid: String, content: String): File {
+        val dir = getImportedDir(context, uuid)
+        val file = File(dir, "config.yaml")
+        file.writeText(content)
+        return file
+    }
+
+    fun savePendingConfig(context: Context, uuid: String, content: String): File {
+        val dir = getPendingDir(context, uuid)
+        val file = File(dir, "config.yaml")
+        file.writeText(content)
+        return file
+    }
+
+    // === 两阶段文件操作 ===
+
+    fun commitPendingToImported(context: Context, uuid: String) {
+        val pending = getPendingDir(context, uuid)
+        val imported = getImportedDir(context, uuid)
+        if (pending.exists()) {
+            imported.deleteRecursively()
+            pending.copyRecursively(imported, overwrite = true)
+            pending.deleteRecursively()
+        }
+    }
+
+    fun releasePending(context: Context, uuid: String) {
+        val pending = File(getWorkDir(context), "pending/$uuid")
+        if (pending.exists()) pending.deleteRecursively()
+    }
+
+    fun deleteProfileDirs(context: Context, uuid: String) {
+        val imported = File(getWorkDir(context), "imported/$uuid")
+        val pending = File(getWorkDir(context), "pending/$uuid")
+        if (imported.exists()) imported.deleteRecursively()
+        if (pending.exists()) pending.deleteRecursively()
+    }
+
+    fun cloneImportedToPending(context: Context, sourceUuid: String, targetUuid: String) {
+        val source = getImportedDir(context, sourceUuid)
+        val target = getPendingDir(context, targetUuid)
+        if (source.exists()) {
+            source.copyRecursively(target, overwrite = true)
+        }
+    }
+
+    // === 迁移 ===
+
+    fun migrateProfileDirs(context: Context) {
+        val oldProfilesDir = File(getWorkDir(context), "profiles")
+        if (!oldProfilesDir.exists()) return
+        val importedBaseDir = File(getWorkDir(context), "imported")
+        importedBaseDir.mkdirs()
+        oldProfilesDir.listFiles()?.forEach { subDir ->
+            if (subDir.isDirectory) {
+                val target = File(importedBaseDir, subDir.name)
+                if (!target.exists()) {
+                    subDir.copyRecursively(target, overwrite = true)
+                }
+            }
+        }
+        oldProfilesDir.deleteRecursively()
+    }
+}

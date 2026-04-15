@@ -36,7 +36,7 @@ class MihomoRunner(private val context: Context) {
         val configFile = ConfigGenerator.getConfigFile(context)
 
         val workDir = if (subscriptionId != null) {
-            ConfigGenerator.getSubscriptionDir(context, subscriptionId)
+            ProfileFileOps.getSubscriptionDir(context, subscriptionId)
         } else {
             ConfigGenerator.getWorkDir(context)
         }

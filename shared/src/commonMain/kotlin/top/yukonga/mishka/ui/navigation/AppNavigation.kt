@@ -54,6 +54,7 @@ import top.yukonga.mishka.ui.screen.settings.NetworkSettingsScreen
 import top.yukonga.mishka.ui.screen.settings.SettingsScreen
 import top.yukonga.mishka.ui.screen.subscription.SubscriptionAddScreen
 import top.yukonga.mishka.ui.screen.subscription.SubscriptionAddUrlScreen
+import top.yukonga.mishka.ui.screen.subscription.SubscriptionEditScreen
 import top.yukonga.mishka.ui.screen.subscription.SubscriptionScreen
 import top.yukonga.mishka.viewmodel.AppProxyViewModel
 import top.yukonga.mishka.viewmodel.ConnectionViewModel
@@ -96,6 +97,7 @@ fun AppNavigation(
     storage: top.yukonga.mishka.platform.PlatformStorage? = null,
     bootStartManager: top.yukonga.mishka.platform.BootStartManager? = null,
     mihomoVersion: String = "",
+    onScanQR: ((callback: (String?) -> Unit) -> Unit)? = null,
 ) {
     val backStack = remember { mutableStateListOf<NavKey>(Route.Main) }
     val navigator = remember { Navigator(backStack) }
@@ -122,6 +124,10 @@ fun AppNavigation(
                         viewModel = it,
                         onBack = { navigator.pop() },
                         onNavigateAdd = { navigator.push(Route.SubscriptionAdd) },
+                        onNavigateEdit = { uuid -> navigator.push(Route.SubscriptionEdit(uuid)) },
+                        onDuplicate = { uuid ->
+                            subscriptionViewModel.duplicateSubscription(uuid)
+                        },
                     )
                 }
             }
@@ -143,6 +149,21 @@ fun AppNavigation(
                         }
                     },
                     onNavigateUrl = { navigator.push(Route.SubscriptionAddUrl) },
+                    onScanQR = if (onScanQR != null) {
+                        {
+                            onScanQR { url ->
+                                if (url != null && subscriptionViewModel != null) {
+                                    subscriptionViewModel.addSubscription(
+                                        name = "新配置",
+                                        url = url,
+                                        onComplete = {
+                                            navigator.popUntil { key -> key is Route.Subscription }
+                                        },
+                                    )
+                                }
+                            }
+                        }
+                    } else null,
                 )
             }
             entry<Route.SubscriptionAddUrl> {
@@ -151,6 +172,16 @@ fun AppNavigation(
                         viewModel = it,
                         onBack = { navigator.pop() },
                         onSaved = { navigator.popUntil { key -> key is Route.Subscription } },
+                    )
+                }
+            }
+            entry<Route.SubscriptionEdit> { route ->
+                subscriptionViewModel?.let {
+                    SubscriptionEditScreen(
+                        uuid = route.uuid,
+                        viewModel = it,
+                        onBack = { navigator.pop() },
+                        onSaved = { navigator.pop() },
                     )
                 }
             }
@@ -314,6 +345,10 @@ private fun MainPage(
                         viewModel = it,
                         bottomPadding = bottomPadding,
                         onNavigateAdd = { navigator.push(Route.SubscriptionAdd) },
+                        onNavigateEdit = { uuid -> navigator.push(Route.SubscriptionEdit(uuid)) },
+                        onDuplicate = { uuid ->
+                            subscriptionViewModel.duplicateSubscription(uuid)
+                        },
                     )
                 }
 

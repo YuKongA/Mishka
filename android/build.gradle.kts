@@ -8,6 +8,7 @@ plugins {
 dependencies {
     implementation(projects.shared)
     implementation(libs.androidx.activity)
+    implementation(libs.quickie.bundled)
 }
 
 

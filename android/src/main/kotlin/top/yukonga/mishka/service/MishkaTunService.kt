@@ -215,9 +215,10 @@ class MishkaTunService : VpnService() {
         private const val TUN_GATEWAY = "198.18.0.1"
         private const val TUN_DNS = "198.18.0.2"
 
-        fun start(context: Context) {
+        fun start(context: Context, subscriptionId: String? = null) {
             val intent = Intent(context, MishkaTunService::class.java).apply {
                 action = ACTION_START
+                subscriptionId?.let { putExtra(EXTRA_SUBSCRIPTION_ID, it) }
             }
             context.startForegroundService(intent)
         }

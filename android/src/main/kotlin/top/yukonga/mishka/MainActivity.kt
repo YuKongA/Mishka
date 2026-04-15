@@ -4,6 +4,9 @@ import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.result.ActivityResultLauncher
+import io.github.g00fy2.quickie.QRResult
+import io.github.g00fy2.quickie.ScanQRCode
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -16,13 +19,13 @@ import top.yukonga.mishka.data.api.MihomoWebSocket
 import top.yukonga.mishka.data.database.DataMigration
 import top.yukonga.mishka.data.database.getAppDatabase
 import top.yukonga.mishka.data.repository.MihomoRepository
-import top.yukonga.mishka.service.MihomoValidator
 import top.yukonga.mishka.platform.FilePicker
 import top.yukonga.mishka.platform.PlatformStorage
 import top.yukonga.mishka.platform.ProxyServiceBridge
 import top.yukonga.mishka.platform.ProxyServiceController
 import top.yukonga.mishka.platform.ProxyState
-import top.yukonga.mishka.service.ConfigGenerator
+import top.yukonga.mishka.service.AndroidProfileFileManager
+import top.yukonga.mishka.service.ProfileFileOps
 import top.yukonga.mishka.platform.AppListProvider
 import top.yukonga.mishka.platform.BootStartManager
 import top.yukonga.mishka.viewmodel.AppProxyViewModel
@@ -48,19 +51,29 @@ class MainActivity : ComponentActivity() {
     private lateinit var overrideSettingsViewModel: OverrideSettingsViewModel
     private lateinit var appProxyViewModel: AppProxyViewModel
     private lateinit var filePicker: FilePicker
+    private lateinit var scanQrLauncher: ActivityResultLauncher<Nothing?>
+    private var qrResultCallback: ((String?) -> Unit)? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
+        scanQrLauncher = registerForActivityResult(ScanQRCode()) { result ->
+            val url = when (result) {
+                is QRResult.QRSuccess -> result.content.rawValue
+                else -> null
+            }
+            qrResultCallback?.invoke(url)
+            qrResultCallback = null
+        }
+
         val storage = PlatformStorage(this)
         val database = getAppDatabase(this)
         DataMigration.migrateIfNeeded(storage, database)
-        ConfigGenerator.migrateProfileDirs(this)
+        ProfileFileOps.migrateProfileDirs(this)
         top.yukonga.mishka.platform.IconDiskCache.init(this)
         serviceController = ProxyServiceController(this)
         filePicker = FilePicker(this)
-        proxyViewModel = ProxyViewModel()
         logViewModel = LogViewModel()
         providerViewModel = ProviderViewModel()
         connectionViewModel = ConnectionViewModel()
@@ -71,27 +84,16 @@ class MainActivity : ComponentActivity() {
             appListProvider = AppListProvider(this),
         )
 
+        val fileManager = AndroidProfileFileManager(this)
         subscriptionViewModel = SubscriptionViewModel(
             database = database,
             storage = storage,
-            onConfigSaved = { subscriptionId, content ->
-                ConfigGenerator.saveSubscriptionConfig(this, subscriptionId, content)
-            },
-            getSubscriptionDir = { subscriptionId ->
-                ConfigGenerator.getSubscriptionDir(this, subscriptionId).absolutePath
-            },
-            commitPendingToImported = { uuid ->
-                ConfigGenerator.commitPendingToImported(this, uuid)
-            },
-            releasePending = { uuid ->
-                ConfigGenerator.releasePending(this, uuid)
-            },
-            deleteProfileDirs = { uuid ->
-                ConfigGenerator.deleteProfileDirs(this, uuid)
-            },
-            validateWithMihomo = { workDir ->
-                MihomoValidator.validate(this, workDir)
-            },
+            fileManager = fileManager,
+        )
+
+        proxyViewModel = ProxyViewModel(
+            selectionDao = database.selectionDao(),
+            getActiveUuid = { subscriptionViewModel.getActiveSubscription()?.id },
         )
 
         homeViewModel = HomeViewModel(
@@ -148,6 +150,10 @@ class MainActivity : ComponentActivity() {
                 filePicker = filePicker,
                 storage = storage,
                 bootStartManager = BootStartManager(this@MainActivity),
+                onScanQR = { callback ->
+                    qrResultCallback = callback
+                    scanQrLauncher.launch(null)
+                },
             )
         }
     }

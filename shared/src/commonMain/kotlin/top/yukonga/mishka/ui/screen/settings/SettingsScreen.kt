@@ -107,12 +107,11 @@ fun SettingsScreen(
                 ) {
                     if (bootStartManager != null) {
                         SwitchPreference(
-                            title = "开机自启",
-                            summary = "设备重启后自动启动代理",
+                            title = "自动重启",
+                            summary = "开机或应用升级后自动恢复代理",
                             checked = isAutoStartEnabled,
                             onCheckedChange = { checked ->
                                 bootStartManager.setEnabled(checked)
-                                storage?.putString("auto_start", if (checked) "true" else "false")
                                 isAutoStartEnabled = checked
                             },
                         )

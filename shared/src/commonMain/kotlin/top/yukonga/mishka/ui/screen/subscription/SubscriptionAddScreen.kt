@@ -40,6 +40,7 @@ fun SubscriptionAddScreen(
     onBack: () -> Unit = {},
     onPickFile: () -> Unit = {},
     onNavigateUrl: () -> Unit = {},
+    onScanQR: (() -> Unit)? = null,
     bottomPadding: Dp = 0.dp,
 ) {
     val scrollBehavior = MiuixScrollBehavior()
@@ -94,6 +95,14 @@ fun SubscriptionAddScreen(
                         enabled = !uiState.isLoading,
                         onClick = onNavigateUrl,
                     )
+                    if (onScanQR != null) {
+                        ArrowPreference(
+                            title = "二维码",
+                            summary = "扫描二维码导入",
+                            enabled = !uiState.isLoading,
+                            onClick = onScanQR,
+                        )
+                    }
                 }
             }
             if (uiState.error.isNotEmpty()) {

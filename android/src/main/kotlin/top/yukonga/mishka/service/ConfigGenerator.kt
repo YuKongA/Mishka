@@ -6,6 +6,10 @@ import top.yukonga.mishka.platform.PlatformStorage
 import java.io.File
 import java.util.UUID
 
+/**
+ * 运行配置生成器：生成 mihomo 最终运行配置。
+ * 订阅文件操作已拆分到 ProfileFileOps。
+ */
 object ConfigGenerator {
 
     fun generateSecret(): String = UUID.randomUUID().toString().take(16)
@@ -17,116 +21,6 @@ object ConfigGenerator {
     }
 
     fun getConfigFile(context: Context): File = File(getWorkDir(context), "config.yaml")
-
-    // === 两阶段目录结构 ===
-
-    fun getImportedDir(context: Context, uuid: String): File {
-        val dir = File(getWorkDir(context), "imported/$uuid")
-        if (!dir.exists()) dir.mkdirs()
-        return dir
-    }
-
-    fun getPendingDir(context: Context, uuid: String): File {
-        val dir = File(getWorkDir(context), "pending/$uuid")
-        if (!dir.exists()) dir.mkdirs()
-        return dir
-    }
-
-    fun getProcessingDir(context: Context): File {
-        val dir = File(getWorkDir(context), "processing")
-        if (!dir.exists()) dir.mkdirs()
-        return dir
-    }
-
-    /**
-     * 获取订阅专属目录（已导入的），mihomo 的 -d 参数指向此处。
-     */
-    fun getSubscriptionDir(context: Context, subscriptionId: String): File =
-        getImportedDir(context, subscriptionId)
-
-    fun getSubscriptionConfigFile(context: Context, subscriptionId: String): File =
-        File(getImportedDir(context, subscriptionId), "config.yaml")
-
-    /**
-     * 保存订阅配置到 imported 目录。
-     */
-    fun saveSubscriptionConfig(context: Context, subscriptionId: String, content: String): File {
-        val dir = getImportedDir(context, subscriptionId)
-        val file = File(dir, "config.yaml")
-        file.writeText(content)
-        return file
-    }
-
-    /**
-     * 保存配置到 pending 目录。
-     */
-    fun savePendingConfig(context: Context, uuid: String, content: String): File {
-        val dir = getPendingDir(context, uuid)
-        val file = File(dir, "config.yaml")
-        file.writeText(content)
-        return file
-    }
-
-    /**
-     * commit：将 pending 移动到 imported（通过 processing 沙箱中转）。
-     */
-    fun commitPendingToImported(context: Context, uuid: String) {
-        val pending = getPendingDir(context, uuid)
-        val imported = getImportedDir(context, uuid)
-        if (pending.exists()) {
-            imported.deleteRecursively()
-            pending.copyRecursively(imported, overwrite = true)
-            pending.deleteRecursively()
-        }
-    }
-
-    /**
-     * release：丢弃 pending 目录。
-     */
-    fun releasePending(context: Context, uuid: String) {
-        val pending = File(getWorkDir(context), "pending/$uuid")
-        if (pending.exists()) pending.deleteRecursively()
-    }
-
-    /**
-     * delete：同时删除 imported 和 pending 目录。
-     */
-    fun deleteProfileDirs(context: Context, uuid: String) {
-        val imported = File(getWorkDir(context), "imported/$uuid")
-        val pending = File(getWorkDir(context), "pending/$uuid")
-        if (imported.exists()) imported.deleteRecursively()
-        if (pending.exists()) pending.deleteRecursively()
-    }
-
-    /**
-     * clone：复制 imported 文件到新 pending 目录。
-     */
-    fun cloneImportedToPending(context: Context, sourceUuid: String, targetUuid: String) {
-        val source = getImportedDir(context, sourceUuid)
-        val target = getPendingDir(context, targetUuid)
-        if (source.exists()) {
-            source.copyRecursively(target, overwrite = true)
-        }
-    }
-
-    /**
-     * 迁移旧版 profiles/{id}/ 目录到 imported/{id}/。
-     */
-    fun migrateProfileDirs(context: Context) {
-        val oldProfilesDir = File(getWorkDir(context), "profiles")
-        if (!oldProfilesDir.exists()) return
-        val importedBaseDir = File(getWorkDir(context), "imported")
-        importedBaseDir.mkdirs()
-        oldProfilesDir.listFiles()?.forEach { subDir ->
-            if (subDir.isDirectory) {
-                val target = File(importedBaseDir, subDir.name)
-                if (!target.exists()) {
-                    subDir.copyRecursively(target, overwrite = true)
-                }
-            }
-        }
-        oldProfilesDir.deleteRecursively()
-    }
 
     /**
      * 生成最终运行配置。
@@ -145,7 +39,7 @@ object ConfigGenerator {
         val h = OverrideStorageHelper
 
         val baseConfig = if (subscriptionId != null) {
-            val subConfig = getSubscriptionConfigFile(context, subscriptionId)
+            val subConfig = ProfileFileOps.getSubscriptionConfigFile(context, subscriptionId)
             if (subConfig.exists()) subConfig.readText() else ""
         } else {
             ""
@@ -200,7 +94,6 @@ object ConfigGenerator {
             add("secret")
             add("external-ui")
             add("tun")
-            // 覆写的简单顶层 key
             if (httpPort != null) add("port")
             if (socksPort != null) add("socks-port")
             if (redirPort != null) add("redir-port")
@@ -214,7 +107,6 @@ object ConfigGenerator {
             if (geodataMode != null) add("geodata-mode")
             if (tcpConcurrent != null) add("tcp-concurrent")
             if (findProcessMode != null) add("find-process-mode")
-            // 覆写的复杂段
             if (hasDnsOverrides) add("dns")
             if (hasSnifferOverrides) add("sniffer")
         }
@@ -231,12 +123,10 @@ object ConfigGenerator {
                 appendLine()
             }
 
-            // 注入 Mishka 控制参数
             appendLine("# === Mishka injected ===")
             appendLine("external-controller: 127.0.0.1:9090")
             appendLine("secret: \"$secret\"")
 
-            // TUN 配置（始终由 Mishka 控制）
             appendLine()
             appendLine("tun:")
             appendLine("  enable: true")
@@ -251,7 +141,6 @@ object ConfigGenerator {
             appendLine("  dns-hijack:")
             appendLine("    - 0.0.0.0:53")
 
-            // === 覆写：简单顶层 key ===
             appendLine()
             appendLine("# === Override settings ===")
             httpPort?.let { appendLine("port: $it") }
@@ -268,7 +157,6 @@ object ConfigGenerator {
             tcpConcurrent?.let { appendLine("tcp-concurrent: $it") }
             findProcessMode?.let { appendLine("find-process-mode: $it") }
 
-            // === 覆写：DNS 段 ===
             if (hasDnsOverrides) {
                 appendLine()
                 appendLine("dns:")
@@ -295,7 +183,6 @@ object ConfigGenerator {
                     list.forEach { appendLine("    - $it") }
                 }
             } else if (!baseConfig.contains("dns:")) {
-                // 如果没有覆写也没有订阅 DNS，注入默认 DNS
                 appendLine()
                 appendLine("dns:")
                 appendLine("  enable: true")
@@ -308,7 +195,6 @@ object ConfigGenerator {
                 appendLine("    - https://dns.alidns.com/dns-query")
             }
 
-            // === 覆写：Sniffer 段 ===
             if (hasSnifferOverrides) {
                 appendLine()
                 appendLine("sniffer:")
@@ -326,7 +212,6 @@ object ConfigGenerator {
                 }
             }
 
-            // 默认端口和模式（如果没有覆写也没有在订阅中）
             if (mixedPort == null && !baseConfig.contains("mixed-port:")) {
                 appendLine()
                 appendLine("mixed-port: 7890")
@@ -341,10 +226,6 @@ object ConfigGenerator {
         return configFile
     }
 
-    /**
-     * 过滤顶层 key 及其所有子行（缩进行）。
-     * 当遇到要移除的顶层 key 时，跳过该行及后续所有缩进子行，直到下一个顶层 key。
-     */
     private fun filterTopLevelKeys(content: String, keysToRemove: Set<String>): String {
         val lines = content.lines()
         val result = mutableListOf<String>()
@@ -353,13 +234,11 @@ object ConfigGenerator {
         for (line in lines) {
             val trimmed = line.trimStart()
 
-            // 空行和注释
             if (trimmed.isEmpty() || trimmed.startsWith("#")) {
                 if (!skipping) result.add(line)
                 continue
             }
 
-            // 判断是否为顶层 key（不以空格/tab 开头）
             val isTopLevel = !line.startsWith(" ") && !line.startsWith("\t")
 
             if (isTopLevel) {
@@ -367,7 +246,6 @@ object ConfigGenerator {
                 skipping = key in keysToRemove
                 if (!skipping) result.add(line)
             } else {
-                // 缩进行：如果当前不在跳过模式则保留
                 if (!skipping) result.add(line)
             }
         }

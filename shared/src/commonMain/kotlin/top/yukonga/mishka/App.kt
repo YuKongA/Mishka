@@ -38,6 +38,7 @@ fun App(
     storage: PlatformStorage? = null,
     bootStartManager: BootStartManager? = null,
     mihomoVersion: String = "",
+    onScanQR: ((callback: (String?) -> Unit) -> Unit)? = null,
 ) {
     val controller = remember(colorMode) {
         when (colorMode) {
@@ -70,6 +71,7 @@ fun App(
                 storage = storage,
                 bootStartManager = bootStartManager,
                 mihomoVersion = mihomoVersion,
+                onScanQR = onScanQR,
             )
         }
     }

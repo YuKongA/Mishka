@@ -63,16 +63,21 @@ class ProfileReceiver : BroadcastReceiver() {
          */
         suspend fun rescheduleAll(context: Context) = lock.withLock {
             if (initialized) return@withLock
-            initialized = true
 
-            Log.i(TAG, "Reschedule all profiles update")
-            val database = getAppDatabase(context)
-            val importedDao = database.importedDao()
+            try {
+                Log.i(TAG, "Reschedule all profiles update")
+                val database = getAppDatabase(context)
+                val importedDao = database.importedDao()
 
-            importedDao.queryAllUUIDs()
-                .mapNotNull { importedDao.queryByUUID(it) }
-                .filter { it.type != "File" && it.interval >= MIN_INTERVAL_MS }
-                .forEach { scheduleNext(context, it) }
+                importedDao.queryAllUUIDs()
+                    .mapNotNull { importedDao.queryByUUID(it) }
+                    .filter { it.type != "File" && it.interval >= MIN_INTERVAL_MS }
+                    .forEach { scheduleNext(context, it) }
+
+                initialized = true
+            } catch (e: Exception) {
+                Log.e(TAG, "rescheduleAll failed", e)
+            }
         }
 
         /**
@@ -89,7 +94,7 @@ class ProfileReceiver : BroadcastReceiver() {
 
             val current = System.currentTimeMillis()
             val configFile = File(
-                ConfigGenerator.getImportedDir(context, imported.uuid),
+                ProfileFileOps.getImportedDir(context, imported.uuid),
                 "config.yaml"
             )
             val lastModified = if (configFile.exists()) configFile.lastModified() else -1L

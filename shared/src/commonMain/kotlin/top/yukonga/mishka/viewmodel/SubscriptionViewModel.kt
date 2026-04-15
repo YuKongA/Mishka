@@ -14,6 +14,7 @@ import top.yukonga.mishka.data.repository.ConfigValidationException
 import top.yukonga.mishka.data.repository.SubscriptionFetcher
 import top.yukonga.mishka.data.repository.SubscriptionRepository
 import top.yukonga.mishka.platform.PlatformStorage
+import top.yukonga.mishka.platform.ProfileFileManager
 
 data class ImportProgress(
     val step: String,
@@ -32,12 +33,7 @@ data class SubscriptionUiState(
 class SubscriptionViewModel(
     database: AppDatabase,
     storage: PlatformStorage,
-    private val onConfigSaved: (subscriptionId: String, content: String) -> Unit,
-    private val getSubscriptionDir: (subscriptionId: String) -> String,
-    private val commitPendingToImported: (uuid: String) -> Unit,
-    private val releasePending: (uuid: String) -> Unit,
-    private val deleteProfileDirs: (uuid: String) -> Unit,
-    private val validateWithMihomo: suspend (workDir: String) -> String? = { null },
+    private val fileManager: ProfileFileManager,
 ) : ViewModel() {
 
     private val repository = SubscriptionRepository(
@@ -82,18 +78,15 @@ class SubscriptionViewModel(
         viewModelScope.launch {
             var subId: String? = null
             try {
-                // 1. 创建 Pending
                 val sub = repository.create("Url", name, url)
                 subId = sub.id
                 yield()
 
-                // 2. 下载配置
                 _uiState.value = _uiState.value.copy(
                     importProgress = ImportProgress("下载配置...")
                 )
                 val result = fetcher.fetch(sub)
 
-                // 3. 校验 + 保存 + 下载 provider + commit
                 processAndCommit(result.subscription, result.configContent)
                 onComplete()
             } catch (e: ConfigValidationException) {
@@ -182,7 +175,7 @@ class SubscriptionViewModel(
     fun removeSubscription(id: String) {
         viewModelScope.launch {
             repository.delete(id)
-            deleteProfileDirs(id)
+            fileManager.deleteDirs(id)
         }
     }
 
@@ -198,32 +191,63 @@ class SubscriptionViewModel(
 
     fun getActiveSubscription(): Subscription? = repository.getActive()
 
+    /**
+     * 编辑订阅属性（名称、URL、更新间隔），通过 Pending → Commit 两阶段。
+     */
+    fun editSubscription(uuid: String, name: String, source: String, interval: Long, onComplete: () -> Unit = {}) {
+        _uiState.value = _uiState.value.copy(isLoading = true, error = "", importProgress = null)
+
+        viewModelScope.launch {
+            try {
+                repository.patch(uuid, name, source, interval)
+                repository.commit(uuid)
+                onComplete()
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    error = "保存失败: ${e.message}",
+                )
+            } finally {
+                _uiState.value = _uiState.value.copy(isLoading = false, importProgress = null)
+            }
+        }
+    }
+
+    /**
+     * 复制已导入的订阅。
+     */
+    fun duplicateSubscription(uuid: String) {
+        viewModelScope.launch {
+            try {
+                val newUuid = repository.clone(uuid)
+                fileManager.cloneFiles(uuid, newUuid)
+                repository.commit(newUuid)
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    error = "复制失败: ${e.message}",
+                )
+            }
+        }
+    }
+
     override fun onCleared() {
         super.onCleared()
         fetcher.close()
     }
 
-    /**
-     * 新建导入流程：保存配置 → 下载 Provider → mihomo -t 校验 → commit
-     */
     private suspend fun processAndCommit(subscription: Subscription, configContent: String) {
-        // 1. 保存配置到 imported 目录
-        onConfigSaved(subscription.id, configContent)
+        fileManager.saveConfig(subscription.id, configContent)
 
-        // 2. 下载 provider
         downloadProviders(subscription.id, configContent)
 
-        // 3. mihomo -t 完整校验（包含 provider 的配置解析）
         _uiState.value = _uiState.value.copy(
             importProgress = ImportProgress("验证配置...")
         )
         yield()
-        val error = validateWithMihomo(getSubscriptionDir(subscription.id))
+        val error = fileManager.validate(fileManager.getDir(subscription.id))
         if (error != null) {
             throw ConfigValidationException(error)
         }
 
-        // 4. 校验通过，commit 数据库
         repository.commit(
             uuid = subscription.id,
             upload = subscription.upload,
@@ -236,27 +260,20 @@ class SubscriptionViewModel(
         _uiState.value = _uiState.value.copy(isLoading = false, importProgress = null)
     }
 
-    /**
-     * 更新已导入的订阅：保存配置 → 下载 Provider → mihomo -t 校验 → 更新数据库
-     */
     private suspend fun processAndUpdateImported(subscription: Subscription, configContent: String) {
-        // 1. 覆写 imported 目录的配置
-        onConfigSaved(subscription.id, configContent)
+        fileManager.saveConfig(subscription.id, configContent)
 
-        // 2. 下载 provider
         downloadProviders(subscription.id, configContent)
 
-        // 3. mihomo -t 完整校验
         _uiState.value = _uiState.value.copy(
             importProgress = ImportProgress("验证配置...")
         )
         yield()
-        val error = validateWithMihomo(getSubscriptionDir(subscription.id))
+        val error = fileManager.validate(fileManager.getDir(subscription.id))
         if (error != null) {
             throw ConfigValidationException(error)
         }
 
-        // 4. 校验通过，更新数据库
         repository.updateImported(
             uuid = subscription.id,
             name = subscription.name,
@@ -269,9 +286,6 @@ class SubscriptionViewModel(
         _uiState.value = _uiState.value.copy(isLoading = false, importProgress = null)
     }
 
-    /**
-     * 解析并下载 provider 资源。
-     */
     private suspend fun downloadProviders(subscriptionId: String, configContent: String) {
         val providers = ConfigProcessor.parseProviders(configContent)
         val downloadable = providers.filter { it.url.isNotEmpty() }
@@ -279,7 +293,7 @@ class SubscriptionViewModel(
         if (downloadable.isNotEmpty()) {
             val downloadResult = ConfigProcessor.downloadProviders(
                 providers = providers,
-                subscriptionDir = getSubscriptionDir(subscriptionId),
+                subscriptionDir = fileManager.getDir(subscriptionId),
                 downloader = { url -> fetcher.downloadBytes(url) },
                 onProgress = { current, total, _ ->
                     _uiState.value = _uiState.value.copy(
@@ -300,11 +314,8 @@ class SubscriptionViewModel(
         }
     }
 
-    /**
-     * 清理失败的 Pending（release 数据库 + 删除目录）。
-     */
     private suspend fun cleanupFailedPending(uuid: String) {
         repository.release(uuid)
-        releasePending(uuid)
+        fileManager.releasePending(uuid)
     }
 }

@@ -46,6 +46,7 @@ import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Add
 import top.yukonga.miuix.kmp.icon.extended.Back
 import top.yukonga.miuix.kmp.icon.extended.Delete
+import top.yukonga.miuix.kmp.icon.extended.More
 import top.yukonga.miuix.kmp.icon.extended.Refresh
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.theme.miuixShape
@@ -62,6 +63,8 @@ fun SubscriptionScreen(
     bottomPadding: Dp = 0.dp,
     onBack: (() -> Unit)? = null,
     onNavigateAdd: () -> Unit = {},
+    onNavigateEdit: (uuid: String) -> Unit = {},
+    onDuplicate: (uuid: String) -> Unit = {},
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val scrollBehavior = MiuixScrollBehavior()
@@ -89,6 +92,18 @@ fun SubscriptionScreen(
                     {}
                 },
                 actions = {
+                    if (uiState.subscriptions.any { it.url.isNotBlank() }) {
+                        IconButton(
+                            onClick = { viewModel.updateAllSubscriptions() },
+                            enabled = !uiState.isLoading,
+                        ) {
+                            Icon(
+                                imageVector = MiuixIcons.Refresh,
+                                contentDescription = "全部更新",
+                                tint = MiuixTheme.colorScheme.onSurface,
+                            )
+                        }
+                    }
                     IconButton(onClick = { viewModel.clearError(); onNavigateAdd() }) {
                         Icon(
                             imageVector = MiuixIcons.Add,
@@ -160,6 +175,8 @@ fun SubscriptionScreen(
                     onSelect = { viewModel.setActive(sub.id) },
                     onRefresh = { viewModel.fetchSubscription(sub.id) },
                     onDelete = { viewModel.removeSubscription(sub.id) },
+                    onEdit = { onNavigateEdit(sub.id) },
+                    onDuplicate = { onDuplicate(sub.id) },
                 )
             }
         }
@@ -173,6 +190,8 @@ private fun SubscriptionItem(
     onSelect: () -> Unit,
     onRefresh: () -> Unit,
     onDelete: () -> Unit,
+    onEdit: () -> Unit,
+    onDuplicate: () -> Unit,
 ) {
     Card(
         modifier = Modifier
@@ -185,11 +204,11 @@ private fun SubscriptionItem(
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             Text(
                 text = subscription.name.ifBlank { "配置" },
-                modifier = Modifier.weight(1f, fill = false),
+                modifier = Modifier.weight(1f),
                 fontSize = 17.sp,
                 fontWeight = FontWeight(550),
                 color = MiuixTheme.colorScheme.onSurface,
@@ -258,8 +277,22 @@ private fun SubscriptionItem(
             Spacer(Modifier.weight(1f))
 
             IconButton(
+                onClick = onEdit,
+                minHeight = 35.dp,
+                minWidth = 35.dp,
+                backgroundColor = MiuixTheme.colorScheme.secondaryContainer,
+            ) {
+                Icon(
+                    modifier = Modifier.size(20.dp),
+                    imageVector = MiuixIcons.More,
+                    contentDescription = "编辑",
+                    tint = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                )
+            }
+            Spacer(Modifier.width(8.dp))
+            IconButton(
                 onClick = onRefresh,
-                enabled = !isLoading,
+                enabled = !isLoading && subscription.url.isNotBlank(),
                 minHeight = 35.dp,
                 minWidth = 35.dp,
                 backgroundColor = MiuixTheme.colorScheme.secondaryContainer,

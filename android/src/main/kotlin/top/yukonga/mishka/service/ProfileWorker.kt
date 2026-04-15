@@ -100,7 +100,7 @@ class ProfileWorker : Service() {
                 val result = fetcher.fetch(sub)
 
                 // 2. 保存配置
-                ConfigGenerator.saveSubscriptionConfig(this, uuid, result.configContent)
+                ProfileFileOps.saveSubscriptionConfig(this, uuid, result.configContent)
 
                 // 3. 下载 Provider
                 val providers = ConfigProcessor.parseProviders(result.configContent)
@@ -108,7 +108,7 @@ class ProfileWorker : Service() {
                 if (downloadable.isNotEmpty()) {
                     ConfigProcessor.downloadProviders(
                         providers = providers,
-                        subscriptionDir = ConfigGenerator.getSubscriptionDir(this, uuid).absolutePath,
+                        subscriptionDir = ProfileFileOps.getSubscriptionDir(this, uuid).absolutePath,
                         downloader = { url -> fetcher.downloadBytes(url) },
                     )
                 }
@@ -116,7 +116,7 @@ class ProfileWorker : Service() {
                 // 4. mihomo -t 校验
                 val error = MihomoValidator.validate(
                     this,
-                    ConfigGenerator.getSubscriptionDir(this, uuid).absolutePath,
+                    ProfileFileOps.getSubscriptionDir(this, uuid).absolutePath,
                 )
                 if (error != null) {
                     throw Exception(error)

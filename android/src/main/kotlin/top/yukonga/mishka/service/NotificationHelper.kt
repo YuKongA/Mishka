@@ -8,6 +8,7 @@ import android.content.Context
 import android.content.Intent
 import top.yukonga.mishka.MainActivity
 import top.yukonga.mishka.R
+import java.util.concurrent.atomic.AtomicInteger
 
 object NotificationHelper {
 
@@ -21,7 +22,7 @@ object NotificationHelper {
 
     // 配置更新结果通知
     private const val CHANNEL_PROFILE_RESULT = "mishka_profile_result"
-    private var nextResultId = 100
+    private val nextResultId = AtomicInteger(100)
 
     fun createChannels(context: Context) {
         val manager = context.getSystemService(NotificationManager::class.java)
@@ -117,7 +118,7 @@ object NotificationHelper {
     // === 配置更新结果通知 ===
 
     fun notifyProfileUpdateSuccess(context: Context, name: String): Int {
-        val id = nextResultId++
+        val id = nextResultId.getAndIncrement()
         val intent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_SINGLE_TOP
         }
@@ -140,7 +141,7 @@ object NotificationHelper {
     }
 
     fun notifyProfileUpdateFailed(context: Context, name: String, reason: String): Int {
-        val id = nextResultId++
+        val id = nextResultId.getAndIncrement()
         val intent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_SINGLE_TOP
         }

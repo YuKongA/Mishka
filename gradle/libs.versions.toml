@@ -2,28 +2,30 @@
 agp = "9.1.1"
 kotlin = "2.3.20"
 ksp = "2.3.6"
-compose-multiplatform = "1.10.3"
-components-resources = "1.10.3"
-material-icons-extended = "1.7.3"
-miuix = "0.9.0"
-kotlinx-serialization = "1.11.0"
-kotlinx-coroutines = "1.10.2"
-ktor = "3.4.2"
-room3 = "3.0.0-alpha03"
-sqlite = "2.6.2"
 androidx-activity = "1.13.0"
 androidx-lifecycle = "2.10.0"
 androidx-navigation3 = "1.1.0"
+compose-multiplatform = "1.10.3"
+components-resources = "1.10.3"
 jetbrains-navigationevent = "1.0.1"
+kotlinx-serialization = "1.11.0"
+kotlinx-coroutines = "1.10.2"
+ktor = "3.4.2"
+material-icons-extended = "1.7.3"
+miuix = "0.9.0"
+room3 = "3.0.0-alpha03"
+quickie = "1.11.0"
+sqlite = "2.6.2"
 
 [libraries]
-components-resources = { module = "org.jetbrains.compose.components:components-resources", version.ref = "components-resources" }
-material-icons-extended = { module = "org.jetbrains.compose.material:material-icons-extended", version.ref = "material-icons-extended" }
-miuix-ui = { module = "top.yukonga.miuix.kmp:miuix-ui", version.ref = "miuix" }
-miuix-icons = { module = "top.yukonga.miuix.kmp:miuix-icons", version.ref = "miuix" }
-miuix-navigation3-ui = { module = "top.yukonga.miuix.kmp:miuix-navigation3-ui", version.ref = "miuix" }
-miuix-preference = { module = "top.yukonga.miuix.kmp:miuix-preference", version.ref = "miuix" }
+androidx-activity = { module = "androidx.activity:activity-compose", version.ref = "androidx-activity" }
+androidx-lifecycle-viewmodel = { module = "org.jetbrains.androidx.lifecycle:lifecycle-viewmodel-compose", version.ref = "androidx-lifecycle" }
 androidx-navigation3-runtime = { module = "androidx.navigation3:navigation3-runtime", version.ref = "androidx-navigation3" }
+androidx-lifecycle-runtime = { module = "org.jetbrains.androidx.lifecycle:lifecycle-runtime-compose", version.ref = "androidx-lifecycle" }
+androidx-room3-runtime = { module = "androidx.room3:room3-runtime", version.ref = "room3" }
+androidx-room3-compiler = { module = "androidx.room3:room3-compiler", version.ref = "room3" }
+androidx-sqlite-bundled = { module = "androidx.sqlite:sqlite-bundled", version.ref = "sqlite" }
+components-resources = { module = "org.jetbrains.compose.components:components-resources", version.ref = "components-resources" }
 jetbrains-navigationevent = { module = "org.jetbrains.androidx.navigationevent:navigationevent-compose", version.ref = "jetbrains-navigationevent" }
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinx-serialization" }
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinx-coroutines" }
@@ -33,12 +35,12 @@ ktor-client-okhttp = { module = "io.ktor:ktor-client-okhttp", version.ref = "kto
 ktor-client-content-negotiation = { module = "io.ktor:ktor-client-content-negotiation", version.ref = "ktor" }
 ktor-serialization-json = { module = "io.ktor:ktor-serialization-kotlinx-json", version.ref = "ktor" }
 ktor-client-websockets = { module = "io.ktor:ktor-client-websockets", version.ref = "ktor" }
-androidx-activity = { module = "androidx.activity:activity-compose", version.ref = "androidx-activity" }
-androidx-lifecycle-viewmodel = { module = "org.jetbrains.androidx.lifecycle:lifecycle-viewmodel-compose", version.ref = "androidx-lifecycle" }
-androidx-lifecycle-runtime = { module = "org.jetbrains.androidx.lifecycle:lifecycle-runtime-compose", version.ref = "androidx-lifecycle" }
-androidx-room3-runtime = { module = "androidx.room3:room3-runtime", version.ref = "room3" }
-androidx-room3-compiler = { module = "androidx.room3:room3-compiler", version.ref = "room3" }
-androidx-sqlite-bundled = { module = "androidx.sqlite:sqlite-bundled", version.ref = "sqlite" }
+material-icons-extended = { module = "org.jetbrains.compose.material:material-icons-extended", version.ref = "material-icons-extended" }
+miuix-ui = { module = "top.yukonga.miuix.kmp:miuix-ui", version.ref = "miuix" }
+miuix-icons = { module = "top.yukonga.miuix.kmp:miuix-icons", version.ref = "miuix" }
+miuix-navigation3-ui = { module = "top.yukonga.miuix.kmp:miuix-navigation3-ui", version.ref = "miuix" }
+miuix-preference = { module = "top.yukonga.miuix.kmp:miuix-preference", version.ref = "miuix" }
+quickie-bundled = { module = "io.github.g00fy2.quickie:quickie-bundled", version.ref = "quickie" }
 
 [plugins]
 androidApplication = { id = "com.android.application", version.ref = "agp" }

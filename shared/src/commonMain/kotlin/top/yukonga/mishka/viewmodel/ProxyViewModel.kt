@@ -6,6 +6,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import top.yukonga.mishka.data.database.SelectionDao
+import top.yukonga.mishka.data.database.SelectionEntity
 import top.yukonga.mishka.data.repository.MihomoRepository
 
 data class ProxyGroupUi(
@@ -25,7 +27,10 @@ data class ProxyUiState(
     val error: String = "",
 )
 
-class ProxyViewModel : ViewModel() {
+class ProxyViewModel(
+    private val selectionDao: SelectionDao? = null,
+    private val getActiveUuid: () -> String? = { null },
+) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ProxyUiState())
     val uiState: StateFlow<ProxyUiState> = _uiState.asStateFlow()
@@ -46,15 +51,12 @@ class ProxyViewModel : ViewModel() {
         _uiState.value = _uiState.value.copy(isLoading = true, error = "")
 
         viewModelScope.launch {
-            // 同时获取组信息和所有代理详情（含延迟历史）
             val groupsResult = repo.getGroups()
             val proxiesResult = repo.getProxies()
 
             groupsResult.onSuccess { groupsResponse ->
-                // 从 /proxies 获取每个节点的最新延迟
                 val allProxies = proxiesResult.getOrNull()?.proxies ?: emptyMap()
 
-                // 从 GLOBAL 组的 all 字段获取配置文件中的原始顺序
                 val globalGroup = groupsResponse.proxies.firstOrNull { it.name == "GLOBAL" }
                 val orderMap = globalGroup?.all
                     ?.mapIndexed { index, name -> name to index }
@@ -72,8 +74,6 @@ class ProxyViewModel : ViewModel() {
                             if (lastDelay != null && lastDelay > 0) {
                                 delays[proxyName] = lastDelay
                             } else if (proxy != null && proxy.now.isNotEmpty()) {
-                                // 子组（URLTest/Selector/Fallback）自身可能没有 history，
-                                // 取其当前选中节点的延迟
                                 val nowProxy = allProxies[proxy.now]
                                 val nowDelay = nowProxy?.history?.lastOrNull()?.delay
                                 if (nowDelay != null && nowDelay > 0) {
@@ -98,6 +98,9 @@ class ProxyViewModel : ViewModel() {
                     groups = groups,
                     isLoading = false,
                 )
+
+                // 恢复已保存的代理组选择
+                restoreSelections(repo, groups)
             }.onFailure {
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
@@ -116,6 +119,8 @@ class ProxyViewModel : ViewModel() {
                         if (it.name == group) it.copy(now = proxy) else it
                     }
                 )
+                // 保存选择到数据库
+                saveSelection(group, proxy)
             }
         }
     }
@@ -125,12 +130,39 @@ class ProxyViewModel : ViewModel() {
         _uiState.value = _uiState.value.copy(isTesting = true)
 
         viewModelScope.launch {
-            // healthcheck 触发组内所有节点测速
-            // url-test/fallback 组会自动更新最优节点（now 字段）
             repo.healthCheck(group)
-            // 重新加载（含最新延迟和自动选择结果）
             loadProxies()
             _uiState.value = _uiState.value.copy(isTesting = false)
         }
+    }
+
+    private suspend fun saveSelection(group: String, proxy: String) {
+        val uuid = getActiveUuid() ?: return
+        val dao = selectionDao ?: return
+        dao.insert(SelectionEntity(uuid = uuid, proxy = group, selected = proxy))
+    }
+
+    private suspend fun restoreSelections(repo: MihomoRepository, groups: List<ProxyGroupUi>) {
+        val uuid = getActiveUuid() ?: return
+        val dao = selectionDao ?: return
+        val selections = dao.queryByUUID(uuid)
+        if (selections.isEmpty()) return
+
+        val selectionMap = selections.associate { it.proxy to it.selected }
+        val updatedGroups = groups.toMutableList()
+
+        for ((index, group) in groups.withIndex()) {
+            // 只恢复 Selector 类型的组
+            if (group.type != "Selector") continue
+            val saved = selectionMap[group.name] ?: continue
+            if (saved == group.now) continue
+            if (saved !in group.all) continue
+
+            repo.selectProxy(group.name, saved).onSuccess {
+                updatedGroups[index] = group.copy(now = saved)
+            }
+        }
+
+        _uiState.value = _uiState.value.copy(groups = updatedGroups)
     }
 }

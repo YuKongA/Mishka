@@ -38,5 +38,8 @@ sealed interface Route : NavKey {
     data object MetaSettings : Route
 
     @Serializable
+    data class SubscriptionEdit(val uuid: String) : Route
+
+    @Serializable
     data object About : Route
 }
