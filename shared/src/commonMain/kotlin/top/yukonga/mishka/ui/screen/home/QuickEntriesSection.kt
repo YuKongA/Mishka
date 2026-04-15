@@ -16,6 +16,9 @@ import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.PressFeedbackType
+import mishka.shared.generated.resources.Res
+import mishka.shared.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
 
 fun LazyListScope.quickEntriesSection(
     onNavigateLog: () -> Unit = {},
@@ -36,14 +39,14 @@ fun LazyListScope.quickEntriesSection(
             ) {
                 QuickEntryCard(
                     modifier = Modifier.weight(1f),
-                    title = "外部资源",
-                    subtitle = "Provider",
+                    title = stringResource(Res.string.home_providers),
+                    subtitle = stringResource(Res.string.home_providers_subtitle),
                     onClick = onNavigateProvider,
                 )
                 QuickEntryCard(
                     modifier = Modifier.weight(1f),
-                    title = "连接",
-                    subtitle = "Connection",
+                    title = stringResource(Res.string.home_connections),
+                    subtitle = stringResource(Res.string.home_connections_subtitle),
                     onClick = onNavigateConnection,
                 )
             }
@@ -53,14 +56,14 @@ fun LazyListScope.quickEntriesSection(
             ) {
                 QuickEntryCard(
                     modifier = Modifier.weight(1f),
-                    title = "日志",
-                    subtitle = "查看",
+                    title = stringResource(Res.string.home_logs),
+                    subtitle = stringResource(Res.string.home_logs_subtitle),
                     onClick = onNavigateLog,
                 )
                 QuickEntryCard(
                     modifier = Modifier.weight(1f),
-                    title = "DNS",
-                    subtitle = "查询",
+                    title = stringResource(Res.string.home_dns),
+                    subtitle = stringResource(Res.string.home_dns_subtitle),
                     onClick = onNavigateDnsQuery,
                 )
             }

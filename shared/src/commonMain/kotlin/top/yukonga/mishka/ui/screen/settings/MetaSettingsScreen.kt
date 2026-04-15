@@ -39,6 +39,9 @@ import top.yukonga.mishka.data.repository.OverrideStorageHelper
 import top.yukonga.mishka.ui.component.ListEditDialog
 import top.yukonga.mishka.ui.component.TriStatePreference
 import top.yukonga.mishka.viewmodel.OverrideSettingsViewModel
+import mishka.shared.generated.resources.Res
+import mishka.shared.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
 
 @Composable
 fun MetaSettingsScreen(
@@ -65,14 +68,14 @@ fun MetaSettingsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = "Meta 设置",
+                title = stringResource(Res.string.meta_settings_title),
                 scrollBehavior = scrollBehavior,
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         val layoutDirection = LocalLayoutDirection.current
                         Icon(
                             imageVector = MiuixIcons.Back,
-                            contentDescription = "返回",
+                            contentDescription = stringResource(Res.string.common_back),
                             tint = MiuixTheme.colorScheme.onSurface,
                             modifier = Modifier.graphicsLayer {
                                 scaleX = if (layoutDirection == LayoutDirection.Rtl) -1f else 1f
@@ -95,7 +98,7 @@ fun MetaSettingsScreen(
             ),
         ) {
             // === 基本 ===
-            item { SmallTitle(text = "基本") }
+            item { SmallTitle(text = stringResource(Res.string.meta_basic)) }
             item {
                 Card(
                     modifier = Modifier
@@ -104,17 +107,17 @@ fun MetaSettingsScreen(
                         .padding(bottom = 6.dp),
                 ) {
                     TriStatePreference(
-                        title = "统一延迟",
+                        title = stringResource(Res.string.meta_unified_delay),
                         value = uiState.unifiedDelay,
                         onValueChange = { viewModel.updateBoolean(OverrideStorageHelper.KEY_UNIFIED_DELAY, it) },
                     )
                     TriStatePreference(
-                        title = "Geodata 模式",
+                        title = stringResource(Res.string.meta_geodata_mode),
                         value = uiState.geodataMode,
                         onValueChange = { viewModel.updateBoolean(OverrideStorageHelper.KEY_GEODATA_MODE, it) },
                     )
                     TriStatePreference(
-                        title = "TCP 并发",
+                        title = stringResource(Res.string.meta_tcp_concurrent),
                         value = uiState.tcpConcurrent,
                         onValueChange = { viewModel.updateBoolean(OverrideStorageHelper.KEY_TCP_CONCURRENT, it) },
                     )
@@ -126,7 +129,7 @@ fun MetaSettingsScreen(
             }
 
             // === 嗅探器 ===
-            item { SmallTitle(text = "嗅探器") }
+            item { SmallTitle(text = stringResource(Res.string.meta_sniffer)) }
             item {
                 Card(
                     modifier = Modifier
@@ -135,34 +138,36 @@ fun MetaSettingsScreen(
                         .padding(bottom = 6.dp),
                 ) {
                     TriStatePreference(
-                        title = "启用嗅探器",
+                        title = stringResource(Res.string.meta_sniffer_enable),
                         value = uiState.snifferEnable,
                         onValueChange = { viewModel.updateBoolean(OverrideStorageHelper.KEY_SNIFFER_ENABLE, it) },
                     )
                     TriStatePreference(
-                        title = "强制 DNS 映射",
+                        title = stringResource(Res.string.meta_sniffer_force_dns_mapping),
                         value = uiState.snifferForceDnsMapping,
                         onValueChange = { viewModel.updateBoolean(OverrideStorageHelper.KEY_SNIFFER_FORCE_DNS_MAPPING, it) },
                     )
                     TriStatePreference(
-                        title = "解析纯 IP",
+                        title = stringResource(Res.string.meta_sniffer_parse_pure_ip),
                         value = uiState.snifferParsePureIp,
                         onValueChange = { viewModel.updateBoolean(OverrideStorageHelper.KEY_SNIFFER_PARSE_PURE_IP, it) },
                     )
                     TriStatePreference(
-                        title = "覆写目标地址",
+                        title = stringResource(Res.string.meta_sniffer_override_dest),
                         value = uiState.snifferOverrideDestination,
                         onValueChange = { viewModel.updateBoolean(OverrideStorageHelper.KEY_SNIFFER_OVERRIDE_DEST, it) },
                     )
+                    val forceDomainTitle = stringResource(Res.string.meta_sniffer_force_domain)
                     ArrowPreference(
-                        title = "强制嗅探域名",
+                        title = forceDomainTitle,
                         summary = listSummary(uiState.snifferForceDomain),
-                        onClick = { openListDialog("强制嗅探域名", OverrideStorageHelper.KEY_SNIFFER_FORCE_DOMAIN, uiState.snifferForceDomain) },
+                        onClick = { openListDialog(forceDomainTitle, OverrideStorageHelper.KEY_SNIFFER_FORCE_DOMAIN, uiState.snifferForceDomain) },
                     )
+                    val skipDomainTitle = stringResource(Res.string.meta_sniffer_skip_domain)
                     ArrowPreference(
-                        title = "跳过嗅探域名",
+                        title = skipDomainTitle,
                         summary = listSummary(uiState.snifferSkipDomain),
-                        onClick = { openListDialog("跳过嗅探域名", OverrideStorageHelper.KEY_SNIFFER_SKIP_DOMAIN, uiState.snifferSkipDomain) },
+                        onClick = { openListDialog(skipDomainTitle, OverrideStorageHelper.KEY_SNIFFER_SKIP_DOMAIN, uiState.snifferSkipDomain) },
                     )
                 }
             }
@@ -187,12 +192,13 @@ private fun FindProcessModePreference(
     value: String?,
     onValueChange: (String?) -> Unit,
 ) {
-    val items = listOf("不修改", "Off", "Strict", "Always")
+    val notModifiedStr = stringResource(Res.string.common_not_modified)
+    val items = listOf(notModifiedStr, "Off", "Strict", "Always")
     val values = listOf(null, "off", "strict", "always")
     val selectedIndex = values.indexOf(value).coerceAtLeast(0)
 
     OverlayDropdownPreference(
-        title = "进程匹配模式",
+        title = stringResource(Res.string.meta_find_process_mode),
         summary = items[selectedIndex],
         items = items,
         selectedIndex = selectedIndex,
@@ -200,8 +206,9 @@ private fun FindProcessModePreference(
     )
 }
 
+@Composable
 private fun listSummary(list: List<String>?): String {
-    if (list == null) return "不修改"
-    if (list.isEmpty()) return "已清除"
-    return "${list.size} 条"
+    if (list == null) return stringResource(Res.string.common_not_modified)
+    if (list.isEmpty()) return stringResource(Res.string.common_cleared)
+    return stringResource(Res.string.common_items_count, list.size)
 }

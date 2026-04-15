@@ -56,6 +56,9 @@ import top.yukonga.miuix.kmp.utils.scrollEndHaptic
 import top.yukonga.miuix.kmp.window.WindowDialog
 import top.yukonga.mishka.data.model.DnsAnswer
 import top.yukonga.mishka.viewmodel.DnsQueryViewModel
+import mishka.shared.generated.resources.Res
+import mishka.shared.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
 
 @Composable
 fun DnsQueryScreen(
@@ -71,14 +74,14 @@ fun DnsQueryScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = "DNS 查询",
+                title = stringResource(Res.string.dns_title),
                 scrollBehavior = scrollBehavior,
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         val layoutDirection = LocalLayoutDirection.current
                         Icon(
                             imageVector = MiuixIcons.Back,
-                            contentDescription = "返回",
+                            contentDescription = stringResource(Res.string.common_back),
                             tint = MiuixTheme.colorScheme.onSurface,
                             modifier = Modifier.graphicsLayer {
                                 scaleX = if (layoutDirection == LayoutDirection.Rtl) -1f else 1f
@@ -90,7 +93,7 @@ fun DnsQueryScreen(
                     IconButton(onClick = { showCacheDialog = true }) {
                         Icon(
                             imageVector = MiuixIcons.Delete,
-                            contentDescription = "清除缓存",
+                            contentDescription = stringResource(Res.string.dns_clear_cache),
                             tint = MiuixTheme.colorScheme.onSurface,
                         )
                     }
@@ -122,7 +125,7 @@ fun DnsQueryScreen(
                     TextField(
                         state = textFieldState,
                         modifier = Modifier.fillMaxWidth(),
-                        label = "域名",
+                        label = stringResource(Res.string.dns_domain),
                         useLabelAsPlaceholder = true,
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                         onKeyboardAction = {
@@ -177,7 +180,7 @@ fun DnsQueryScreen(
 
                     // 查询按钮
                     TextButton(
-                        text = if (uiState.isQuerying) "查询中..." else "查询",
+                        text = if (uiState.isQuerying) stringResource(Res.string.dns_querying) else stringResource(Res.string.dns_query),
                         modifier = Modifier.fillMaxWidth(),
                         enabled = textFieldState.text.isNotBlank() && !uiState.isQuerying,
                         colors = ButtonDefaults.textButtonColorsPrimary(),
@@ -210,7 +213,7 @@ fun DnsQueryScreen(
             // 结果区域
             if (uiState.status != null) {
                 item(key = "result_title") {
-                    SmallTitle(text = "查询结果")
+                    SmallTitle(text = stringResource(Res.string.dns_results))
                 }
 
                 if (uiState.answers.isEmpty()) {
@@ -223,7 +226,7 @@ fun DnsQueryScreen(
                             insideMargin = PaddingValues(16.dp),
                         ) {
                             Text(
-                                text = "无记录",
+                                text = stringResource(Res.string.dns_no_record),
                                 fontSize = 14.sp,
                                 color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                             )
@@ -254,12 +257,12 @@ fun DnsQueryScreen(
     // 缓存清除 Dialog
     WindowDialog(
         show = showCacheDialog,
-        title = "清除缓存",
+        title = stringResource(Res.string.dns_clear_cache),
         onDismissRequest = { showCacheDialog = false },
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             TextButton(
-                text = "清除 DNS 缓存",
+                text = stringResource(Res.string.dns_clear_dns),
                 modifier = Modifier.fillMaxWidth(),
                 onClick = {
                     viewModel.flushDnsCache()
@@ -267,7 +270,7 @@ fun DnsQueryScreen(
                 },
             )
             TextButton(
-                text = "清除 FakeIP 缓存",
+                text = stringResource(Res.string.dns_clear_fakeip),
                 modifier = Modifier.fillMaxWidth(),
                 onClick = {
                     viewModel.flushFakeIp()

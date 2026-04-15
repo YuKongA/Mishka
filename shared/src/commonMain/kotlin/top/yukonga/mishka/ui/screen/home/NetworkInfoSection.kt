@@ -23,10 +23,13 @@ import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.theme.miuixShape
+import mishka.shared.generated.resources.Res
+import mishka.shared.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
 
 fun LazyListScope.networkInfoSection(state: HomeUiState = HomeUiState()) {
     item(key = "network_title") {
-        SmallTitle(text = "网络")
+        SmallTitle(text = stringResource(Res.string.home_network))
     }
     item(key = "network") {
         Row(
@@ -56,8 +59,8 @@ fun LazyListScope.networkInfoSection(state: HomeUiState = HomeUiState()) {
                     )
                     BadgeLabel("LAN")
                 }
-                InfoRow("地址", state.localIp, Modifier.padding(top = 8.dp))
-                InfoRow("接口", state.interfaceName, Modifier.padding(top = 4.dp))
+                InfoRow(stringResource(Res.string.home_address), state.localIp, Modifier.padding(top = 8.dp))
+                InfoRow(stringResource(Res.string.home_interface), state.interfaceName, Modifier.padding(top = 4.dp))
             }
             Card(
                 modifier = Modifier
@@ -71,15 +74,15 @@ fun LazyListScope.networkInfoSection(state: HomeUiState = HomeUiState()) {
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
-                        text = "网速",
+                        text = stringResource(Res.string.home_speed),
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Medium,
                         color = MiuixTheme.colorScheme.onSurface
                     )
                     BadgeLabel("NET")
                 }
-                InfoRow("上行", state.uploadSpeed, Modifier.padding(top = 8.dp))
-                InfoRow("下行", state.downloadSpeed, Modifier.padding(top = 4.dp))
+                InfoRow(stringResource(Res.string.home_upload), state.uploadSpeed, Modifier.padding(top = 8.dp))
+                InfoRow(stringResource(Res.string.home_download), state.downloadSpeed, Modifier.padding(top = 4.dp))
             }
         }
     }

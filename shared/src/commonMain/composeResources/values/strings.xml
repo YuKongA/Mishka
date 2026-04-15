@@ -1,12 +1,281 @@
 <resources>
     <string name="app_name">Mishka</string>
-    <string name="tab_home">主页</string>
-    <string name="tab_proxy">代理</string>
-    <string name="tab_settings">设置</string>
-    <string name="status_running">运行中</string>
-    <string name="status_stopped">已停止</string>
-    <string name="action_start">启动</string>
-    <string name="action_stop">停止</string>
-    <string name="action_restart">重启</string>
-    <string name="action_reload">重载</string>
+
+    <!-- Navigation -->
+    <string name="nav_home">Home</string>
+    <string name="nav_proxy">Proxy</string>
+    <string name="nav_subscription">Subscriptions</string>
+    <string name="nav_settings">Settings</string>
+
+    <!-- Common -->
+    <string name="common_confirm">OK</string>
+    <string name="common_cancel">Cancel</string>
+    <string name="common_save">Save</string>
+    <string name="common_back">Back</string>
+    <string name="common_refresh">Refresh</string>
+    <string name="common_more">More</string>
+    <string name="common_search">Search</string>
+    <string name="common_close">Close</string>
+    <string name="common_delete">Delete</string>
+    <string name="common_edit">Edit</string>
+    <string name="common_update">Update</string>
+    <string name="common_clear">Clear</string>
+    <string name="common_not_modified">Not modified</string>
+    <string name="common_enabled">Enabled</string>
+    <string name="common_disabled">Disabled</string>
+    <string name="common_cleared">Cleared</string>
+    <string name="common_items_count">%1$d items</string>
+    <string name="common_processing">Processing...</string>
+    <string name="common_new_config">New Config</string>
+
+    <!-- Home - Status -->
+    <string name="home_starting">Starting</string>
+    <string name="home_running">Running</string>
+    <string name="home_stopped">Stopped</string>
+    <string name="home_mode">Mode</string>
+    <string name="home_tun">TUN</string>
+    <string name="home_switch_mode">Switch Mode</string>
+    <string name="home_switch_tun_stack">Switch TUN Stack</string>
+
+    <!-- Home - Action Buttons -->
+    <string name="home_restart">Restart</string>
+    <string name="home_stop">Stop</string>
+    <string name="home_reload">Hot Reload</string>
+    <string name="home_start">Start</string>
+    <string name="home_starting_btn">Starting...</string>
+
+    <!-- Home - Quick Entries -->
+    <string name="home_providers">Providers</string>
+    <string name="home_providers_subtitle">Provider</string>
+    <string name="home_connections">Connections</string>
+    <string name="home_connections_subtitle">Connection</string>
+    <string name="home_logs">Logs</string>
+    <string name="home_logs_subtitle">View</string>
+    <string name="home_dns">DNS</string>
+    <string name="home_dns_subtitle">Query</string>
+
+    <!-- Home - Latency -->
+    <string name="home_latency">Latency</string>
+    <string name="home_latency_untested">Untested</string>
+    <string name="home_latency_normal">Normal</string>
+    <string name="home_latency_partial">Partial</string>
+    <string name="home_latency_abnormal">Abnormal</string>
+    <string name="home_switch">Switch</string>
+    <string name="home_select_proxy_group">Select Proxy Group</string>
+
+    <!-- Home - Network -->
+    <string name="home_network">Network</string>
+    <string name="home_address">Address</string>
+    <string name="home_interface">Interface</string>
+    <string name="home_speed">Speed</string>
+    <string name="home_upload">Upload</string>
+    <string name="home_download">Download</string>
+
+    <!-- Home - Bottom Cards -->
+    <string name="home_subscription">Subscription</string>
+    <string name="home_system">System</string>
+    <string name="home_used">Used</string>
+    <string name="home_total">Total</string>
+
+    <!-- Proxy -->
+    <string name="proxy_title">Proxy Groups</string>
+    <string name="proxy_no_groups">No proxy groups</string>
+    <string name="proxy_start_first">Please start the proxy service first</string>
+    <string name="proxy_refresh_icon">Refresh Icons</string>
+    <string name="proxy_timeout">Timeout</string>
+
+    <!-- Subscription -->
+    <string name="subscription_title">Subscriptions</string>
+    <string name="subscription_update_all">Update All</string>
+    <string name="subscription_add">Add</string>
+    <string name="subscription_no_config">No configs</string>
+    <string name="subscription_tap_add">Tap + to add a config</string>
+    <string name="subscription_config_list">Config List</string>
+    <string name="subscription_in_use">Active</string>
+    <string name="subscription_config">Config</string>
+    <string name="subscription_used_traffic">Used %1$s / %2$s</string>
+    <string name="subscription_no_traffic">No traffic info</string>
+    <string name="subscription_updated_at">Updated at %1$s</string>
+
+    <!-- Subscription Create/Edit -->
+    <string name="subscription_create">Create Config</string>
+    <string name="subscription_edit">Edit Config</string>
+    <string name="subscription_file">File</string>
+    <string name="subscription_file_summary">Import from file</string>
+    <string name="subscription_url">URL</string>
+    <string name="subscription_url_summary">Import from URL</string>
+    <string name="subscription_qr">QR Code</string>
+    <string name="subscription_qr_summary">Scan QR code to import</string>
+    <string name="subscription_url_hint">Only accepts mihomo config files (with proxies/rules)</string>
+    <string name="subscription_name">Name</string>
+    <string name="subscription_url_label">URL</string>
+    <string name="subscription_url_placeholder">Only accepts http(s) and content types</string>
+    <string name="subscription_config_name">Config Name</string>
+    <string name="subscription_sub_url">Subscription URL</string>
+    <string name="subscription_auto_update_hint">Auto-update interval (minutes, 0 or empty to disable, min 15)</string>
+    <string name="subscription_import_config">Import Config</string>
+    <string name="subscription_downloading">Downloading config...</string>
+    <string name="subscription_validating">Validating config...</string>
+    <string name="subscription_downloading_providers">Downloading providers (%1$d/%2$d)</string>
+
+    <!-- Connection -->
+    <string name="connection_title">Connections</string>
+    <string name="connection_search">Search connections</string>
+    <string name="connection_no_active">No active connections</string>
+    <string name="connection_start_first">Please start the proxy service first</string>
+    <string name="connection_list">Connection List</string>
+    <string name="connection_close_all_title">Close All Connections</string>
+    <string name="connection_close_all_summary">Are you sure to close all active connections?</string>
+    <string name="connection_close_all">Close All</string>
+    <string name="connection_no_match">No matching results</string>
+    <string name="connection_active">Active Connections</string>
+    <string name="connection_upload_total">Upload Total</string>
+    <string name="connection_download_total">Download Total</string>
+
+    <!-- Log -->
+    <string name="log_title">Logs</string>
+    <string name="log_clear">Clear</string>
+    <string name="log_waiting">Waiting for logs...</string>
+    <string name="log_not_connected">Not connected</string>
+
+    <!-- DNS -->
+    <string name="dns_title">DNS Query</string>
+    <string name="dns_domain">Domain</string>
+    <string name="dns_results">Results</string>
+    <string name="dns_no_record">No records</string>
+    <string name="dns_clear_cache">Clear Cache</string>
+    <string name="dns_clear_dns">Clear DNS Cache</string>
+    <string name="dns_clear_fakeip">Clear FakeIP Cache</string>
+    <string name="dns_querying">Querying...</string>
+    <string name="dns_query">Query</string>
+
+    <!-- Provider -->
+    <string name="provider_title">Providers</string>
+    <string name="provider_no_providers">No providers</string>
+    <string name="provider_start_first">Please start the proxy service first</string>
+    <string name="provider_list">Provider List</string>
+    <string name="provider_not_updated">Not updated</string>
+
+    <!-- Settings -->
+    <string name="settings_title">Settings</string>
+    <string name="settings_network">Network</string>
+    <string name="settings_general">General</string>
+    <string name="settings_tun_mode">TUN Mode</string>
+    <string name="settings_tun_vpn_summary">VPN (via VpnService)</string>
+    <string name="settings_tun_root_summary">ROOT (requires root)</string>
+    <string name="settings_vpn_settings">VPN Settings</string>
+    <string name="settings_vpn_summary">Bypass private network, DNS hijacking, IPv6</string>
+    <string name="settings_override_settings">Override Settings</string>
+    <string name="settings_override_summary">Ports, DNS, network overrides</string>
+    <string name="settings_meta_settings">Meta Settings</string>
+    <string name="settings_meta_summary">Unified delay, sniffer, etc.</string>
+    <string name="settings_app_proxy">Per-App Proxy</string>
+    <string name="settings_app_proxy_summary">Select apps to proxy</string>
+    <string name="settings_dynamic_notification">Dynamic Notification</string>
+    <string name="settings_dynamic_notification_summary">Show real-time speed and traffic in notification</string>
+    <string name="settings_auto_restart">Auto Restart</string>
+    <string name="settings_auto_restart_summary">Automatically restore proxy after boot or app update</string>
+    <string name="settings_theme_mode">Theme Mode</string>
+    <string name="settings_theme_system">Follow System</string>
+    <string name="settings_theme_light">Light Mode</string>
+    <string name="settings_theme_dark">Dark Mode</string>
+    <string name="settings_predictive_back">Predictive Back Gesture</string>
+    <string name="settings_predictive_back_summary">Enable predictive back animation</string>
+    <string name="settings_about">About</string>
+
+    <!-- VPN Settings -->
+    <string name="vpn_settings_title">VPN Settings</string>
+    <string name="vpn_tunnel">VPN Tunnel</string>
+    <string name="vpn_bypass_private">Bypass Private Network</string>
+    <string name="vpn_bypass_private_summary">Exclude LAN addresses from VPN routing</string>
+    <string name="vpn_allow_bypass">Allow App Bypass</string>
+    <string name="vpn_allow_bypass_summary">Allow apps to request bypassing VPN</string>
+    <string name="vpn_dns_hijacking">DNS Hijacking</string>
+    <string name="vpn_dns_hijacking_summary">Intercept all DNS requests</string>
+    <string name="vpn_system_proxy">System Proxy</string>
+    <string name="vpn_system_proxy_summary">Configure system-level HTTP proxy</string>
+    <string name="vpn_allow_ipv6">Allow IPv6</string>
+    <string name="vpn_allow_ipv6_summary">Route IPv6 traffic through VPN</string>
+
+    <!-- Network Settings -->
+    <string name="network_settings_title">Override Settings</string>
+    <string name="network_proxy_ports">Proxy Ports</string>
+    <string name="network_http_port">HTTP Port</string>
+    <string name="network_socks_port">SOCKS Port</string>
+    <string name="network_redir_port">Redir Port</string>
+    <string name="network_tproxy_port">TProxy Port</string>
+    <string name="network_mixed_port">Mixed Port</string>
+    <string name="network_options">Network Options</string>
+    <string name="network_allow_lan">Allow LAN</string>
+    <string name="network_ipv6">IPv6</string>
+    <string name="network_bind_address">Bind Address</string>
+    <string name="network_log_level">Log Level</string>
+    <string name="network_dns">DNS</string>
+    <string name="network_dns_enable">Enable DNS</string>
+    <string name="network_dns_listen">Listen Address</string>
+    <string name="network_dns_listen_title">DNS Listen Address</string>
+    <string name="network_dns_ipv6">DNS IPv6</string>
+    <string name="network_dns_prefer_h3">Prefer H3</string>
+    <string name="network_dns_use_hosts">Use Hosts</string>
+    <string name="network_dns_enhanced_mode">Enhanced Mode</string>
+    <string name="network_dns_nameservers">Nameserver</string>
+    <string name="network_dns_fallback">Fallback</string>
+    <string name="network_dns_default_nameserver">Default Nameserver</string>
+    <string name="network_dns_fakeip_filter">FakeIP Filter</string>
+    <string name="network_port_label">Port (0-65535)</string>
+    <string name="network_input_value">Input value</string>
+    <string name="network_one_per_line">One per line</string>
+
+    <!-- Meta Settings -->
+    <string name="meta_settings_title">Meta Settings</string>
+    <string name="meta_basic">Basic</string>
+    <string name="meta_unified_delay">Unified Delay</string>
+    <string name="meta_geodata_mode">Geodata Mode</string>
+    <string name="meta_tcp_concurrent">TCP Concurrent</string>
+    <string name="meta_find_process_mode">Process Match Mode</string>
+    <string name="meta_sniffer">Sniffer</string>
+    <string name="meta_sniffer_enable">Enable Sniffer</string>
+    <string name="meta_sniffer_force_dns_mapping">Force DNS Mapping</string>
+    <string name="meta_sniffer_parse_pure_ip">Parse Pure IP</string>
+    <string name="meta_sniffer_override_dest">Override Destination</string>
+    <string name="meta_sniffer_force_domain">Force Sniff Domain</string>
+    <string name="meta_sniffer_skip_domain">Skip Sniff Domain</string>
+
+    <!-- App Proxy -->
+    <string name="app_proxy_title">Per-App Proxy</string>
+    <string name="app_proxy_search">Search apps</string>
+    <string name="app_proxy_select_all">Select All</string>
+    <string name="app_proxy_deselect_all">Deselect All</string>
+    <string name="app_proxy_invert">Invert</string>
+    <string name="app_proxy_show_system">Show System Apps</string>
+    <string name="app_proxy_hide_system">Hide System Apps</string>
+    <string name="app_proxy_import">Import</string>
+    <string name="app_proxy_export">Export</string>
+    <string name="app_proxy_no_match">No matching apps</string>
+    <string name="app_proxy_mode">Proxy Mode</string>
+    <string name="app_proxy_allow_all">Allow All Apps</string>
+    <string name="app_proxy_allow_all_summary">All app traffic goes through proxy</string>
+    <string name="app_proxy_allow_selected">Allow Selected Only</string>
+    <string name="app_proxy_allow_selected_summary">Only selected apps go through proxy</string>
+    <string name="app_proxy_deny_selected">Exclude Selected</string>
+    <string name="app_proxy_deny_selected_summary">Selected apps bypass proxy</string>
+    <string name="app_proxy_app_list">App List (%1$d/%2$d)</string>
+    <string name="app_proxy_running_hint">Changes will take effect after restarting proxy</string>
+
+    <!-- About -->
+    <string name="about_title">About</string>
+    <string name="about_info">Info</string>
+    <string name="about_app_version">App Version</string>
+    <string name="about_build_version">Build Version</string>
+    <string name="about_mihomo_version">mihomo Version</string>
+    <string name="about_project">Project</string>
+
+    <!-- FormatUtils -->
+    <string name="format_seconds">%1$ds</string>
+    <string name="format_minutes">%1$dm</string>
+    <string name="format_hours_minutes">%1$dh%2$dm</string>
+    <string name="format_days_hours">%1$dd%2$dh</string>
+
+    <!-- Provider -->
+    <string name="provider_update">Update</string>
 </resources>

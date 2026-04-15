@@ -2,6 +2,9 @@ package top.yukonga.mishka.ui.component
 
 import androidx.compose.runtime.Composable
 import top.yukonga.miuix.kmp.preference.OverlayDropdownPreference
+import mishka.shared.generated.resources.Res
+import mishka.shared.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * 三态偏好组件，用于覆写设置中的三态 Boolean。
@@ -15,7 +18,7 @@ fun TriStatePreference(
     value: Boolean?,
     onValueChange: (Boolean?) -> Unit,
 ) {
-    val items = listOf("不修改", "启用", "禁用")
+    val items = listOf(stringResource(Res.string.common_not_modified), stringResource(Res.string.common_enabled), stringResource(Res.string.common_disabled))
     val selectedIndex = when (value) {
         null -> 0
         true -> 1

@@ -30,26 +30,26 @@ object NotificationHelper {
             listOf(
                 NotificationChannel(
                     CHANNEL_VPN,
-                    "VPN 服务状态",
+                    context.getString(R.string.channel_vpn_name),
                     NotificationManager.IMPORTANCE_LOW,
                 ).apply {
-                    description = "Mishka 代理服务运行状态"
+                    description = context.getString(R.string.channel_vpn_desc)
                     setShowBadge(false)
                 },
                 NotificationChannel(
                     CHANNEL_PROFILE_STATUS,
-                    "配置更新进度",
+                    context.getString(R.string.channel_profile_status_name),
                     NotificationManager.IMPORTANCE_LOW,
                 ).apply {
-                    description = "配置下载和验证进度"
+                    description = context.getString(R.string.channel_profile_status_desc)
                     setShowBadge(false)
                 },
                 NotificationChannel(
                     CHANNEL_PROFILE_RESULT,
-                    "配置更新结果",
+                    context.getString(R.string.channel_profile_result_name),
                     NotificationManager.IMPORTANCE_DEFAULT,
                 ).apply {
-                    description = "配置更新成功或失败的通知"
+                    description = context.getString(R.string.channel_profile_result_desc)
                 },
             )
         )
@@ -81,11 +81,11 @@ object NotificationHelper {
     }
 
     fun buildLoadingNotification(context: Context): Notification {
-        return buildNotification(context, "Mishka", "正在启动...")
+        return buildNotification(context, "Mishka", context.getString(R.string.notification_loading))
     }
 
     fun buildRunningNotification(context: Context, mode: String = "VpnService"): Notification {
-        return buildNotification(context, "Mishka 运行中", "模式: $mode")
+        return buildNotification(context, context.getString(R.string.notification_running_title), context.getString(R.string.notification_running_content, mode))
     }
 
     fun buildDynamicNotification(
@@ -124,8 +124,8 @@ object NotificationHelper {
 
     fun buildProfileWorkerNotification(context: Context): Notification {
         return Notification.Builder(context, CHANNEL_PROFILE_STATUS)
-            .setContentTitle("配置更新")
-            .setContentText("正在运行...")
+            .setContentTitle(context.getString(R.string.notification_profile_update))
+            .setContentText(context.getString(R.string.notification_profile_running))
             .setSmallIcon(R.drawable.ic_launcher_foreground)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
@@ -135,7 +135,7 @@ object NotificationHelper {
 
     fun buildProfileUpdatingNotification(context: Context, name: String): Notification {
         return Notification.Builder(context, CHANNEL_PROFILE_STATUS)
-            .setContentTitle("正在更新配置")
+            .setContentTitle(context.getString(R.string.notification_profile_updating))
             .setContentText(name)
             .setSmallIcon(R.drawable.ic_launcher_foreground)
             .setOngoing(true)
@@ -157,8 +157,8 @@ object NotificationHelper {
         )
 
         val notification = Notification.Builder(context, CHANNEL_PROFILE_RESULT)
-            .setContentTitle("更新成功")
-            .setContentText("$name 已更新")
+            .setContentTitle(context.getString(R.string.notification_update_success))
+            .setContentText(context.getString(R.string.notification_update_success_content, name))
             .setSmallIcon(R.drawable.ic_launcher_foreground)
             .setContentIntent(pendingIntent)
             .setAutoCancel(true)
@@ -181,7 +181,7 @@ object NotificationHelper {
 
         val text = "$name: $reason"
         val notification = Notification.Builder(context, CHANNEL_PROFILE_RESULT)
-            .setContentTitle("更新失败")
+            .setContentTitle(context.getString(R.string.notification_update_failed))
             .setContentText(text)
             .setSmallIcon(R.drawable.ic_launcher_foreground)
             .setContentIntent(pendingIntent)

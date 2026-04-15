@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -52,7 +51,16 @@ import androidx.compose.ui.unit.sp
 import io.ktor.client.HttpClient
 import io.ktor.client.request.get
 import io.ktor.client.statement.readRawBytes
+import mishka.shared.generated.resources.Res
+import mishka.shared.generated.resources.common_more
+import mishka.shared.generated.resources.common_refresh
+import mishka.shared.generated.resources.proxy_no_groups
+import mishka.shared.generated.resources.proxy_refresh_icon
+import mishka.shared.generated.resources.proxy_start_first
+import mishka.shared.generated.resources.proxy_timeout
+import mishka.shared.generated.resources.proxy_title
 import org.jetbrains.compose.resources.decodeToImageBitmap
+import org.jetbrains.compose.resources.stringResource
 import top.yukonga.mishka.platform.IconDiskCache
 import top.yukonga.mishka.ui.component.ListPopupDefaults.MenuPositionProvider
 import top.yukonga.mishka.viewmodel.ProxyGroupUi
@@ -99,7 +107,7 @@ fun ProxyScreen(
         modifier = modifier,
         topBar = {
             TopAppBar(
-                title = "代理组",
+                title = stringResource(Res.string.proxy_title),
                 scrollBehavior = scrollBehavior,
                 actions = {
                     if (groups.isNotEmpty()) {
@@ -109,7 +117,7 @@ fun ProxyScreen(
                         ) {
                             Icon(
                                 imageVector = MiuixIcons.Refresh,
-                                contentDescription = "刷新",
+                                contentDescription = stringResource(Res.string.common_refresh),
                                 tint = MiuixTheme.colorScheme.onSurface,
                             )
                         }
@@ -119,7 +127,7 @@ fun ProxyScreen(
                         ) {
                             Icon(
                                 imageVector = MiuixIcons.More,
-                                contentDescription = "更多",
+                                contentDescription = stringResource(Res.string.common_more),
                                 tint = MiuixTheme.colorScheme.onSurface,
                             )
                         }
@@ -132,7 +140,7 @@ fun ProxyScreen(
                         ) {
                             ListPopupColumn {
                                 DropdownImpl(
-                                    text = "刷新图标",
+                                    text = stringResource(Res.string.proxy_refresh_icon),
                                     optionSize = 1,
                                     isSelected = false,
                                     index = 0,
@@ -159,12 +167,12 @@ fun ProxyScreen(
                 verticalArrangement = Arrangement.Center,
             ) {
                 Text(
-                    text = "暂无代理组",
+                    text = stringResource(Res.string.proxy_no_groups),
                     fontSize = 16.sp,
                     color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                 )
                 Text(
-                    text = "请先启动代理服务",
+                    text = stringResource(Res.string.proxy_start_first),
                     modifier = Modifier.padding(top = 6.dp),
                     fontSize = 14.sp,
                     color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
@@ -226,7 +234,7 @@ fun ProxyScreen(
                 }
 
                 item(key = "bottom_spacer") {
-                    Spacer(Modifier.navigationBarsPadding())
+                    Spacer(Modifier.padding(bottom = 12.dp))
                 }
             }
         }
@@ -285,7 +293,8 @@ private fun ProxyGroupHeader(
         // 右侧：当前节点延迟 + 节点数 + 箭头
         val nowDelay = group.delays[group.now]
         if (nowDelay != null) {
-            val delayText = if (nowDelay < 0) "超时" else "${nowDelay}ms"
+            val timeoutText = stringResource(Res.string.proxy_timeout)
+            val delayText = if (nowDelay < 0) timeoutText else "${nowDelay}ms"
             val delayColor = when {
                 nowDelay < 0 -> Color(0xFFE53935)
                 nowDelay < 200 -> Color(0xFF4CAF50)
@@ -444,9 +453,10 @@ private fun ProxyNodeCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val timeoutStr = stringResource(Res.string.proxy_timeout)
     val delayText = when {
         delay == null -> null
-        delay < 0 -> "超时"
+        delay < 0 -> timeoutStr
         else -> "$delay"
     }
     val delayColor = when {

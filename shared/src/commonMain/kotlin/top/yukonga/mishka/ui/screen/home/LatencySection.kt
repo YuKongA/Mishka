@@ -41,6 +41,9 @@ import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Refresh
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.window.WindowDialog
+import mishka.shared.generated.resources.Res
+import mishka.shared.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
 
 fun LazyListScope.latencySection(
     state: HomeUiState = HomeUiState(),
@@ -85,10 +88,10 @@ private fun LatencyHeader(
         else -> Color(0xFFE53935)
     }
     val statusText = when {
-        !allTested -> "未测试"
-        state.latencyGoogle >= 0 -> "正常"
-        state.latencyCloudflare >= 0 -> "部分"
-        else -> "异常"
+        !allTested -> stringResource(Res.string.home_latency_untested)
+        state.latencyGoogle >= 0 -> stringResource(Res.string.home_latency_normal)
+        state.latencyCloudflare >= 0 -> stringResource(Res.string.home_latency_partial)
+        else -> stringResource(Res.string.home_latency_abnormal)
     }
 
     var showGroupDialog by remember { mutableStateOf(false) }
@@ -98,7 +101,7 @@ private fun LatencyHeader(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        SmallTitle(text = "延迟")
+        SmallTitle(text = stringResource(Res.string.home_latency))
         Row(
             modifier = Modifier.padding(end = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -111,7 +114,7 @@ private fun LatencyHeader(
                     color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                 )
                 Text(
-                    text = "切换",
+                    text = stringResource(Res.string.home_switch),
                     fontSize = 12.sp,
                     color = MiuixTheme.colorScheme.primary,
                     modifier = Modifier
@@ -138,7 +141,7 @@ private fun LatencyHeader(
                 ) {
                     Icon(
                         imageVector = MiuixIcons.Refresh,
-                        contentDescription = "刷新",
+                        contentDescription = stringResource(Res.string.common_refresh),
                         modifier = Modifier.size(16.dp),
                         tint = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                     )
@@ -206,7 +209,7 @@ private fun ProxyGroupSelectDialog(
 
     WindowDialog(
         show = show,
-        title = "选择代理组",
+        title = stringResource(Res.string.home_select_proxy_group),
         onDismissRequest = onDismiss,
     ) {
         Column {
@@ -229,13 +232,13 @@ private fun ProxyGroupSelectDialog(
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 TextButton(
-                    text = "确定",
+                    text = stringResource(Res.string.common_confirm),
                     onClick = { onSelect(selected) },
                     modifier = Modifier.weight(1f),
                     colors = ButtonDefaults.textButtonColorsPrimary(),
                 )
                 TextButton(
-                    text = "取消",
+                    text = stringResource(Res.string.common_cancel),
                     onClick = onDismiss,
                     modifier = Modifier.weight(1f),
                 )

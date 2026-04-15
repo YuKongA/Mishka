@@ -1,0 +1,281 @@
+<resources>
+    <string name="app_name">Mishka</string>
+
+    <!-- Navigation -->
+    <string name="nav_home">主页</string>
+    <string name="nav_proxy">代理</string>
+    <string name="nav_subscription">订阅</string>
+    <string name="nav_settings">设置</string>
+
+    <!-- Common -->
+    <string name="common_confirm">确定</string>
+    <string name="common_cancel">取消</string>
+    <string name="common_save">保存</string>
+    <string name="common_back">返回</string>
+    <string name="common_refresh">刷新</string>
+    <string name="common_more">更多</string>
+    <string name="common_search">搜索</string>
+    <string name="common_close">关闭</string>
+    <string name="common_delete">删除</string>
+    <string name="common_edit">编辑</string>
+    <string name="common_update">更新</string>
+    <string name="common_clear">清除</string>
+    <string name="common_not_modified">不修改</string>
+    <string name="common_enabled">启用</string>
+    <string name="common_disabled">禁用</string>
+    <string name="common_cleared">已清除</string>
+    <string name="common_items_count">%1$d 条</string>
+    <string name="common_processing">处理中...</string>
+    <string name="common_new_config">新配置</string>
+
+    <!-- Home - Status -->
+    <string name="home_starting">启动中</string>
+    <string name="home_running">运行中</string>
+    <string name="home_stopped">已停止</string>
+    <string name="home_mode">模式</string>
+    <string name="home_tun">TUN</string>
+    <string name="home_switch_mode">切换模式</string>
+    <string name="home_switch_tun_stack">切换 TUN Stack</string>
+
+    <!-- Home - Action Buttons -->
+    <string name="home_restart">重启</string>
+    <string name="home_stop">停止</string>
+    <string name="home_reload">热重载</string>
+    <string name="home_start">启动</string>
+    <string name="home_starting_btn">启动中...</string>
+
+    <!-- Home - Quick Entries -->
+    <string name="home_providers">外部资源</string>
+    <string name="home_providers_subtitle">Provider</string>
+    <string name="home_connections">连接</string>
+    <string name="home_connections_subtitle">Connection</string>
+    <string name="home_logs">日志</string>
+    <string name="home_logs_subtitle">查看</string>
+    <string name="home_dns">DNS</string>
+    <string name="home_dns_subtitle">查询</string>
+
+    <!-- Home - Latency -->
+    <string name="home_latency">延迟</string>
+    <string name="home_latency_untested">未测试</string>
+    <string name="home_latency_normal">正常</string>
+    <string name="home_latency_partial">部分</string>
+    <string name="home_latency_abnormal">异常</string>
+    <string name="home_switch">切换</string>
+    <string name="home_select_proxy_group">选择代理组</string>
+
+    <!-- Home - Network -->
+    <string name="home_network">网络</string>
+    <string name="home_address">地址</string>
+    <string name="home_interface">接口</string>
+    <string name="home_speed">网速</string>
+    <string name="home_upload">上行</string>
+    <string name="home_download">下行</string>
+
+    <!-- Home - Bottom Cards -->
+    <string name="home_subscription">订阅</string>
+    <string name="home_system">系统</string>
+    <string name="home_used">已用</string>
+    <string name="home_total">总量</string>
+
+    <!-- Proxy -->
+    <string name="proxy_title">代理组</string>
+    <string name="proxy_no_groups">暂无代理组</string>
+    <string name="proxy_start_first">请先启动代理服务</string>
+    <string name="proxy_refresh_icon">刷新图标</string>
+    <string name="proxy_timeout">超时</string>
+
+    <!-- Subscription -->
+    <string name="subscription_title">订阅管理</string>
+    <string name="subscription_update_all">全部更新</string>
+    <string name="subscription_add">添加</string>
+    <string name="subscription_no_config">暂无配置</string>
+    <string name="subscription_tap_add">点击右上角 + 添加配置</string>
+    <string name="subscription_config_list">配置列表</string>
+    <string name="subscription_in_use">使用中</string>
+    <string name="subscription_config">配置</string>
+    <string name="subscription_used_traffic">已用 %1$s / %2$s</string>
+    <string name="subscription_no_traffic">未获取到流量信息</string>
+    <string name="subscription_updated_at">更新于 %1$s</string>
+
+    <!-- Subscription Create/Edit -->
+    <string name="subscription_create">创建配置</string>
+    <string name="subscription_edit">编辑配置</string>
+    <string name="subscription_file">文件</string>
+    <string name="subscription_file_summary">从文件导入</string>
+    <string name="subscription_url">URL</string>
+    <string name="subscription_url_summary">从 URL 导入</string>
+    <string name="subscription_qr">二维码</string>
+    <string name="subscription_qr_summary">扫描二维码导入</string>
+    <string name="subscription_url_hint">仅接受 mihomo 配置文件(包含代理/规则)</string>
+    <string name="subscription_name">名称</string>
+    <string name="subscription_url_label">URL</string>
+    <string name="subscription_url_placeholder">仅接受 http(s) 和 content 类型</string>
+    <string name="subscription_config_name">配置名称</string>
+    <string name="subscription_sub_url">订阅 URL</string>
+    <string name="subscription_auto_update_hint">自动更新间隔（分钟，0 或留空为禁用，最小 15）</string>
+    <string name="subscription_import_config">导入配置</string>
+    <string name="subscription_downloading">下载配置...</string>
+    <string name="subscription_validating">验证配置...</string>
+    <string name="subscription_downloading_providers">下载外部资源 (%1$d/%2$d)</string>
+
+    <!-- Connection -->
+    <string name="connection_title">连接</string>
+    <string name="connection_search">搜索连接</string>
+    <string name="connection_no_active">暂无活跃连接</string>
+    <string name="connection_start_first">请先启动代理服务</string>
+    <string name="connection_list">连接列表</string>
+    <string name="connection_close_all_title">关闭所有连接</string>
+    <string name="connection_close_all_summary">确定要关闭所有活跃连接吗？</string>
+    <string name="connection_close_all">关闭全部</string>
+    <string name="connection_no_match">无匹配结果</string>
+    <string name="connection_active">活跃连接</string>
+    <string name="connection_upload_total">上行总量</string>
+    <string name="connection_download_total">下行总量</string>
+
+    <!-- Log -->
+    <string name="log_title">日志</string>
+    <string name="log_clear">清除</string>
+    <string name="log_waiting">等待日志...</string>
+    <string name="log_not_connected">未连接</string>
+
+    <!-- DNS -->
+    <string name="dns_title">DNS 查询</string>
+    <string name="dns_domain">域名</string>
+    <string name="dns_results">查询结果</string>
+    <string name="dns_no_record">无记录</string>
+    <string name="dns_clear_cache">清除缓存</string>
+    <string name="dns_clear_dns">清除 DNS 缓存</string>
+    <string name="dns_clear_fakeip">清除 FakeIP 缓存</string>
+    <string name="dns_querying">查询中...</string>
+    <string name="dns_query">查询</string>
+
+    <!-- Provider -->
+    <string name="provider_title">外部资源</string>
+    <string name="provider_no_providers">暂无外部资源</string>
+    <string name="provider_start_first">请先启动代理服务</string>
+    <string name="provider_list">资源列表</string>
+    <string name="provider_not_updated">未更新</string>
+
+    <!-- Settings -->
+    <string name="settings_title">设置</string>
+    <string name="settings_network">网络</string>
+    <string name="settings_general">通用</string>
+    <string name="settings_tun_mode">TUN 模式</string>
+    <string name="settings_tun_vpn_summary">VPN（通过 VpnService）</string>
+    <string name="settings_tun_root_summary">ROOT（需要 Root 权限）</string>
+    <string name="settings_vpn_settings">VPN 设置</string>
+    <string name="settings_vpn_summary">绕过私有网络、DNS 劫持、IPv6</string>
+    <string name="settings_override_settings">覆写设置</string>
+    <string name="settings_override_summary">端口、DNS、网络选项覆写</string>
+    <string name="settings_meta_settings">Meta 设置</string>
+    <string name="settings_meta_summary">统一延迟、嗅探器等</string>
+    <string name="settings_app_proxy">分应用代理</string>
+    <string name="settings_app_proxy_summary">选择需要代理的应用</string>
+    <string name="settings_dynamic_notification">动态通知</string>
+    <string name="settings_dynamic_notification_summary">在通知栏显示实时网速和流量</string>
+    <string name="settings_auto_restart">自动重启</string>
+    <string name="settings_auto_restart_summary">开机或应用升级后自动恢复代理</string>
+    <string name="settings_theme_mode">主题模式</string>
+    <string name="settings_theme_system">跟随系统</string>
+    <string name="settings_theme_light">浅色模式</string>
+    <string name="settings_theme_dark">深色模式</string>
+    <string name="settings_predictive_back">预测性返回手势</string>
+    <string name="settings_predictive_back_summary">启用预测性返回动画效果</string>
+    <string name="settings_about">关于</string>
+
+    <!-- VPN Settings -->
+    <string name="vpn_settings_title">VPN 设置</string>
+    <string name="vpn_tunnel">VPN 隧道</string>
+    <string name="vpn_bypass_private">绕过私有网络</string>
+    <string name="vpn_bypass_private_summary">排除局域网地址，不通过 VPN 路由</string>
+    <string name="vpn_allow_bypass">允许应用绕过</string>
+    <string name="vpn_allow_bypass_summary">允许应用请求绕过 VPN 连接</string>
+    <string name="vpn_dns_hijacking">DNS 劫持</string>
+    <string name="vpn_dns_hijacking_summary">接管所有 DNS 请求</string>
+    <string name="vpn_system_proxy">系统代理</string>
+    <string name="vpn_system_proxy_summary">配置系统级 HTTP 代理</string>
+    <string name="vpn_allow_ipv6">允许 IPv6</string>
+    <string name="vpn_allow_ipv6_summary">通过 VPN 路由 IPv6 流量</string>
+
+    <!-- Network Settings -->
+    <string name="network_settings_title">覆写设置</string>
+    <string name="network_proxy_ports">代理端口</string>
+    <string name="network_http_port">HTTP 端口</string>
+    <string name="network_socks_port">SOCKS 端口</string>
+    <string name="network_redir_port">Redir 端口</string>
+    <string name="network_tproxy_port">TProxy 端口</string>
+    <string name="network_mixed_port">Mixed 端口</string>
+    <string name="network_options">网络选项</string>
+    <string name="network_allow_lan">允许局域网</string>
+    <string name="network_ipv6">IPv6</string>
+    <string name="network_bind_address">绑定地址</string>
+    <string name="network_log_level">日志等级</string>
+    <string name="network_dns">DNS</string>
+    <string name="network_dns_enable">启用 DNS</string>
+    <string name="network_dns_listen">监听地址</string>
+    <string name="network_dns_listen_title">DNS 监听地址</string>
+    <string name="network_dns_ipv6">DNS IPv6</string>
+    <string name="network_dns_prefer_h3">Prefer H3</string>
+    <string name="network_dns_use_hosts">使用 Hosts</string>
+    <string name="network_dns_enhanced_mode">增强模式</string>
+    <string name="network_dns_nameservers">Nameserver</string>
+    <string name="network_dns_fallback">Fallback</string>
+    <string name="network_dns_default_nameserver">默认 Nameserver</string>
+    <string name="network_dns_fakeip_filter">FakeIP 过滤</string>
+    <string name="network_port_label">端口号 (0-65535)</string>
+    <string name="network_input_value">输入值</string>
+    <string name="network_one_per_line">每行一条</string>
+
+    <!-- Meta Settings -->
+    <string name="meta_settings_title">Meta 设置</string>
+    <string name="meta_basic">基本</string>
+    <string name="meta_unified_delay">统一延迟</string>
+    <string name="meta_geodata_mode">Geodata 模式</string>
+    <string name="meta_tcp_concurrent">TCP 并发</string>
+    <string name="meta_find_process_mode">进程匹配模式</string>
+    <string name="meta_sniffer">嗅探器</string>
+    <string name="meta_sniffer_enable">启用嗅探器</string>
+    <string name="meta_sniffer_force_dns_mapping">强制 DNS 映射</string>
+    <string name="meta_sniffer_parse_pure_ip">解析纯 IP</string>
+    <string name="meta_sniffer_override_dest">覆写目标地址</string>
+    <string name="meta_sniffer_force_domain">强制嗅探域名</string>
+    <string name="meta_sniffer_skip_domain">跳过嗅探域名</string>
+
+    <!-- App Proxy -->
+    <string name="app_proxy_title">分应用代理</string>
+    <string name="app_proxy_search">搜索应用</string>
+    <string name="app_proxy_select_all">全选</string>
+    <string name="app_proxy_deselect_all">全不选</string>
+    <string name="app_proxy_invert">反选</string>
+    <string name="app_proxy_show_system">显示系统应用</string>
+    <string name="app_proxy_hide_system">隐藏系统应用</string>
+    <string name="app_proxy_import">导入</string>
+    <string name="app_proxy_export">导出</string>
+    <string name="app_proxy_no_match">无匹配应用</string>
+    <string name="app_proxy_mode">代理模式</string>
+    <string name="app_proxy_allow_all">允许所有应用</string>
+    <string name="app_proxy_allow_all_summary">所有应用的流量都经过代理</string>
+    <string name="app_proxy_allow_selected">仅允许选中应用</string>
+    <string name="app_proxy_allow_selected_summary">只有选中的应用经过代理</string>
+    <string name="app_proxy_deny_selected">排除选中应用</string>
+    <string name="app_proxy_deny_selected_summary">选中的应用不经过代理</string>
+    <string name="app_proxy_app_list">应用列表 (%1$d/%2$d)</string>
+    <string name="app_proxy_running_hint">修改将在重启代理后生效</string>
+
+    <!-- About -->
+    <string name="about_title">关于</string>
+    <string name="about_info">信息</string>
+    <string name="about_app_version">应用版本</string>
+    <string name="about_build_version">构建版本</string>
+    <string name="about_mihomo_version">mihomo 版本</string>
+    <string name="about_project">项目</string>
+
+    <!-- FormatUtils -->
+    <string name="format_seconds">%1$d秒</string>
+    <string name="format_minutes">%1$d分钟</string>
+    <string name="format_hours_minutes">%1$d小时%2$d分</string>
+    <string name="format_days_hours">%1$d天%2$d时</string>
+
+    <!-- Provider -->
+    <string name="provider_update">更新</string>
+</resources>

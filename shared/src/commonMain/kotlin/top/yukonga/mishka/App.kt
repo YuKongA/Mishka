@@ -40,6 +40,7 @@ fun App(
     mihomoVersion: String = "",
     onScanQR: ((callback: (String?) -> Unit) -> Unit)? = null,
     onPredictiveBackChange: ((Boolean) -> Unit)? = null,
+    hasRootPermission: Boolean = false,
 ) {
     val controller = remember(colorMode) {
         when (colorMode) {
@@ -74,6 +75,7 @@ fun App(
                 mihomoVersion = mihomoVersion,
                 onScanQR = onScanQR,
                 onPredictiveBackChange = onPredictiveBackChange,
+                hasRootPermission = hasRootPermission,
             )
         }
     }

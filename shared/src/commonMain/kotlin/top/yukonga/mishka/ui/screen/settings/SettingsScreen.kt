@@ -7,15 +7,44 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
-import top.yukonga.miuix.kmp.utils.overScrollVertical
-import top.yukonga.miuix.kmp.utils.scrollEndHaptic
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import mishka.shared.generated.resources.Res
+import mishka.shared.generated.resources.settings_about
+import mishka.shared.generated.resources.settings_app_proxy
+import mishka.shared.generated.resources.settings_app_proxy_summary
+import mishka.shared.generated.resources.settings_auto_restart
+import mishka.shared.generated.resources.settings_auto_restart_summary
+import mishka.shared.generated.resources.settings_dynamic_notification
+import mishka.shared.generated.resources.settings_dynamic_notification_summary
+import mishka.shared.generated.resources.settings_general
+import mishka.shared.generated.resources.settings_meta_settings
+import mishka.shared.generated.resources.settings_meta_summary
+import mishka.shared.generated.resources.settings_network
+import mishka.shared.generated.resources.settings_override_settings
+import mishka.shared.generated.resources.settings_override_summary
+import mishka.shared.generated.resources.settings_predictive_back
+import mishka.shared.generated.resources.settings_predictive_back_summary
+import mishka.shared.generated.resources.settings_theme_dark
+import mishka.shared.generated.resources.settings_theme_light
+import mishka.shared.generated.resources.settings_theme_mode
+import mishka.shared.generated.resources.settings_theme_system
+import mishka.shared.generated.resources.settings_title
+import mishka.shared.generated.resources.settings_tun_mode
+import mishka.shared.generated.resources.settings_tun_root_summary
+import mishka.shared.generated.resources.settings_tun_vpn_summary
+import mishka.shared.generated.resources.settings_vpn_settings
+import mishka.shared.generated.resources.settings_vpn_summary
+import org.jetbrains.compose.resources.stringResource
+import top.yukonga.mishka.platform.BootStartManager
+import top.yukonga.mishka.platform.PlatformStorage
+import top.yukonga.mishka.platform.StorageKeys
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.Scaffold
@@ -24,9 +53,8 @@ import top.yukonga.miuix.kmp.basic.TopAppBar
 import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.preference.OverlayDropdownPreference
 import top.yukonga.miuix.kmp.preference.SwitchPreference
-import top.yukonga.miuix.kmp.theme.MiuixTheme
-import top.yukonga.mishka.platform.BootStartManager
-import top.yukonga.mishka.platform.PlatformStorage
+import top.yukonga.miuix.kmp.utils.overScrollVertical
+import top.yukonga.miuix.kmp.utils.scrollEndHaptic
 
 @Composable
 fun SettingsScreen(
@@ -42,25 +70,34 @@ fun SettingsScreen(
     onColorModeChange: (Int) -> Unit = {},
     storage: PlatformStorage? = null,
     onPredictiveBackChange: ((Boolean) -> Unit)? = null,
+    hasRootPermission: Boolean = false,
+    isProxyRunning: Boolean = false,
 ) {
     val scrollBehavior = MiuixScrollBehavior()
     var isAutoStartEnabled by remember {
         mutableStateOf(bootStartManager?.isEnabled() ?: false)
     }
     var isPredictiveBackEnabled by remember {
-        mutableStateOf(storage?.getString("predictive_back", "false") == "true")
+        mutableStateOf(storage?.getString(StorageKeys.PREDICTIVE_BACK, "false") == "true")
     }
     var isDynamicNotificationEnabled by remember {
-        mutableStateOf(storage?.getString("dynamic_notification", "true") != "false")
+        mutableStateOf(storage?.getString(StorageKeys.DYNAMIC_NOTIFICATION, "true") != "false")
+    }
+    var tunModeIndex by remember {
+        mutableIntStateOf(if (storage?.getString(StorageKeys.TUN_MODE, "vpn") == "root") 1 else 0)
     }
 
-    val themeItems = listOf("跟随系统", "浅色模式", "深色模式")
+    val themeSystemStr = stringResource(Res.string.settings_theme_system)
+    val themeLightStr = stringResource(Res.string.settings_theme_light)
+    val themeDarkStr = stringResource(Res.string.settings_theme_dark)
+    val themeItems = listOf(themeSystemStr, themeLightStr, themeDarkStr)
+    val tunModeItems = listOf("VPN", "ROOT")
 
     Scaffold(
         modifier = modifier,
         topBar = {
             TopAppBar(
-                title = "设置",
+                title = stringResource(Res.string.settings_title),
                 scrollBehavior = scrollBehavior,
             )
         },
@@ -77,7 +114,7 @@ fun SettingsScreen(
             ),
         ) {
             item {
-                SmallTitle(text = "网络")
+                SmallTitle(text = stringResource(Res.string.settings_network))
             }
             item {
                 Card(
@@ -86,51 +123,67 @@ fun SettingsScreen(
                         .padding(horizontal = 12.dp)
                         .padding(bottom = 6.dp),
                 ) {
+                    if (hasRootPermission) {
+                        OverlayDropdownPreference(
+                            title = stringResource(Res.string.settings_tun_mode),
+                            summary = if (tunModeIndex == 0) stringResource(Res.string.settings_tun_vpn_summary) else stringResource(Res.string.settings_tun_root_summary),
+                            items = tunModeItems,
+                            selectedIndex = tunModeIndex,
+                            onSelectedIndexChange = { index ->
+                                val mode = if (index == 1) "root" else "vpn"
+                                storage?.putString(StorageKeys.TUN_MODE, mode)
+                                tunModeIndex = index
+                            },
+                            enabled = !isProxyRunning,
+                        )
+                    }
+                    if (tunModeIndex == 0) {
+                        ArrowPreference(
+                            title = stringResource(Res.string.settings_vpn_settings),
+                            summary = stringResource(Res.string.settings_vpn_summary),
+                            onClick = onNavigateVpnSettings,
+                        )
+                    }
                     ArrowPreference(
-                        title = "VPN 设置",
-                        summary = "绕过私有网络、DNS 劫持、IPv6",
-                        onClick = onNavigateVpnSettings,
-                    )
-                    ArrowPreference(
-                        title = "覆写设置",
-                        summary = "端口、DNS、网络选项覆写",
+                        title = stringResource(Res.string.settings_override_settings),
+                        summary = stringResource(Res.string.settings_override_summary),
                         onClick = onNavigateNetworkSettings,
                     )
                     ArrowPreference(
-                        title = "Meta 设置",
-                        summary = "统一延迟、嗅探器等",
+                        title = stringResource(Res.string.settings_meta_settings),
+                        summary = stringResource(Res.string.settings_meta_summary),
                         onClick = onNavigateMetaSettings,
                     )
                     ArrowPreference(
-                        title = "分应用代理",
-                        summary = "选择需要代理的应用",
+                        title = stringResource(Res.string.settings_app_proxy),
+                        summary = stringResource(Res.string.settings_app_proxy_summary),
                         onClick = onNavigateAppProxy,
                     )
                 }
             }
             item {
-                SmallTitle(text = "通用")
+                SmallTitle(text = stringResource(Res.string.settings_general))
             }
             item {
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 12.dp)
-                        .padding(bottom = 6.dp),
+                        .padding(bottom = 12.dp),
                 ) {
                     SwitchPreference(
-                        title = "动态通知",
-                        summary = "在通知栏显示实时网速和流量",
+                        title = stringResource(Res.string.settings_dynamic_notification),
+                        summary = stringResource(Res.string.settings_dynamic_notification_summary),
                         checked = isDynamicNotificationEnabled,
                         onCheckedChange = { checked ->
-                            storage?.putString("dynamic_notification", if (checked) "true" else "false")
+                            storage?.putString(StorageKeys.DYNAMIC_NOTIFICATION, if (checked) "true" else "false")
                             isDynamicNotificationEnabled = checked
                         },
                     )
                     if (bootStartManager != null) {
                         SwitchPreference(
-                            title = "自动重启",
-                            summary = "开机或应用升级后自动恢复代理",
+                            title = stringResource(Res.string.settings_auto_restart),
+                            summary = stringResource(Res.string.settings_auto_restart_summary),
                             checked = isAutoStartEnabled,
                             onCheckedChange = { checked ->
                                 bootStartManager.setEnabled(checked)
@@ -139,8 +192,8 @@ fun SettingsScreen(
                         )
                     }
                     OverlayDropdownPreference(
-                        title = "主题模式",
-                        summary = themeItems.getOrElse(colorMode) { "跟随系统" },
+                        title = stringResource(Res.string.settings_theme_mode),
+                        summary = themeItems.getOrElse(colorMode) { themeSystemStr },
                         items = themeItems,
                         selectedIndex = colorMode,
                         onSelectedIndexChange = { index ->
@@ -150,23 +203,23 @@ fun SettingsScreen(
                                 2 -> "dark"
                                 else -> "system"
                             }
-                            storage?.putString("dark_mode", value)
+                            storage?.putString(StorageKeys.DARK_MODE, value)
                         },
                     )
                     if (onPredictiveBackChange != null) {
                         SwitchPreference(
-                            title = "预测性返回手势",
-                            summary = "启用预测性返回动画效果",
+                            title = stringResource(Res.string.settings_predictive_back),
+                            summary = stringResource(Res.string.settings_predictive_back_summary),
                             checked = isPredictiveBackEnabled,
                             onCheckedChange = { checked ->
-                                storage?.putString("predictive_back", if (checked) "true" else "false")
+                                storage?.putString(StorageKeys.PREDICTIVE_BACK, if (checked) "true" else "false")
                                 isPredictiveBackEnabled = checked
                                 onPredictiveBackChange(checked)
                             },
                         )
                     }
                     ArrowPreference(
-                        title = "关于",
+                        title = stringResource(Res.string.settings_about),
                         summary = "Mishka v${misc.VersionInfo.VERSION_NAME}",
                         onClick = onNavigateAbout,
                     )

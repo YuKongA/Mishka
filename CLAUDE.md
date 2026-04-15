@@ -52,7 +52,7 @@ Mishka/
 │   ├── kotlin/.../mishka/
 │   │   ├── MainActivity.kt           应用入口
 │   │   ├── MishkaApplication.kt      全局初始化（通知渠道 + 预测性返回手势）
-│   │   └── service/                  12 个服务组件
+│   │   └── service/                  15 个服务组件（含 ROOT 模式）
 │   ├── cpp/                          process_helper.c（JNI fork+exec）
 │   └── jniLibs/arm64-v8a/            libmihomo.so
 └── desktop/                          Desktop 预留入口
@@ -78,9 +78,15 @@ MainActivity → App → AppNavigation
 - **通信方案**：mihomo RESTful API + WebSocket（非 JNI），代码全部在 commonMain 跨平台共享
 - **导航**：miuix NavDisplay + 自定义 Navigator（push/pop/popUntil + navigateForResult 结果通信）+ LocalNavigator
 - **主页 Tab**：HorizontalPager + MainPagerState + NavigationBar（4 Tab）
-- **状态桥接**：ProxyServiceBridge（全局 StateFlow），TunService 写入、ViewModel 读取
-- **进程模型**：单进程（VpnService 和 UI 同进程）
-- **数据持久化**：Room 3.0 KMP（结构化数据）+ PlatformStorage（简单偏好设置）
+- **TUN 双模式**：VPN 模式（VpnService 创建 TUN fd）和 ROOT 模式（mihomo 自行创建 TUN + auto-route）
+  - VPN 模式：VpnService.establish() → fd → `tun.file-descriptor` + `auto-route: false`
+  - ROOT 模式：`su -c mihomo` → 无 fd → `auto-route: true` + `auto-detect-interface: true`
+  - ROOT 模式下分应用代理通过 mihomo 的 `include/exclude-package` 实现（VPN 模式用 VpnService API）
+  - ROOT 进程 app 被杀后仍存活，重启 app 通过持久化的 PID/secret 重连
+  - ROOT 不可用时（卸载 Magisk 等）自动回退 VPN 模式
+- **状态桥接**：ProxyServiceBridge（全局 StateFlow + TunMode），Service 写入、ViewModel 读取
+- **进程模型**：单进程（VpnService 和 UI 同进程），ROOT 模式 mihomo 为独立 root 进程
+- **数据持久化**：Room 3.0 KMP（结构化数据）+ PlatformStorage（简单偏好设置）+ StorageKeys（key 常量）
 - **订阅管理**：Pending/Imported 两阶段编辑模型（对齐 CMFA ProfileManager）
 - **配置校验**：mihomo -t 进程完整校验（ProcessBuilder，不需要 TUN fd）
 
@@ -179,20 +185,23 @@ files/mihomo/
 
 ## Android 服务层
 
-| 组件                      | 用途                                                 |
-| ------------------------- | ---------------------------------------------------- |
-| MishkaTunService          | VpnService + JNI fork+exec 启动 mihomo               |
-| MishkaTileService         | Quick Settings Tile 一键启停代理                     |
-| BootReceiver              | 开机自启（默认 disabled，动态启用）                  |
-| ConfigGenerator           | 运行配置生成（writeRunConfig + YAML 行过滤）         |
-| ProfileFileOps            | 订阅文件操作（imported/pending/processing 目录管理） |
-| AndroidProfileFileManager | ProfileFileManager 接口的 Android 实现               |
-| MihomoRunner              | mihomo 进程生命周期管理（JNI fork+exec）             |
-| MihomoValidator           | mihomo -t 配置校验（ProcessBuilder）                 |
-| ProcessHelper             | JNI 包装（nativeForkExec/nativeKill/nativeWaitpid）  |
-| NotificationHelper        | 三层通知渠道（VPN/更新进度/更新结果）                |
-| ProfileReceiver           | AlarmManager 调度自动更新                            |
-| ProfileWorker             | 前台服务执行后台配置更新                             |
+| 组件                       | 用途                                                  |
+| -------------------------- | ----------------------------------------------------- |
+| MishkaTunService           | VpnService + JNI fork+exec 启动 mihomo                |
+| MishkaRootService          | ROOT TUN 模式前台服务（su 启动 mihomo，进程重连）     |
+| RootHelper                 | root 检测/启动/终止/存活检查/残留清理                 |
+| DynamicNotificationManager | 动态通知（WebSocket 流量），两个 Service 共用          |
+| MishkaTileService          | Quick Settings Tile 一键启停代理（双模式路由）        |
+| BootReceiver               | 开机自启（默认 disabled，动态启用）                   |
+| ConfigGenerator            | 运行配置生成（writeRunConfig + YAML 行过滤）          |
+| ProfileFileOps             | 订阅文件操作（imported/pending/processing 目录管理）  |
+| AndroidProfileFileManager  | ProfileFileManager 接口的 Android 实现                |
+| MihomoRunner               | mihomo 进程管理（VPN: JNI fork+exec / ROOT: su）      |
+| MihomoValidator            | mihomo -t 配置校验（ProcessBuilder）                  |
+| ProcessHelper              | JNI 包装（nativeForkExec/nativeKill/nativeWaitpid）   |
+| NotificationHelper         | 三层通知渠道（VPN/更新进度/更新结果）                 |
+| ProfileReceiver            | AlarmManager 调度自动更新                             |
+| ProfileWorker              | 前台服务执行后台配置更新                              |
 
 ## 数据模型
 

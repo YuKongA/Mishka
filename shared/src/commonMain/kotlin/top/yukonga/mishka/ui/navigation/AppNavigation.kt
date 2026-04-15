@@ -78,6 +78,9 @@ import top.yukonga.miuix.kmp.icon.extended.Settings
 import top.yukonga.miuix.kmp.icon.extended.Sidebar
 import top.yukonga.miuix.kmp.icon.extended.Tune
 import top.yukonga.miuix.kmp.icon.extended.UploadCloud
+import mishka.shared.generated.resources.Res
+import mishka.shared.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
 import kotlin.math.abs
 
 val LocalMainPagerState = staticCompositionLocalOf<MainPagerState> {
@@ -103,6 +106,7 @@ fun AppNavigation(
     mihomoVersion: String = "",
     onScanQR: ((callback: (String?) -> Unit) -> Unit)? = null,
     onPredictiveBackChange: ((Boolean) -> Unit)? = null,
+    hasRootPermission: Boolean = false,
 ) {
     val backStack = remember { mutableStateListOf<NavKey>(Route.Main) }
     val navigator = remember { Navigator(backStack) }
@@ -131,7 +135,8 @@ fun AppNavigation(
                     colorMode,
                     onColorModeChange,
                     storage,
-                    onPredictiveBackChange
+                    onPredictiveBackChange,
+                    hasRootPermission,
                 )
             }
             entry<Route.Subscription> {
@@ -170,7 +175,7 @@ fun AppNavigation(
                             onScanQR { url ->
                                 if (url != null && subscriptionViewModel != null) {
                                     subscriptionViewModel.addSubscription(
-                                        name = "新配置",
+                                        name = "",
                                         url = url,
                                         onComplete = {
                                             navigator.popUntil { key -> key is Route.Subscription }
@@ -306,6 +311,7 @@ private fun MainPage(
     onColorModeChange: (Int) -> Unit = {},
     storage: top.yukonga.mishka.platform.PlatformStorage? = null,
     onPredictiveBackChange: ((Boolean) -> Unit)? = null,
+    hasRootPermission: Boolean = false,
 ) {
     val homeUiState = homeViewModel?.uiState?.collectAsState()?.value ?: HomeUiState()
     val selectedPage = mainPagerState.selectedPage
@@ -318,25 +324,25 @@ private fun MainPage(
                     selected = selectedPage == 0,
                     onClick = { mainPagerState.animateToPage(0) },
                     icon = MiuixIcons.Sidebar,
-                    label = "主页",
+                    label = stringResource(Res.string.nav_home),
                 )
                 NavigationBarItem(
                     selected = selectedPage == 1,
                     onClick = { mainPagerState.animateToPage(1) },
                     icon = MiuixIcons.Tune,
-                    label = "代理",
+                    label = stringResource(Res.string.nav_proxy),
                 )
                 NavigationBarItem(
                     selected = selectedPage == 2,
                     onClick = { mainPagerState.animateToPage(2) },
                     icon = MiuixIcons.UploadCloud,
-                    label = "订阅",
+                    label = stringResource(Res.string.nav_subscription),
                 )
                 NavigationBarItem(
                     selected = selectedPage == 3,
                     onClick = { mainPagerState.animateToPage(3) },
                     icon = MiuixIcons.Settings,
-                    label = "设置",
+                    label = stringResource(Res.string.nav_settings),
                 )
             }
         },
@@ -391,6 +397,8 @@ private fun MainPage(
                     onColorModeChange = onColorModeChange,
                     storage = storage,
                     onPredictiveBackChange = onPredictiveBackChange,
+                    hasRootPermission = hasRootPermission,
+                    isProxyRunning = homeUiState.isRunning || homeUiState.isStarting,
                 )
             }
         }

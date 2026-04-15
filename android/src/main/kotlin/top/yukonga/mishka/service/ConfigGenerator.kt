@@ -3,6 +3,7 @@ package top.yukonga.mishka.service
 import android.content.Context
 import top.yukonga.mishka.data.repository.OverrideStorageHelper
 import top.yukonga.mishka.platform.PlatformStorage
+import top.yukonga.mishka.platform.StorageKeys
 import java.io.File
 import java.util.UUID
 
@@ -26,13 +27,15 @@ object ConfigGenerator {
      * 生成最终运行配置。
      * 以订阅配置为基础，用行过滤移除冲突 key，再注入 Mishka 控制参数和覆写设置。
      *
-     * @param tunFd VPN 的 TUN 文件描述符，注入到 tun.file-descriptor
+     * @param tunFd VPN 的 TUN 文件描述符，注入到 tun.file-descriptor（VPN 模式）
+     * @param rootMode 是否为 ROOT 模式（mihomo 自行创建 TUN 和管理路由）
      */
     fun writeRunConfig(
         context: Context,
         secret: String,
         subscriptionId: String? = null,
         tunFd: Int = -1,
+        rootMode: Boolean = false,
     ): File {
         val configFile = getConfigFile(context)
         val storage = PlatformStorage(context)
@@ -130,14 +133,40 @@ object ConfigGenerator {
             appendLine()
             appendLine("tun:")
             appendLine("  enable: true")
-            if (tunFd >= 0) {
-                appendLine("  file-descriptor: $tunFd")
+            if (rootMode) {
+                // ROOT 模式：mihomo 自行创建 TUN 设备和管理路由表
+                appendLine("  auto-route: true")
+                appendLine("  auto-detect-interface: true")
+                // 分应用代理：通过 mihomo 的 include/exclude-package 实现
+                val proxyMode = storage.getString(StorageKeys.APP_PROXY_MODE, "AllowAll")
+                val packages = storage.getStringSet(StorageKeys.APP_PROXY_PACKAGES, emptySet())
+                if (proxyMode == "AllowSelected" && packages.isNotEmpty()) {
+                    appendLine("  include-package:")
+                    packages.forEach { appendLine("    - $it") }
+                } else if (proxyMode == "DenySelected" && packages.isNotEmpty()) {
+                    appendLine("  exclude-package:")
+                    packages.forEach { appendLine("    - $it") }
+                }
+            } else {
+                // VPN 模式：使用 VpnService 提供的 TUN fd
+                if (tunFd >= 0) {
+                    appendLine("  file-descriptor: $tunFd")
+                }
+                appendLine("  auto-route: false")
+                appendLine("  auto-detect-interface: false")
             }
             appendLine("  stack: mixed")
-            appendLine("  inet4-address: 198.18.0.1/30")
-            appendLine("  inet6-address: []")
-            appendLine("  auto-route: false")
-            appendLine("  auto-detect-interface: false")
+            appendLine("  inet4-address:")
+            appendLine("    - 198.18.0.1/30")
+            if (rootMode) {
+                val allowIpv6 = storage.getString(StorageKeys.VPN_ALLOW_IPV6, "false") == "true"
+                if (allowIpv6) {
+                    appendLine("  inet6-address:")
+                    appendLine("    - fdfe:dcba:9876::1/126")
+                }
+            } else {
+                appendLine("  inet6-address: []")
+            }
             appendLine("  dns-hijack:")
             appendLine("    - 0.0.0.0:53")
 

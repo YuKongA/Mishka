@@ -4,6 +4,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import top.yukonga.mishka.data.model.Subscription
 import top.yukonga.mishka.platform.PlatformStorage
+import top.yukonga.mishka.platform.StorageKeys
 
 object DataMigration {
 
@@ -34,7 +35,7 @@ object DataMigration {
                     importedDao.insert(entity)
 
                     if (sub.isActive) {
-                        storage.putString("active_profile_uuid", sub.id)
+                        storage.putString(StorageKeys.ACTIVE_PROFILE_UUID, sub.id)
                     }
                 }
                 storage.putString("subscriptions", "")

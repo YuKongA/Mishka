@@ -13,6 +13,9 @@ import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.window.WindowDialog
+import mishka.shared.generated.resources.Res
+import mishka.shared.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * 列表编辑对话框，用于编辑 DNS 服务器、域名列表等。
@@ -35,7 +38,7 @@ fun ListEditDialog(
         TextField(
             state = textState,
             modifier = Modifier.fillMaxWidth().height(160.dp),
-            label = "每行一条",
+            label = stringResource(Res.string.network_one_per_line),
         )
         Spacer(Modifier.height(12.dp))
         Row(
@@ -43,7 +46,7 @@ fun ListEditDialog(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             TextButton(
-                text = "不修改",
+                text = stringResource(Res.string.common_not_modified),
                 modifier = Modifier.weight(1f),
                 onClick = {
                     onReset()
@@ -51,7 +54,7 @@ fun ListEditDialog(
                 },
             )
             TextButton(
-                text = "清除",
+                text = stringResource(Res.string.common_clear),
                 modifier = Modifier.weight(1f),
                 onClick = {
                     onConfirm(emptyList())
@@ -59,7 +62,7 @@ fun ListEditDialog(
                 },
             )
             TextButton(
-                text = "确定",
+                text = stringResource(Res.string.common_confirm),
                 modifier = Modifier.weight(1f),
                 colors = ButtonDefaults.textButtonColorsPrimary(),
                 onClick = {

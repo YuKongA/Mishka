@@ -12,6 +12,9 @@ import top.yukonga.miuix.kmp.basic.CircularProgressIndicator
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.window.WindowDialog
+import mishka.shared.generated.resources.Res
+import mishka.shared.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * 导入进度对话框：校验配置、下载外部资源时显示。
@@ -24,7 +27,7 @@ fun ImportProgressDialog(
 ) {
     WindowDialog(
         show = show,
-        title = "导入配置",
+        title = stringResource(Res.string.subscription_import_config),
         onDismissRequest = null,
         content = {
             Row(

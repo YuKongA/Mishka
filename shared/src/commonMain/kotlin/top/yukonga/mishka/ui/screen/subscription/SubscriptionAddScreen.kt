@@ -30,6 +30,9 @@ import top.yukonga.miuix.kmp.icon.extended.Back
 import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.mishka.viewmodel.SubscriptionViewModel
+import mishka.shared.generated.resources.Res
+import mishka.shared.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * 创建配置 —— 选择添加方式（文件 / URL）
@@ -50,14 +53,14 @@ fun SubscriptionAddScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = "创建配置",
+                title = stringResource(Res.string.subscription_create),
                 scrollBehavior = scrollBehavior,
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         val layoutDirection = LocalLayoutDirection.current
                         Icon(
                             imageVector = MiuixIcons.Back,
-                            contentDescription = "返回",
+                            contentDescription = stringResource(Res.string.common_back),
                             tint = MiuixTheme.colorScheme.onSurface,
                             modifier = Modifier.graphicsLayer {
                                 scaleX = if (layoutDirection == LayoutDirection.Rtl) -1f else 1f
@@ -84,21 +87,21 @@ fun SubscriptionAddScreen(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp).padding(top = 12.dp),
                 ) {
                     ArrowPreference(
-                        title = "文件",
-                        summary = if (uiState.importProgress != null) uiState.importProgress!!.step else "从文件导入",
+                        title = stringResource(Res.string.subscription_file),
+                        summary = if (uiState.importProgress != null) uiState.importProgress!!.step else stringResource(Res.string.subscription_file_summary),
                         enabled = !uiState.isLoading,
                         onClick = onPickFile,
                     )
                     ArrowPreference(
-                        title = "URL",
-                        summary = "从 URL 导入",
+                        title = stringResource(Res.string.subscription_url),
+                        summary = stringResource(Res.string.subscription_url_summary),
                         enabled = !uiState.isLoading,
                         onClick = onNavigateUrl,
                     )
                     if (onScanQR != null) {
                         ArrowPreference(
-                            title = "二维码",
-                            summary = "扫描二维码导入",
+                            title = stringResource(Res.string.subscription_qr),
+                            summary = stringResource(Res.string.subscription_qr_summary),
                             enabled = !uiState.isLoading,
                             onClick = onScanQR,
                         )
@@ -124,6 +127,6 @@ fun SubscriptionAddScreen(
 
     ImportProgressDialog(
         show = uiState.isLoading,
-        step = uiState.importProgress?.step ?: "处理中...",
+        step = uiState.importProgress?.step ?: stringResource(Res.string.common_processing),
     )
 }

@@ -62,6 +62,9 @@ import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.basic.Search
 import top.yukonga.miuix.kmp.icon.basic.SearchCleanup
 import top.yukonga.miuix.kmp.theme.MiuixTheme.colorScheme
+import mishka.shared.generated.resources.Res
+import mishka.shared.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * 搜索折叠时显示主内容
@@ -142,7 +145,7 @@ fun SearchStatus.SearchPager(
                 exit = shrinkHorizontally() + slideOutHorizontally(targetOffsetX = { it }),
             ) {
                 Text(
-                    text = "取消",
+                    text = stringResource(Res.string.common_cancel),
                     fontWeight = FontWeight.Bold,
                     color = colorScheme.primary,
                     modifier = Modifier

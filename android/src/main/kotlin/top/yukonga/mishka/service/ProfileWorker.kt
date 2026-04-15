@@ -17,6 +17,7 @@ import top.yukonga.mishka.data.database.getAppDatabase
 import top.yukonga.mishka.data.repository.ConfigProcessor
 import top.yukonga.mishka.data.repository.SubscriptionFetcher
 import top.yukonga.mishka.data.model.Subscription
+import top.yukonga.mishka.R
 
 /**
  * 配置后台更新前台服务（对齐 CMFA ProfileWorker）。
@@ -147,7 +148,7 @@ class ProfileWorker : Service() {
         } catch (e: Exception) {
             Log.e(TAG, "Failed to update profile ${imported.name}", e)
             NotificationHelper.notifyProfileUpdateFailed(
-                this, imported.name, e.message ?: "未知错误"
+                this, imported.name, e.message ?: getString(R.string.notification_unknown_error)
             )
         } finally {
             notificationManager.cancel(statusId)

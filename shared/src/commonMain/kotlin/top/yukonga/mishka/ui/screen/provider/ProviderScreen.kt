@@ -46,6 +46,9 @@ import top.yukonga.miuix.kmp.icon.extended.Refresh
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.overScrollVertical
 import top.yukonga.miuix.kmp.utils.scrollEndHaptic
+import mishka.shared.generated.resources.Res
+import mishka.shared.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
 
 @Composable
 fun ProviderScreen(
@@ -59,14 +62,14 @@ fun ProviderScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = "外部资源",
+                title = stringResource(Res.string.provider_title),
                 scrollBehavior = scrollBehavior,
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         val layoutDirection = LocalLayoutDirection.current
                         Icon(
                             imageVector = MiuixIcons.Back,
-                            contentDescription = "返回",
+                            contentDescription = stringResource(Res.string.common_back),
                             tint = MiuixTheme.colorScheme.onSurface,
                             modifier = Modifier.graphicsLayer {
                                 scaleX = if (layoutDirection == LayoutDirection.Rtl) -1f else 1f
@@ -78,7 +81,7 @@ fun ProviderScreen(
                     IconButton(onClick = { viewModel.updateAll() }) {
                         Icon(
                             imageVector = MiuixIcons.Refresh,
-                            contentDescription = "全部更新",
+                            contentDescription = stringResource(Res.string.subscription_update_all),
                             tint = MiuixTheme.colorScheme.onSurface,
                         )
                     }
@@ -122,12 +125,12 @@ fun ProviderScreen(
                         verticalArrangement = Arrangement.Center,
                     ) {
                         Text(
-                            text = "暂无外部资源",
+                            text = stringResource(Res.string.provider_no_providers),
                             fontSize = 16.sp,
                             color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                         )
                         Text(
-                            text = "请先启动代理服务",
+                            text = stringResource(Res.string.provider_start_first),
                             modifier = Modifier.padding(top = 6.dp),
                             fontSize = 14.sp,
                             color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
@@ -138,7 +141,7 @@ fun ProviderScreen(
 
             if (uiState.providers.isNotEmpty()) {
                 item(key = "provider_title") {
-                    SmallTitle(text = "资源列表")
+                    SmallTitle(text = stringResource(Res.string.provider_list))
                 }
 
                 items(
@@ -199,7 +202,7 @@ private fun ProviderItem(
                                 onClick = onUpdate,
                             ),
                         imageVector = MiuixIcons.Refresh,
-                        contentDescription = "更新",
+                        contentDescription = stringResource(Res.string.provider_update),
                         colorFilter = ColorFilter.tint(MiuixTheme.colorScheme.onSurfaceVariantSummary)
                     )
                 }
@@ -212,7 +215,7 @@ private fun formatUpdatedAt(isoTime: String): String {
     if (isoTime.isBlank()) return ""
     return try {
         // Go 零值时间 "0001-01-01T00:00:00Z" 表示未更新
-        if (isoTime.startsWith("0001-")) return "未更新"
+        if (isoTime.startsWith("0001-")) return ""
 
         // mihomo 返回 ISO 8601 格式如 "2025-04-14T16:51:30.123456+08:00"
         // 提取为 "04-14 16:51"

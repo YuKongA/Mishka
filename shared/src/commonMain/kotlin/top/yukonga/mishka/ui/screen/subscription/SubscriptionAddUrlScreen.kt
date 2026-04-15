@@ -40,6 +40,9 @@ import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Back
 import top.yukonga.miuix.kmp.icon.extended.Info
 import top.yukonga.miuix.kmp.theme.MiuixTheme
+import mishka.shared.generated.resources.Res
+import mishka.shared.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * URL 导入配置页面
@@ -53,20 +56,21 @@ fun SubscriptionAddUrlScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val scrollBehavior = MiuixScrollBehavior()
-    var inputName by remember { mutableStateOf("新配置") }
+    val defaultName = stringResource(Res.string.common_new_config)
+    var inputName by remember { mutableStateOf(defaultName) }
     var inputUrl by remember { mutableStateOf("") }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = "配置",
+                title = stringResource(Res.string.subscription_config),
                 scrollBehavior = scrollBehavior,
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         val layoutDirection = LocalLayoutDirection.current
                         Icon(
                             imageVector = MiuixIcons.Back,
-                            contentDescription = "返回",
+                            contentDescription = stringResource(Res.string.common_back),
                             tint = MiuixTheme.colorScheme.onSurface,
                             modifier = Modifier.graphicsLayer {
                                 scaleX = if (layoutDirection == LayoutDirection.Rtl) -1f else 1f
@@ -106,7 +110,7 @@ fun SubscriptionAddUrlScreen(
                             tint = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                         )
                         Text(
-                            text = "仅接受 mihomo 配置文件(包含代理/规则)",
+                            text = stringResource(Res.string.subscription_url_hint),
                             fontSize = 14.sp,
                             color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                         )
@@ -114,7 +118,7 @@ fun SubscriptionAddUrlScreen(
                 }
             }
             item(key = "name_title") {
-                SmallTitle(text = "名称")
+                SmallTitle(text = stringResource(Res.string.subscription_name))
             }
             item(key = "name_field") {
                 TextField(
@@ -137,16 +141,16 @@ fun SubscriptionAddUrlScreen(
                         .fillMaxWidth()
                         .padding(horizontal = 12.dp)
                         .padding(bottom = 12.dp),
-                    label = "仅接受 http(s) 和 content 类型",
+                    label = stringResource(Res.string.subscription_url_placeholder),
                     useLabelAsPlaceholder = true,
                 )
             }
             item(key = "save") {
                 TextButton(
-                    text = "保存",
+                    text = stringResource(Res.string.common_save),
                     onClick = {
                         viewModel.addSubscription(
-                            name = inputName.ifBlank { "新配置" },
+                            name = inputName.ifBlank { defaultName },
                             url = inputUrl,
                             onComplete = onSaved,
                         )
@@ -181,6 +185,6 @@ fun SubscriptionAddUrlScreen(
 
     ImportProgressDialog(
         show = uiState.isLoading,
-        step = uiState.importProgress?.step ?: "处理中...",
+        step = uiState.importProgress?.step ?: stringResource(Res.string.common_processing),
     )
 }

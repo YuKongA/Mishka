@@ -53,6 +53,9 @@ import top.yukonga.miuix.kmp.theme.miuixShape
 import top.yukonga.miuix.kmp.utils.PressFeedbackType
 import top.yukonga.miuix.kmp.utils.overScrollVertical
 import top.yukonga.miuix.kmp.utils.scrollEndHaptic
+import mishka.shared.generated.resources.Res
+import mishka.shared.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * 订阅列表页面
@@ -72,7 +75,7 @@ fun SubscriptionScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = "订阅管理",
+                title = stringResource(Res.string.subscription_title),
                 scrollBehavior = scrollBehavior,
                 navigationIcon = if (onBack != null) {
                     {
@@ -80,7 +83,7 @@ fun SubscriptionScreen(
                             val layoutDirection = LocalLayoutDirection.current
                             Icon(
                                 imageVector = MiuixIcons.Back,
-                                contentDescription = "返回",
+                                contentDescription = stringResource(Res.string.common_back),
                                 tint = MiuixTheme.colorScheme.onSurface,
                                 modifier = Modifier.graphicsLayer {
                                     scaleX = if (layoutDirection == LayoutDirection.Rtl) -1f else 1f
@@ -99,7 +102,7 @@ fun SubscriptionScreen(
                         ) {
                             Icon(
                                 imageVector = MiuixIcons.Refresh,
-                                contentDescription = "全部更新",
+                                contentDescription = stringResource(Res.string.subscription_update_all),
                                 tint = MiuixTheme.colorScheme.onSurface,
                             )
                         }
@@ -107,7 +110,7 @@ fun SubscriptionScreen(
                     IconButton(onClick = { viewModel.clearError(); onNavigateAdd() }) {
                         Icon(
                             imageVector = MiuixIcons.Add,
-                            contentDescription = "添加",
+                            contentDescription = stringResource(Res.string.subscription_add),
                             tint = MiuixTheme.colorScheme.onSurface,
                         )
                     }
@@ -148,12 +151,12 @@ fun SubscriptionScreen(
                         verticalArrangement = Arrangement.Center,
                     ) {
                         Text(
-                            text = "暂无配置",
+                            text = stringResource(Res.string.subscription_no_config),
                             fontSize = 16.sp,
                             color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                         )
                         Text(
-                            text = "点击右上角 + 添加配置",
+                            text = stringResource(Res.string.subscription_tap_add),
                             modifier = Modifier.padding(top = 6.dp),
                             fontSize = 14.sp,
                             color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
@@ -164,7 +167,7 @@ fun SubscriptionScreen(
 
             if (uiState.subscriptions.isNotEmpty()) {
                 item(key = "sub_title") {
-                    SmallTitle(text = "配置列表")
+                    SmallTitle(text = stringResource(Res.string.subscription_config_list))
                 }
             }
 
@@ -207,7 +210,7 @@ private fun SubscriptionItem(
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             Text(
-                text = subscription.name.ifBlank { "配置" },
+                text = subscription.name.ifBlank { stringResource(Res.string.subscription_config) },
                 modifier = Modifier.weight(1f),
                 fontSize = 17.sp,
                 fontWeight = FontWeight(550),
@@ -215,7 +218,7 @@ private fun SubscriptionItem(
             )
             if (subscription.isActive) {
                 Text(
-                    text = "使用中",
+                    text = stringResource(Res.string.subscription_in_use),
                     fontSize = 12.sp,
                     fontWeight = FontWeight(750),
                     color = Color(0xFF4CAF50),
@@ -248,14 +251,14 @@ private fun SubscriptionItem(
                 if (subscription.total > 0) {
                     val used = subscription.upload + subscription.download
                     Text(
-                        text = "已用 ${FormatUtils.formatBytes(used)} / ${FormatUtils.formatBytes(subscription.total)}",
+                        text = stringResource(Res.string.subscription_used_traffic, FormatUtils.formatBytes(used), FormatUtils.formatBytes(subscription.total)),
                         modifier = Modifier.padding(top = 2.dp),
                         fontSize = 12.sp,
                         color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                     )
                 } else {
                     Text(
-                        text = "未获取到流量信息",
+                        text = stringResource(Res.string.subscription_no_traffic),
                         modifier = Modifier.padding(top = 2.dp),
                         fontSize = 12.sp,
                         color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
@@ -266,7 +269,7 @@ private fun SubscriptionItem(
 
                 if (subscription.updatedAt > 0) {
                     Text(
-                        text = "更新于 ${formatTime(subscription.updatedAt)}",
+                        text = stringResource(Res.string.subscription_updated_at, formatTime(subscription.updatedAt)),
                         modifier = Modifier.padding(top = 2.dp),
                         fontSize = 12.sp,
                         color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
@@ -285,7 +288,7 @@ private fun SubscriptionItem(
                 Icon(
                     modifier = Modifier.size(20.dp),
                     imageVector = MiuixIcons.More,
-                    contentDescription = "编辑",
+                    contentDescription = stringResource(Res.string.common_edit),
                     tint = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                 )
             }
@@ -300,7 +303,7 @@ private fun SubscriptionItem(
                 Icon(
                     modifier = Modifier.size(20.dp),
                     imageVector = MiuixIcons.Refresh,
-                    contentDescription = "更新",
+                    contentDescription = stringResource(Res.string.common_update),
                     tint = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                 )
             }
@@ -314,7 +317,7 @@ private fun SubscriptionItem(
                 Icon(
                     modifier = Modifier.size(20.dp),
                     imageVector = MiuixIcons.Delete,
-                    contentDescription = "删除",
+                    contentDescription = stringResource(Res.string.common_delete),
                     tint = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                 )
             }

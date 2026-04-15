@@ -18,6 +18,14 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import mishka.shared.generated.resources.Res
+import mishka.shared.generated.resources.common_back
+import mishka.shared.generated.resources.common_save
+import mishka.shared.generated.resources.subscription_auto_update_hint
+import mishka.shared.generated.resources.subscription_config_name
+import mishka.shared.generated.resources.subscription_edit
+import mishka.shared.generated.resources.subscription_sub_url
+import org.jetbrains.compose.resources.stringResource
 import top.yukonga.mishka.viewmodel.SubscriptionViewModel
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Icon
@@ -53,9 +61,7 @@ fun SubscriptionEditScreen(
     var url by remember(subscription) { mutableStateOf(subscription?.url ?: "") }
     var intervalMinutes by remember(subscription) {
         mutableStateOf(
-            if ((subscription?.interval ?: 0) > 0)
-                ((subscription?.interval ?: 0) / 60000).toString()
-            else ""
+            if ((subscription?.interval ?: 0) > 0) ((subscription?.interval ?: 0) / 60000).toString() else ""
         )
     }
 
@@ -72,14 +78,14 @@ fun SubscriptionEditScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = "编辑配置",
+                title = stringResource(Res.string.subscription_edit),
                 scrollBehavior = scrollBehavior,
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         val layoutDirection = LocalLayoutDirection.current
                         Icon(
                             imageVector = MiuixIcons.Back,
-                            contentDescription = "返回",
+                            contentDescription = stringResource(Res.string.common_back),
                             tint = MiuixTheme.colorScheme.onSurface,
                             modifier = Modifier.graphicsLayer {
                                 scaleX = if (layoutDirection == LayoutDirection.Rtl) -1f else 1f
@@ -102,7 +108,7 @@ fun SubscriptionEditScreen(
             ),
         ) {
             item {
-                SmallTitle(text = "配置名称")
+                SmallTitle(text = stringResource(Res.string.subscription_config_name))
                 TextField(
                     value = name,
                     onValueChange = { name = it },
@@ -112,7 +118,7 @@ fun SubscriptionEditScreen(
                         .padding(bottom = 12.dp),
                 )
                 if (!isFile) {
-                    SmallTitle(text = "订阅 URL")
+                    SmallTitle(text = stringResource(Res.string.subscription_sub_url))
                     TextField(
                         value = url,
                         onValueChange = { url = it },
@@ -124,7 +130,7 @@ fun SubscriptionEditScreen(
                     TextField(
                         value = intervalMinutes,
                         onValueChange = { intervalMinutes = it.filter { c -> c.isDigit() } },
-                        label = "自动更新间隔（分钟，0 或留空为禁用，最小 15）",
+                        label = stringResource(Res.string.subscription_auto_update_hint),
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 12.dp)
@@ -152,7 +158,7 @@ fun SubscriptionEditScreen(
 
             item {
                 TextButton(
-                    text = "保存",
+                    text = stringResource(Res.string.common_save),
                     onClick = {
                         val intervalMs = (intervalMinutes.toLongOrNull() ?: 0) * 60000
                         viewModel.editSubscription(

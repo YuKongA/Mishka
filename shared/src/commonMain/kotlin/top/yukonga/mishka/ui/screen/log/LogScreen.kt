@@ -50,6 +50,9 @@ import top.yukonga.miuix.kmp.icon.extended.Delete
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.mishka.data.model.LogMessage
 import top.yukonga.mishka.viewmodel.LogViewModel
+import mishka.shared.generated.resources.Res
+import mishka.shared.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
 
 @Composable
 fun LogScreen(
@@ -70,14 +73,14 @@ fun LogScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = "日志",
+                title = stringResource(Res.string.log_title),
                 scrollBehavior = scrollBehavior,
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         val layoutDirection = LocalLayoutDirection.current
                         Icon(
                             imageVector = MiuixIcons.Back,
-                            contentDescription = "返回",
+                            contentDescription = stringResource(Res.string.common_back),
                             tint = MiuixTheme.colorScheme.onSurface,
                             modifier = Modifier.graphicsLayer {
                                 scaleX = if (layoutDirection == LayoutDirection.Rtl) -1f else 1f
@@ -89,7 +92,7 @@ fun LogScreen(
                     IconButton(onClick = { viewModel.clearLogs() }) {
                         Icon(
                             imageVector = MiuixIcons.Delete,
-                            contentDescription = "清除",
+                            contentDescription = stringResource(Res.string.log_clear),
                             tint = MiuixTheme.colorScheme.onSurface,
                         )
                     }
@@ -118,7 +121,7 @@ fun LogScreen(
                         verticalArrangement = Arrangement.Center,
                     ) {
                         Text(
-                            text = if (uiState.isConnected) "等待日志..." else "未连接",
+                            text = if (uiState.isConnected) stringResource(Res.string.log_waiting) else stringResource(Res.string.log_not_connected),
                             fontSize = 16.sp,
                             color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                         )

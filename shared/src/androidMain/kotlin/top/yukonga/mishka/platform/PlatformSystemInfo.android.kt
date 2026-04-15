@@ -31,11 +31,8 @@ actual class PlatformSystemInfo actual constructor() {
     }
 
     actual fun getCpuUsage(): Float {
-        // 方案 1：读 /proc/stat（系统总 CPU）
         tryProcStat()?.let { return it }
-        // 方案 2：读 /proc/loadavg（系统负载）
         tryLoadAvg()?.let { return it }
-        // 方案 3：读 /proc/self/stat（应用进程 CPU）
         trySelfStat()?.let { return it }
         return -1f
     }
@@ -81,10 +78,8 @@ actual class PlatformSystemInfo actual constructor() {
     private fun trySelfStat(): Float? {
         return try {
             val line = File("/proc/self/stat").bufferedReader().use { it.readLine() } ?: return null
-            // 字段 14(utime) + 15(stime) 是进程 CPU 时间（以 clock tick 计）
             val parts = line.substringAfterLast(')').trim().split(" ")
             if (parts.size < 13) return null
-            // parts[0] = state, parts[11] = utime (index 13 in full), parts[12] = stime (index 14)
             val utime = parts[11].toLong()
             val stime = parts[12].toLong()
             val cpuTime = utime + stime
@@ -102,7 +97,6 @@ actual class PlatformSystemInfo actual constructor() {
             prevRealTime = realTime
 
             if (timeDiff == 0L) 0f
-            // clock tick 通常是 10ms，realTime 是 1ms
             else (cpuDiff.toFloat() * 10 / timeDiff * 100).coerceIn(0f, 100f)
         } catch (_: Exception) {
             null

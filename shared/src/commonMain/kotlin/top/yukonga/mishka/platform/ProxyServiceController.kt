@@ -9,10 +9,13 @@ enum class ProxyState {
     Error,
 }
 
+enum class TunMode { Vpn, Root }
+
 data class ProxyServiceStatus(
     val state: ProxyState = ProxyState.Stopped,
     val secret: String = "",
     val errorMessage: String = "",
+    val tunMode: TunMode = TunMode.Vpn,
 )
 
 expect class ProxyServiceController {
@@ -21,4 +24,7 @@ expect class ProxyServiceController {
     fun stop()
     fun requestVpnPermission()
     fun hasVpnPermission(): Boolean
+    fun hasRootPermission(): Boolean
+    fun getTunMode(): TunMode
+    fun verifyAndSyncState()
 }

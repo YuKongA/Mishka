@@ -23,6 +23,9 @@ import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.theme.miuixShape
+import mishka.shared.generated.resources.Res
+import mishka.shared.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
 
 fun LazyListScope.bottomCardsSection(
     state: HomeUiState = HomeUiState(),
@@ -48,7 +51,7 @@ fun LazyListScope.bottomCardsSection(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
-                        text = "订阅",
+                        text = stringResource(Res.string.home_subscription),
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Medium,
                         color = MiuixTheme.colorScheme.onSurface,
@@ -56,12 +59,12 @@ fun LazyListScope.bottomCardsSection(
                     BadgeLabel("SUB")
                 }
                 InfoRow(
-                    "已用",
+                    stringResource(Res.string.home_used),
                     state.subscription?.let { FormatUtils.formatBytes(it.Upload + it.Download) } ?: "--",
                     Modifier.padding(top = 8.dp)
                 )
                 InfoRow(
-                    "总量",
+                    stringResource(Res.string.home_total),
                     state.subscription?.let { FormatUtils.formatBytes(it.Total) } ?: "--",
                     Modifier.padding(top = 4.dp)
                 )
@@ -78,7 +81,7 @@ fun LazyListScope.bottomCardsSection(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
-                        text = "系统",
+                        text = stringResource(Res.string.home_system),
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Medium,
                         color = MiuixTheme.colorScheme.onSurface,

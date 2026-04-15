@@ -74,6 +74,9 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.overScrollVertical
 import top.yukonga.miuix.kmp.utils.scrollEndHaptic
 import top.yukonga.miuix.kmp.window.WindowListPopup
+import mishka.shared.generated.resources.Res
+import mishka.shared.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
 
 @Composable
 fun AppProxyScreen(
@@ -89,7 +92,11 @@ fun AppProxyScreen(
     val density = LocalDensity.current
     val clipboardManager = LocalClipboardManager.current
 
-    var searchStatus by remember { mutableStateOf(SearchStatus(label = "搜索应用")) }
+    var searchStatus by remember { mutableStateOf(SearchStatus(label = "")) }
+    val searchLabel = stringResource(Res.string.app_proxy_search)
+    if (searchStatus.label != searchLabel) {
+        searchStatus = searchStatus.copy(label = searchLabel)
+    }
 
     // 搜索文本同步到 ViewModel
     val searchText = searchStatus.searchText
@@ -117,14 +124,14 @@ fun AppProxyScreen(
         topBar = {
             searchStatus.TopAppBarAnim {
                 TopAppBar(
-                    title = "分应用代理",
+                    title = stringResource(Res.string.app_proxy_title),
                     scrollBehavior = scrollBehavior,
                     navigationIcon = {
                         IconButton(onClick = onBack) {
                             val layoutDirection = LocalLayoutDirection.current
                             Icon(
                                 imageVector = MiuixIcons.Back,
-                                contentDescription = "返回",
+                                contentDescription = stringResource(Res.string.common_back),
                                 tint = MiuixTheme.colorScheme.onSurface,
                                 modifier = Modifier.graphicsLayer {
                                     scaleX = if (layoutDirection == LayoutDirection.Rtl) -1f else 1f
@@ -139,7 +146,7 @@ fun AppProxyScreen(
                         ) {
                             Icon(
                                 imageVector = MiuixIcons.More,
-                                contentDescription = "更多",
+                                contentDescription = stringResource(Res.string.common_more),
                                 tint = MiuixTheme.colorScheme.onSurface,
                             )
                         }
@@ -153,7 +160,7 @@ fun AppProxyScreen(
                         ) {
                             ListPopupColumn {
                                 DropdownImpl(
-                                    text = "全选",
+                                    text = stringResource(Res.string.app_proxy_select_all),
                                     optionSize = 6,
                                     isSelected = false,
                                     index = 0,
@@ -163,7 +170,7 @@ fun AppProxyScreen(
                                     },
                                 )
                                 DropdownImpl(
-                                    text = "全不选",
+                                    text = stringResource(Res.string.app_proxy_deselect_all),
                                     optionSize = 6,
                                     isSelected = false,
                                     index = 1,
@@ -173,7 +180,7 @@ fun AppProxyScreen(
                                     },
                                 )
                                 DropdownImpl(
-                                    text = "反选",
+                                    text = stringResource(Res.string.app_proxy_invert),
                                     optionSize = 6,
                                     isSelected = false,
                                     index = 2,
@@ -188,7 +195,7 @@ fun AppProxyScreen(
                                         .fillMaxWidth(),
                                 )
                                 DropdownImpl(
-                                    text = if (uiState.showSystemApps) "隐藏系统应用" else "显示系统应用",
+                                    text = if (uiState.showSystemApps) stringResource(Res.string.app_proxy_hide_system) else stringResource(Res.string.app_proxy_show_system),
                                     optionSize = 6,
                                     isSelected = uiState.showSystemApps,
                                     index = 3,
@@ -203,7 +210,7 @@ fun AppProxyScreen(
                                         .fillMaxWidth(),
                                 )
                                 DropdownImpl(
-                                    text = "导入",
+                                    text = stringResource(Res.string.app_proxy_import),
                                     optionSize = 6,
                                     isSelected = false,
                                     index = 4,
@@ -216,7 +223,7 @@ fun AppProxyScreen(
                                     },
                                 )
                                 DropdownImpl(
-                                    text = "导出",
+                                    text = stringResource(Res.string.app_proxy_export),
                                     optionSize = 6,
                                     isSelected = false,
                                     index = 5,
@@ -285,7 +292,7 @@ fun AppProxyScreen(
                                 horizontalAlignment = Alignment.CenterHorizontally,
                             ) {
                                 Text(
-                                    text = "无匹配应用",
+                                    text = stringResource(Res.string.app_proxy_no_match),
                                     fontSize = 16.sp,
                                     color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                                 )
@@ -337,7 +344,7 @@ fun AppProxyScreen(
                             insideMargin = PaddingValues(16.dp),
                         ) {
                             Text(
-                                text = "修改将在重启代理后生效",
+                                text = stringResource(Res.string.app_proxy_running_hint),
                                 fontSize = 13.sp,
                                 color = Color(0xFFFFA726),
                             )
@@ -346,7 +353,7 @@ fun AppProxyScreen(
                 }
 
                 // 代理模式
-                item(key = "mode_title") { SmallTitle(text = "代理模式") }
+                item(key = "mode_title") { SmallTitle(text = stringResource(Res.string.app_proxy_mode)) }
                 item(key = "mode_card") {
                     Card(
                         modifier = Modifier
@@ -355,20 +362,20 @@ fun AppProxyScreen(
                             .padding(bottom = 6.dp),
                     ) {
                         RadioButtonPreference(
-                            title = "允许所有应用",
-                            summary = "所有应用的流量都经过代理",
+                            title = stringResource(Res.string.app_proxy_allow_all),
+                            summary = stringResource(Res.string.app_proxy_allow_all_summary),
                             selected = uiState.mode == AppProxyMode.AllowAll,
                             onClick = { viewModel.setMode(AppProxyMode.AllowAll) },
                         )
                         RadioButtonPreference(
-                            title = "仅允许选中应用",
-                            summary = "只有选中的应用经过代理",
+                            title = stringResource(Res.string.app_proxy_allow_selected),
+                            summary = stringResource(Res.string.app_proxy_allow_selected_summary),
                             selected = uiState.mode == AppProxyMode.AllowSelected,
                             onClick = { viewModel.setMode(AppProxyMode.AllowSelected) },
                         )
                         RadioButtonPreference(
-                            title = "排除选中应用",
-                            summary = "选中的应用不经过代理",
+                            title = stringResource(Res.string.app_proxy_deny_selected),
+                            summary = stringResource(Res.string.app_proxy_deny_selected_summary),
                             selected = uiState.mode == AppProxyMode.DenySelected,
                             onClick = { viewModel.setMode(AppProxyMode.DenySelected) },
                         )
@@ -391,7 +398,7 @@ fun AppProxyScreen(
                         }
                     } else {
                         item(key = "apps_title") {
-                            SmallTitle(text = "应用列表 (${uiState.selectedPackages.size}/${uiState.apps.size})")
+                            SmallTitle(text = stringResource(Res.string.app_proxy_app_list, uiState.selectedPackages.size, uiState.apps.size))
                         }
                         items(
                             items = filteredApps,

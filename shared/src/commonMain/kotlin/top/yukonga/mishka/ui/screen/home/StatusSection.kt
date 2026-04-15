@@ -39,6 +39,9 @@ import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.PressFeedbackType
 import top.yukonga.miuix.kmp.window.WindowDialog
+import mishka.shared.generated.resources.Res
+import mishka.shared.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
 
 fun LazyListScope.statusSection(
     state: HomeUiState = HomeUiState(),
@@ -109,7 +112,7 @@ private fun StatusContent(
                         .padding(all = 16.dp),
                 ) {
                     Text(
-                        text = if (isStarting) "启动中" else if (isRunning) "运行中" else "已停止",
+                        text = if (isStarting) stringResource(Res.string.home_starting) else if (isRunning) stringResource(Res.string.home_running) else stringResource(Res.string.home_stopped),
                         fontSize = 20.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = if (isStarting) {
@@ -150,7 +153,7 @@ private fun StatusContent(
                 pressFeedbackType = PressFeedbackType.Sink,
             ) {
                 Text(
-                    text = "模式",
+                    text = stringResource(Res.string.home_mode),
                     fontSize = 13.sp,
                     color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                 )
@@ -232,7 +235,7 @@ private fun ModeSelectDialog(
 
     WindowDialog(
         show = show,
-        title = "切换模式",
+        title = stringResource(Res.string.home_switch_mode),
         onDismissRequest = onDismiss,
     ) {
         Column {
@@ -251,13 +254,13 @@ private fun ModeSelectDialog(
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 TextButton(
-                    text = "确定",
+                    text = stringResource(Res.string.common_confirm),
                     onClick = { onSelect(selected) },
                     modifier = Modifier.weight(1f),
                     colors = ButtonDefaults.textButtonColorsPrimary(),
                 )
                 TextButton(
-                    text = "取消",
+                    text = stringResource(Res.string.common_cancel),
                     onClick = onDismiss,
                     modifier = Modifier.weight(1f),
                 )
@@ -278,7 +281,7 @@ private fun TunStackSelectDialog(
 
     WindowDialog(
         show = show,
-        title = "切换 TUN Stack",
+        title = stringResource(Res.string.home_switch_tun_stack),
         onDismissRequest = onDismiss,
     ) {
         Column {
@@ -297,13 +300,13 @@ private fun TunStackSelectDialog(
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 TextButton(
-                    text = "确定",
+                    text = stringResource(Res.string.common_confirm),
                     onClick = { onSelect(selected) },
                     modifier = Modifier.weight(1f),
                     colors = ButtonDefaults.textButtonColorsPrimary(),
                 )
                 TextButton(
-                    text = "取消",
+                    text = stringResource(Res.string.common_cancel),
                     onClick = onDismiss,
                     modifier = Modifier.weight(1f),
                 )

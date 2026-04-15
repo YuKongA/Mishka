@@ -3,35 +3,50 @@ package top.yukonga.mishka.service
 import android.content.Context
 import android.util.Log
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
+import top.yukonga.mishka.R
 import java.io.File
-import java.io.FileInputStream
 
 class MihomoRunner(private val context: Context) {
 
     private var childPid: Int = -1
+    private var isRootMode = false
+    val pid: Int get() = childPid
     var secret: String = ""
     var activeSubscriptionId: String? = null
         private set
     var errorMessage: String = ""
         private set
 
-    val isRunning: Boolean get() = childPid > 0 && isProcessAlive(childPid)
+    val isRunning: Boolean
+        get() = childPid > 0 && if (isRootMode) RootHelper.isAliveAsRoot(childPid) else isProcessAlive(childPid)
 
-    suspend fun start(subscriptionId: String? = null): Boolean = withContext(Dispatchers.IO) {
+    fun attachToExisting(pid: Int, secret: String, subscriptionId: String?): Boolean {
+        if (pid <= 0 || !RootHelper.isAliveAsRoot(pid)) return false
+        childPid = pid
+        isRootMode = true
+        this.secret = secret
+        activeSubscriptionId = subscriptionId
+        Log.i(TAG, "已接管现有 mihomo 进程: pid=$pid")
+        return true
+    }
+
+    suspend fun start(subscriptionId: String? = null, useRoot: Boolean = false): Boolean = withContext(Dispatchers.IO) {
         if (isRunning) {
             Log.w(TAG, "mihomo already running")
             return@withContext true
         }
 
         val binary = getMihomoBinary() ?: run {
-            errorMessage = "mihomo 二进制文件未找到"
+            errorMessage = context.getString(R.string.error_mihomo_not_found)
             Log.e(TAG, errorMessage)
             return@withContext false
         }
 
         binary.setExecutable(true)
 
+        isRootMode = useRoot
         activeSubscriptionId = subscriptionId
         val configFile = ConfigGenerator.getConfigFile(context)
 
@@ -42,42 +57,56 @@ class MihomoRunner(private val context: Context) {
         }
 
         try {
-            // 使用 JNI fork+exec，不关闭继承的 fd（包括 VPN TUN fd）
             val args = arrayOf(
                 "-d", workDir.absolutePath,
                 "-f", configFile.absolutePath,
             )
-            childPid = ProcessHelper.nativeForkExec(
-                binary.absolutePath,
-                args,
-                workDir.absolutePath,
-            )
+
+            if (useRoot) {
+                val logFile = File(workDir, "mihomo.log").absolutePath
+                childPid = RootHelper.startAsRoot(binary.absolutePath, args, workDir.absolutePath, logFile)
+            } else {
+                childPid = ProcessHelper.nativeForkExec(
+                    binary.absolutePath,
+                    args,
+                    workDir.absolutePath,
+                )
+            }
 
             if (childPid <= 0) {
-                errorMessage = "fork+exec 失败"
+                errorMessage = if (useRoot) context.getString(R.string.error_root_start_failed) else context.getString(R.string.error_fork_failed)
                 Log.e(TAG, errorMessage)
                 return@withContext false
             }
 
-            Log.i(TAG, "mihomo child pid=$childPid")
+            Log.i(TAG, "mihomo child pid=$childPid (root=$useRoot)")
 
-            // 通过 /proc/<pid>/fd/1 读取子进程 stdout（因为 JNI fork 没有 pipe）
-            // 改为等待一段时间后检查进程是否存活
-            Thread.sleep(2000)
+            delay(2000)
 
-            val started = isProcessAlive(childPid)
+            val started = if (useRoot) RootHelper.isAliveAsRoot(childPid) else isProcessAlive(childPid)
             if (!started) {
-                errorMessage = "mihomo 进程启动后立即退出"
+                if (useRoot) {
+                    val logFile = File(workDir, "mihomo.log").absolutePath
+                    val logContent = RootHelper.readLogFile(logFile)
+                    errorMessage = if (logContent.isNotBlank()) {
+                        Log.e(TAG, "mihomo log:\n$logContent")
+                        context.getString(R.string.error_mihomo_start_failed, logContent)
+                    } else {
+                        context.getString(R.string.error_mihomo_exited)
+                    }
+                } else {
+                    errorMessage = context.getString(R.string.error_mihomo_exited)
+                }
                 Log.e(TAG, errorMessage)
                 childPid = -1
                 return@withContext false
             }
 
             errorMessage = ""
-            Log.i(TAG, "mihomo started: pid=$childPid")
+            Log.i(TAG, "mihomo started: pid=$childPid (root=$useRoot)")
             true
         } catch (e: Exception) {
-            errorMessage = "启动失败: ${e.message}"
+            errorMessage = context.getString(R.string.error_generic_start_failed, e.message ?: "")
             Log.e(TAG, "Failed to start mihomo", e)
             false
         }
@@ -85,15 +114,20 @@ class MihomoRunner(private val context: Context) {
 
     fun stop() {
         if (childPid > 0) {
-            Log.i(TAG, "Stopping mihomo pid=$childPid")
-            ProcessHelper.nativeKill(childPid)
-            try {
-                ProcessHelper.nativeWaitpid(childPid)
-            } catch (_: Exception) {
+            Log.i(TAG, "Stopping mihomo pid=$childPid (root=$isRootMode)")
+            if (isRootMode) {
+                RootHelper.killAsRoot(childPid)
+            } else {
+                ProcessHelper.nativeKill(childPid)
+                try {
+                    ProcessHelper.nativeWaitpid(childPid)
+                } catch (_: Exception) {
+                }
             }
             childPid = -1
         }
         secret = ""
+        isRootMode = false
     }
 
     private fun isProcessAlive(pid: Int): Boolean {
@@ -107,14 +141,7 @@ class MihomoRunner(private val context: Context) {
     private fun getMihomoBinary(): File? {
         val nativeDir = context.applicationInfo.nativeLibraryDir
         val binary = File(nativeDir, "libmihomo.so")
-        Log.d(TAG, "Checking nativeLibraryDir: ${binary.absolutePath}, exists=${binary.exists()}")
         if (binary.exists()) return binary
-
-        val nativeDirFile = File(nativeDir)
-        if (nativeDirFile.exists()) {
-            Log.d(TAG, "nativeLibraryDir contents: ${nativeDirFile.listFiles()?.map { it.name }}")
-        }
-
         return null
     }
 

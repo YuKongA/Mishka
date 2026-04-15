@@ -57,6 +57,9 @@ import top.yukonga.miuix.kmp.theme.miuixShape
 import top.yukonga.miuix.kmp.utils.overScrollVertical
 import top.yukonga.miuix.kmp.utils.scrollEndHaptic
 import top.yukonga.miuix.kmp.window.WindowDialog
+import mishka.shared.generated.resources.Res
+import mishka.shared.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
 
 @Composable
 fun ConnectionScreen(
@@ -77,7 +80,7 @@ fun ConnectionScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = if (isSearchMode) "" else "连接",
+                title = if (isSearchMode) "" else stringResource(Res.string.connection_title),
                 scrollBehavior = scrollBehavior,
                 navigationIcon = {
                     IconButton(
@@ -93,7 +96,7 @@ fun ConnectionScreen(
                         val layoutDirection = LocalLayoutDirection.current
                         Icon(
                             imageVector = MiuixIcons.Back,
-                            contentDescription = "返回",
+                            contentDescription = stringResource(Res.string.common_back),
                             tint = MiuixTheme.colorScheme.onSurface,
                             modifier = Modifier.graphicsLayer {
                                 scaleX = if (layoutDirection == LayoutDirection.Rtl) -1f else 1f
@@ -106,21 +109,21 @@ fun ConnectionScreen(
                         TextField(
                             state = searchFieldState,
                             modifier = Modifier.weight(1f).padding(end = 8.dp),
-                            label = "搜索连接",
+                            label = stringResource(Res.string.connection_search),
                             useLabelAsPlaceholder = true,
                         )
                     } else {
                         IconButton(onClick = { isSearchMode = true }) {
                             Icon(
                                 imageVector = MiuixIcons.Search,
-                                contentDescription = "搜索",
+                                contentDescription = stringResource(Res.string.common_search),
                                 tint = MiuixTheme.colorScheme.onSurface,
                             )
                         }
                         IconButton(onClick = { showCloseAllDialog = true }) {
                             Icon(
                                 imageVector = MiuixIcons.Delete,
-                                contentDescription = "关闭全部",
+                                contentDescription = stringResource(Res.string.connection_close_all),
                                 tint = MiuixTheme.colorScheme.onSurface,
                             )
                         }
@@ -153,12 +156,12 @@ fun ConnectionScreen(
                         verticalArrangement = Arrangement.Center,
                     ) {
                         Text(
-                            text = "暂无活跃连接",
+                            text = stringResource(Res.string.connection_no_active),
                             fontSize = 16.sp,
                             color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                         )
                         Text(
-                            text = "请先启动代理服务",
+                            text = stringResource(Res.string.connection_start_first),
                             modifier = Modifier.padding(top = 6.dp),
                             fontSize = 14.sp,
                             color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
@@ -176,7 +179,7 @@ fun ConnectionScreen(
                 }
 
                 item(key = "connection_title") {
-                    SmallTitle(text = "连接列表")
+                    SmallTitle(text = stringResource(Res.string.connection_list))
                 }
 
                 if (filteredConnections.isEmpty() && uiState.searchQuery.isNotBlank()) {
@@ -189,7 +192,7 @@ fun ConnectionScreen(
                             insideMargin = PaddingValues(16.dp),
                         ) {
                             Text(
-                                text = "无匹配结果",
+                                text = stringResource(Res.string.connection_no_match),
                                 fontSize = 14.sp,
                                 color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                             )
@@ -214,8 +217,8 @@ fun ConnectionScreen(
     // 关闭全部确认 Dialog
     WindowDialog(
         show = showCloseAllDialog,
-        title = "关闭所有连接",
-        summary = "确定要关闭所有活跃连接吗？",
+        title = stringResource(Res.string.connection_close_all_title),
+        summary = stringResource(Res.string.connection_close_all_summary),
         onDismissRequest = { showCloseAllDialog = false },
     ) {
         Row(
@@ -223,12 +226,12 @@ fun ConnectionScreen(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             TextButton(
-                text = "取消",
+                text = stringResource(Res.string.common_cancel),
                 modifier = Modifier.weight(1f),
                 onClick = { showCloseAllDialog = false },
             )
             TextButton(
-                text = "确定",
+                text = stringResource(Res.string.common_confirm),
                 modifier = Modifier.weight(1f),
                 colors = top.yukonga.miuix.kmp.basic.ButtonDefaults.textButtonColorsPrimary(),
                 onClick = {
@@ -257,9 +260,9 @@ private fun StatsCard(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
-            StatItem(label = "活跃连接", value = "$connectionCount")
-            StatItem(label = "上行总量", value = FormatUtils.formatBytes(uploadTotal))
-            StatItem(label = "下行总量", value = FormatUtils.formatBytes(downloadTotal))
+            StatItem(label = stringResource(Res.string.connection_active), value = "$connectionCount")
+            StatItem(label = stringResource(Res.string.connection_upload_total), value = FormatUtils.formatBytes(uploadTotal))
+            StatItem(label = stringResource(Res.string.connection_download_total), value = FormatUtils.formatBytes(downloadTotal))
         }
     }
 }
@@ -342,7 +345,7 @@ private fun ConnectionItem(
                         imageVector = MiuixIcons.Close,
                         modifier = Modifier.size(14.dp),
                         tint = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                        contentDescription = "关闭",
+                        contentDescription = stringResource(Res.string.common_close),
                     )
                 }
             }

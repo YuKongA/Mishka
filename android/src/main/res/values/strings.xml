@@ -1,3 +1,43 @@
 <resources>
     <string name="app_name">Mishka</string>
+
+    <!-- Notification Channels -->
+    <string name="channel_vpn_name">VPN Service Status</string>
+    <string name="channel_vpn_desc">Mishka proxy service status</string>
+    <string name="channel_profile_status_name">Config Update Progress</string>
+    <string name="channel_profile_status_desc">Config download and validation progress</string>
+    <string name="channel_profile_result_name">Config Update Result</string>
+    <string name="channel_profile_result_desc">Config update success or failure notifications</string>
+
+    <!-- VPN Notifications -->
+    <string name="notification_loading">Starting...</string>
+    <string name="notification_running_title">Mishka Running</string>
+    <string name="notification_running_content">Mode: %1$s</string>
+
+    <!-- Profile Update Notifications -->
+    <string name="notification_profile_update">Config Update</string>
+    <string name="notification_profile_running">Running...</string>
+    <string name="notification_profile_updating">Updating config</string>
+    <string name="notification_update_success">Update Successful</string>
+    <string name="notification_update_success_content">%1$s updated</string>
+    <string name="notification_update_failed">Update Failed</string>
+    <string name="notification_unknown_error">Unknown error</string>
+
+    <!-- Tile -->
+    <string name="tile_connected">Connected</string>
+    <string name="tile_connecting">Connecting...</string>
+    <string name="tile_error">Error</string>
+    <string name="tile_disconnected">Disconnected</string>
+
+    <!-- Service Errors -->
+    <string name="error_vpn_failed">VPN establishment failed: %1$s</string>
+    <string name="error_vpn_denied">VPN permission denied</string>
+    <string name="error_start_failed">Start failed</string>
+    <string name="error_root_failed">Cannot obtain Root permission</string>
+    <string name="error_mihomo_not_found">mihomo binary not found</string>
+    <string name="error_fork_failed">fork+exec failed</string>
+    <string name="error_root_start_failed">root start failed</string>
+    <string name="error_mihomo_exited">mihomo process exited immediately</string>
+    <string name="error_mihomo_start_failed">mihomo start failed:\n%1$s</string>
+    <string name="error_generic_start_failed">Start failed: %1$s</string>
 </resources>

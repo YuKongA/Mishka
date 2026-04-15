@@ -48,6 +48,11 @@
         </service>
 
         <service
+            android:name=".service.MishkaRootService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse" />
+
+        <service
             android:name=".service.MishkaTileService"
             android:exported="true"
             android:label="Mishka"

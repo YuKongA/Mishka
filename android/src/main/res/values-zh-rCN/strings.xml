@@ -1,0 +1,43 @@
+<resources>
+    <string name="app_name">Mishka</string>
+
+    <!-- Notification Channels -->
+    <string name="channel_vpn_name">VPN 服务状态</string>
+    <string name="channel_vpn_desc">Mishka 代理服务运行状态</string>
+    <string name="channel_profile_status_name">配置更新进度</string>
+    <string name="channel_profile_status_desc">配置下载和验证进度</string>
+    <string name="channel_profile_result_name">配置更新结果</string>
+    <string name="channel_profile_result_desc">配置更新成功或失败的通知</string>
+
+    <!-- VPN Notifications -->
+    <string name="notification_loading">正在启动...</string>
+    <string name="notification_running_title">Mishka 运行中</string>
+    <string name="notification_running_content">模式: %1$s</string>
+
+    <!-- Profile Update Notifications -->
+    <string name="notification_profile_update">配置更新</string>
+    <string name="notification_profile_running">正在运行...</string>
+    <string name="notification_profile_updating">正在更新配置</string>
+    <string name="notification_update_success">更新成功</string>
+    <string name="notification_update_success_content">%1$s 已更新</string>
+    <string name="notification_update_failed">更新失败</string>
+    <string name="notification_unknown_error">未知错误</string>
+
+    <!-- Tile -->
+    <string name="tile_connected">已连接</string>
+    <string name="tile_connecting">连接中...</string>
+    <string name="tile_error">错误</string>
+    <string name="tile_disconnected">未连接</string>
+
+    <!-- Service Errors -->
+    <string name="error_vpn_failed">VPN 建立失败: %1$s</string>
+    <string name="error_vpn_denied">VPN 权限被拒绝</string>
+    <string name="error_start_failed">启动失败</string>
+    <string name="error_root_failed">无法获取 Root 权限</string>
+    <string name="error_mihomo_not_found">mihomo 二进制文件未找到</string>
+    <string name="error_fork_failed">fork+exec 失败</string>
+    <string name="error_root_start_failed">root 启动失败</string>
+    <string name="error_mihomo_exited">mihomo 进程启动后立即退出</string>
+    <string name="error_mihomo_start_failed">mihomo 启动失败:\n%1$s</string>
+    <string name="error_generic_start_failed">启动失败: %1$s</string>
+</resources>

@@ -4,6 +4,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import top.yukonga.mishka.platform.PlatformStorage
+import top.yukonga.mishka.platform.StorageKeys
 
 /**
  * 自动重启接收器（对齐 CMFA RestartReceiver）。
@@ -19,11 +20,16 @@ class BootReceiver : BroadcastReceiver() {
             Intent.ACTION_BOOT_COMPLETED,
             Intent.ACTION_MY_PACKAGE_REPLACED -> {
                 val storage = PlatformStorage(context)
-                val wasRunning = storage.getString("service_was_running", "false") == "true"
+                val wasRunning = storage.getString(StorageKeys.SERVICE_WAS_RUNNING, "false") == "true"
                 if (wasRunning) {
-                    val subscriptionId = storage.getString("active_profile_uuid", "")
+                    val subscriptionId = storage.getString(StorageKeys.ACTIVE_PROFILE_UUID, "")
                         .ifEmpty { null }
-                    MishkaTunService.start(context, subscriptionId)
+                    val isRoot = storage.getString(StorageKeys.TUN_MODE, "vpn") == "root"
+                    if (isRoot) {
+                        MishkaRootService.start(context, subscriptionId)
+                    } else {
+                        MishkaTunService.start(context, subscriptionId)
+                    }
                 }
             }
         }

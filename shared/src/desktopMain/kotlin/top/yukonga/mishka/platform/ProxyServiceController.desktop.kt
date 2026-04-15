@@ -22,4 +22,10 @@ actual class ProxyServiceController {
     }
 
     actual fun hasVpnPermission(): Boolean = true
+
+    actual fun hasRootPermission(): Boolean = false
+
+    actual fun getTunMode(): TunMode = TunMode.Vpn
+
+    actual fun verifyAndSyncState() {}
 }

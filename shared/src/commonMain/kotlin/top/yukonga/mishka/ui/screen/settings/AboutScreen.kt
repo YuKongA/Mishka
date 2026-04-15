@@ -68,6 +68,9 @@ import top.yukonga.miuix.kmp.shapes.SmoothRoundedCornerShape
 import top.yukonga.miuix.kmp.theme.MiuixTheme.colorScheme
 import top.yukonga.miuix.kmp.utils.overScrollVertical
 import top.yukonga.miuix.kmp.utils.scrollEndHaptic
+import mishka.shared.generated.resources.Res
+import mishka.shared.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
 
 @Composable
 fun AboutScreen(
@@ -95,7 +98,7 @@ fun AboutScreen(
     Scaffold(
         topBar = {
             SmallTopAppBar(
-                title = "关于",
+                title = stringResource(Res.string.about_title),
                 scrollBehavior = scrollBehavior,
                 color = colorScheme.surface.copy(alpha = if (scrollProgress == 1f) 1f else 0f),
                 titleColor = colorScheme.onSurface.copy(alpha = scrollProgress),
@@ -105,7 +108,7 @@ fun AboutScreen(
                     IconButton(onClick = onBack) {
                         Icon(
                             imageVector = MiuixIcons.Back,
-                            contentDescription = "返回",
+                            contentDescription = stringResource(Res.string.common_back),
                             tint = colorScheme.onSurface,
                             modifier = Modifier.graphicsLayer {
                                 scaleX = if (layoutDirection == LayoutDirection.Rtl) -1f else 1f
@@ -316,7 +319,7 @@ private fun AboutContent(
                         .fillParentMaxHeight()
                         .padding(bottom = padding.calculateBottomPadding()),
                 ) {
-                    SmallTitle(text = "信息")
+                    SmallTitle(text = stringResource(Res.string.about_info))
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -338,22 +341,22 @@ private fun AboutContent(
                         ),
                     ) {
                         BasicComponent(
-                            title = "应用版本",
+                            title = stringResource(Res.string.about_app_version),
                             summary = misc.VersionInfo.VERSION_NAME,
                         )
                         BasicComponent(
-                            title = "构建版本",
+                            title = stringResource(Res.string.about_build_version),
                             summary = "${misc.VersionInfo.VERSION_CODE}",
                         )
                         if (mihomoVersion.isNotEmpty()) {
                             BasicComponent(
-                                title = "mihomo 版本",
+                                title = stringResource(Res.string.about_mihomo_version),
                                 summary = mihomoVersion,
                             )
                         }
                     }
 
-                    SmallTitle(text = "项目")
+                    SmallTitle(text = stringResource(Res.string.about_project))
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()

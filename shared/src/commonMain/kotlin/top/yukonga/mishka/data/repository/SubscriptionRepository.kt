@@ -15,6 +15,7 @@ import top.yukonga.mishka.data.database.PendingEntity
 import top.yukonga.mishka.data.database.SelectionDao
 import top.yukonga.mishka.data.model.Subscription
 import top.yukonga.mishka.platform.PlatformStorage
+import top.yukonga.mishka.platform.StorageKeys
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
@@ -42,7 +43,7 @@ class SubscriptionRepository(
 ) {
 
     private val profileLock = Mutex()
-    private val _activeUuid = MutableStateFlow(storage.getString("active_profile_uuid", ""))
+    private val _activeUuid = MutableStateFlow(storage.getString(StorageKeys.ACTIVE_PROFILE_UUID, ""))
     private val _subscriptions = MutableStateFlow<List<Subscription>>(emptyList())
     val subscriptions: StateFlow<List<Subscription>> = _subscriptions.asStateFlow()
 
@@ -232,9 +233,9 @@ class SubscriptionRepository(
 
     fun setActive(id: String) {
         _activeUuid.value = id
-        storage.putString("active_profile_uuid", id)
+        storage.putString(StorageKeys.ACTIVE_PROFILE_UUID, id)
         val name = _subscriptions.value.find { it.id == id }?.name ?: ""
-        storage.putString("active_profile_name", name)
+        storage.putString(StorageKeys.ACTIVE_PROFILE_NAME, name)
     }
 
     fun getActive(): Subscription? {

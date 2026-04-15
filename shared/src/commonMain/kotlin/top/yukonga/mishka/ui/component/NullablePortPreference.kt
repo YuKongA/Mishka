@@ -16,6 +16,9 @@ import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.window.WindowDialog
+import mishka.shared.generated.resources.Res
+import mishka.shared.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * 可空端口编辑偏好。
@@ -33,7 +36,7 @@ fun NullablePortPreference(
 ) {
     ArrowPreference(
         title = title,
-        summary = if (value == null) "不修改" else "$value",
+        summary = if (value == null) stringResource(Res.string.common_not_modified) else "$value",
         onClick = onShowDialog,
     )
 
@@ -45,7 +48,7 @@ fun NullablePortPreference(
         TextField(
             state = textState,
             modifier = Modifier.fillMaxWidth(),
-            label = "端口号 (0-65535)",
+            label = stringResource(Res.string.network_port_label),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
         )
         Spacer(Modifier.height(12.dp))
@@ -54,7 +57,7 @@ fun NullablePortPreference(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             TextButton(
-                text = "不修改",
+                text = stringResource(Res.string.common_not_modified),
                 modifier = Modifier.weight(1f),
                 onClick = {
                     onConfirm(null)
@@ -62,12 +65,12 @@ fun NullablePortPreference(
                 },
             )
             TextButton(
-                text = "取消",
+                text = stringResource(Res.string.common_cancel),
                 modifier = Modifier.weight(1f),
                 onClick = onDismiss,
             )
             TextButton(
-                text = "确定",
+                text = stringResource(Res.string.common_confirm),
                 modifier = Modifier.weight(1f),
                 colors = ButtonDefaults.textButtonColorsPrimary(),
                 onClick = {

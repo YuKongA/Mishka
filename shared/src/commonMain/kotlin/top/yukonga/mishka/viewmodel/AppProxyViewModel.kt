@@ -9,6 +9,7 @@ import kotlinx.coroutines.launch
 import top.yukonga.mishka.platform.AppInfo
 import top.yukonga.mishka.platform.AppListProvider
 import top.yukonga.mishka.platform.PlatformStorage
+import top.yukonga.mishka.platform.StorageKeys
 
 enum class AppProxyMode { AllowAll, AllowSelected, DenySelected }
 
@@ -35,10 +36,10 @@ class AppProxyViewModel(
     }
 
     private fun loadSavedState() {
-        val modeStr = storage.getString("app_proxy_mode", "AllowAll")
+        val modeStr = storage.getString(StorageKeys.APP_PROXY_MODE, "AllowAll")
         val mode = try { AppProxyMode.valueOf(modeStr) } catch (_: Exception) { AppProxyMode.AllowAll }
 
-        val packages = storage.getStringSet("app_proxy_packages", emptySet())
+        val packages = storage.getStringSet(StorageKeys.APP_PROXY_PACKAGES, emptySet())
 
         _uiState.value = _uiState.value.copy(mode = mode, selectedPackages = packages)
     }
@@ -100,7 +101,7 @@ class AppProxyViewModel(
 
     fun setMode(mode: AppProxyMode) {
         _uiState.value = _uiState.value.copy(mode = mode)
-        storage.putString("app_proxy_mode", mode.name)
+        storage.putString(StorageKeys.APP_PROXY_MODE, mode.name)
     }
 
     fun setSearchQuery(query: String) {
@@ -122,6 +123,6 @@ class AppProxyViewModel(
     }
 
     private fun savePackages(packages: Set<String>) {
-        storage.putStringSet("app_proxy_packages", packages)
+        storage.putStringSet(StorageKeys.APP_PROXY_PACKAGES, packages)
     }
 }

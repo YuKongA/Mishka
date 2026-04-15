@@ -24,6 +24,7 @@ import top.yukonga.mishka.data.database.getAppDatabase
 import top.yukonga.mishka.data.repository.MihomoRepository
 import top.yukonga.mishka.platform.FilePicker
 import top.yukonga.mishka.platform.PlatformStorage
+import top.yukonga.mishka.platform.StorageKeys
 import top.yukonga.mishka.platform.ProxyServiceBridge
 import top.yukonga.mishka.platform.ProxyServiceController
 import top.yukonga.mishka.platform.ProxyState
@@ -31,6 +32,7 @@ import top.yukonga.mishka.service.AndroidProfileFileManager
 import top.yukonga.mishka.service.ProfileFileOps
 import top.yukonga.mishka.platform.AppListProvider
 import top.yukonga.mishka.platform.BootStartManager
+import top.yukonga.mishka.service.RootHelper
 import top.yukonga.mishka.viewmodel.AppProxyViewModel
 import top.yukonga.mishka.viewmodel.ConnectionViewModel
 import top.yukonga.mishka.viewmodel.DnsQueryViewModel
@@ -137,7 +139,21 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        val initialColorMode = when (storage.getString("dark_mode", "system")) {
+        // 异步检测 root 权限：先用缓存值，检测完成后更新 State 触发 recompose
+        val hasRootState = androidx.compose.runtime.mutableStateOf(
+            storage.getString(StorageKeys.HAS_ROOT, "false") == "true"
+        )
+        lifecycleScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            val hasRoot = RootHelper.hasRootAccess()
+            storage.putString(StorageKeys.HAS_ROOT, if (hasRoot) "true" else "false")
+            // ROOT 不可用时自动回退到 VPN 模式，防止卡在错误状态
+            if (!hasRoot && storage.getString(StorageKeys.TUN_MODE, "vpn") == "root") {
+                storage.putString(StorageKeys.TUN_MODE, "vpn")
+            }
+            hasRootState.value = hasRoot
+        }
+
+        val initialColorMode = when (storage.getString(StorageKeys.DARK_MODE, "system")) {
             "light" -> 1
             "dark" -> 2
             else -> 0
@@ -163,6 +179,7 @@ class MainActivity : ComponentActivity() {
                     qrResultCallback = callback
                     scanQrLauncher.launch(null)
                 },
+                hasRootPermission = hasRootState.value,
                 onPredictiveBackChange = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
                     { enabled ->
                         MishkaApplication.setEnableOnBackInvokedCallback(applicationInfo, enabled)
@@ -171,6 +188,11 @@ class MainActivity : ComponentActivity() {
                 } else null,
             )
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        serviceController.verifyAndSyncState()
     }
 
     @Deprecated("Use ActivityResult API")

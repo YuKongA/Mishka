@@ -13,6 +13,9 @@ import androidx.compose.ui.unit.dp
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.basic.TextButtonColors
+import mishka.shared.generated.resources.Res
+import mishka.shared.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
 
 fun LazyListScope.actionButtonsSection(
     onRestart: () -> Unit = {},
@@ -47,7 +50,7 @@ private fun ActionButtonsRow(
     ) {
         if (isRunning) {
             TextButton(
-                text = "重启",
+                text = stringResource(Res.string.home_restart),
                 onClick = onRestart,
                 modifier = Modifier.weight(1f),
                 colors = TextButtonColors(
@@ -58,7 +61,7 @@ private fun ActionButtonsRow(
                 ),
             )
             TextButton(
-                text = "停止",
+                text = stringResource(Res.string.home_stop),
                 onClick = onStop,
                 modifier = Modifier.weight(1f),
                 colors = TextButtonColors(
@@ -69,7 +72,7 @@ private fun ActionButtonsRow(
                 ),
             )
             TextButton(
-                text = "热重载",
+                text = stringResource(Res.string.home_reload),
                 onClick = onReload,
                 modifier = Modifier.weight(1f),
                 colors = TextButtonColors(
@@ -81,7 +84,7 @@ private fun ActionButtonsRow(
             )
         } else {
             TextButton(
-                text = if (isStarting) "启动中..." else "启动",
+                text = if (isStarting) stringResource(Res.string.home_starting_btn) else stringResource(Res.string.home_start),
                 onClick = onStart,
                 modifier = Modifier.weight(1f),
                 enabled = !isStarting,

@@ -46,6 +46,9 @@ import top.yukonga.mishka.data.repository.OverrideStorageHelper
 import top.yukonga.mishka.ui.component.ListEditDialog
 import top.yukonga.mishka.ui.component.TriStatePreference
 import top.yukonga.mishka.viewmodel.OverrideSettingsViewModel
+import mishka.shared.generated.resources.Res
+import mishka.shared.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
 
 @Composable
 fun NetworkSettingsScreen(
@@ -101,14 +104,14 @@ fun NetworkSettingsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = "覆写设置",
+                title = stringResource(Res.string.network_settings_title),
                 scrollBehavior = scrollBehavior,
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         val layoutDirection = LocalLayoutDirection.current
                         Icon(
                             imageVector = MiuixIcons.Back,
-                            contentDescription = "返回",
+                            contentDescription = stringResource(Res.string.common_back),
                             tint = MiuixTheme.colorScheme.onSurface,
                             modifier = Modifier.graphicsLayer {
                                 scaleX = if (layoutDirection == LayoutDirection.Rtl) -1f else 1f
@@ -131,7 +134,7 @@ fun NetworkSettingsScreen(
             ),
         ) {
             // === 代理端口 ===
-            item { SmallTitle(text = "代理端口") }
+            item { SmallTitle(text = stringResource(Res.string.network_proxy_ports)) }
             item {
                 Card(
                     modifier = Modifier
@@ -139,36 +142,41 @@ fun NetworkSettingsScreen(
                         .padding(horizontal = 12.dp)
                         .padding(bottom = 6.dp),
                 ) {
+                    val httpPortTitle = stringResource(Res.string.network_http_port)
                     ArrowPreference(
-                        title = "HTTP 端口",
+                        title = httpPortTitle,
                         summary = portSummary(uiState.httpPort),
-                        onClick = { openPortDialog("HTTP 端口", OverrideStorageHelper.KEY_HTTP_PORT, uiState.httpPort) },
+                        onClick = { openPortDialog(httpPortTitle, OverrideStorageHelper.KEY_HTTP_PORT, uiState.httpPort) },
                     )
+                    val socksPortTitle = stringResource(Res.string.network_socks_port)
                     ArrowPreference(
-                        title = "SOCKS 端口",
+                        title = socksPortTitle,
                         summary = portSummary(uiState.socksPort),
-                        onClick = { openPortDialog("SOCKS 端口", OverrideStorageHelper.KEY_SOCKS_PORT, uiState.socksPort) },
+                        onClick = { openPortDialog(socksPortTitle, OverrideStorageHelper.KEY_SOCKS_PORT, uiState.socksPort) },
                     )
+                    val redirPortTitle = stringResource(Res.string.network_redir_port)
                     ArrowPreference(
-                        title = "Redir 端口",
+                        title = redirPortTitle,
                         summary = portSummary(uiState.redirPort),
-                        onClick = { openPortDialog("Redir 端口", OverrideStorageHelper.KEY_REDIR_PORT, uiState.redirPort) },
+                        onClick = { openPortDialog(redirPortTitle, OverrideStorageHelper.KEY_REDIR_PORT, uiState.redirPort) },
                     )
+                    val tproxyPortTitle = stringResource(Res.string.network_tproxy_port)
                     ArrowPreference(
-                        title = "TProxy 端口",
+                        title = tproxyPortTitle,
                         summary = portSummary(uiState.tproxyPort),
-                        onClick = { openPortDialog("TProxy 端口", OverrideStorageHelper.KEY_TPROXY_PORT, uiState.tproxyPort) },
+                        onClick = { openPortDialog(tproxyPortTitle, OverrideStorageHelper.KEY_TPROXY_PORT, uiState.tproxyPort) },
                     )
+                    val mixedPortTitle = stringResource(Res.string.network_mixed_port)
                     ArrowPreference(
-                        title = "Mixed 端口",
+                        title = mixedPortTitle,
                         summary = portSummary(uiState.mixedPort),
-                        onClick = { openPortDialog("Mixed 端口", OverrideStorageHelper.KEY_MIXED_PORT, uiState.mixedPort) },
+                        onClick = { openPortDialog(mixedPortTitle, OverrideStorageHelper.KEY_MIXED_PORT, uiState.mixedPort) },
                     )
                 }
             }
 
             // === 网络选项 ===
-            item { SmallTitle(text = "网络选项") }
+            item { SmallTitle(text = stringResource(Res.string.network_options)) }
             item {
                 Card(
                     modifier = Modifier
@@ -177,7 +185,7 @@ fun NetworkSettingsScreen(
                         .padding(bottom = 6.dp),
                 ) {
                     TriStatePreference(
-                        title = "允许局域网",
+                        title = stringResource(Res.string.network_allow_lan),
                         value = uiState.allowLan,
                         onValueChange = { viewModel.updateBoolean(OverrideStorageHelper.KEY_ALLOW_LAN, it) },
                     )
@@ -186,10 +194,11 @@ fun NetworkSettingsScreen(
                         value = uiState.ipv6,
                         onValueChange = { viewModel.updateBoolean(OverrideStorageHelper.KEY_IPV6, it) },
                     )
+                    val bindAddrTitle = stringResource(Res.string.network_bind_address)
                     ArrowPreference(
-                        title = "绑定地址",
-                        summary = uiState.bindAddress ?: "不修改",
-                        onClick = { openStringDialog("绑定地址", OverrideStorageHelper.KEY_BIND_ADDRESS, uiState.bindAddress) },
+                        title = bindAddrTitle,
+                        summary = uiState.bindAddress ?: stringResource(Res.string.common_not_modified),
+                        onClick = { openStringDialog(bindAddrTitle, OverrideStorageHelper.KEY_BIND_ADDRESS, uiState.bindAddress) },
                     )
                     LogLevelPreference(
                         value = uiState.logLevel,
@@ -199,7 +208,7 @@ fun NetworkSettingsScreen(
             }
 
             // === DNS ===
-            item { SmallTitle(text = "DNS") }
+            item { SmallTitle(text = stringResource(Res.string.network_dns)) }
             item {
                 Card(
                     modifier = Modifier
@@ -208,14 +217,15 @@ fun NetworkSettingsScreen(
                         .padding(bottom = 6.dp),
                 ) {
                     TriStatePreference(
-                        title = "启用 DNS",
+                        title = stringResource(Res.string.network_dns_enable),
                         value = uiState.dnsEnable,
                         onValueChange = { viewModel.updateBoolean(OverrideStorageHelper.KEY_DNS_ENABLE, it) },
                     )
+                    val dnsListenTitle = stringResource(Res.string.network_dns_listen_title)
                     ArrowPreference(
-                        title = "监听地址",
-                        summary = uiState.dnsListen ?: "不修改",
-                        onClick = { openStringDialog("DNS 监听地址", OverrideStorageHelper.KEY_DNS_LISTEN, uiState.dnsListen) },
+                        title = stringResource(Res.string.network_dns_listen),
+                        summary = uiState.dnsListen ?: stringResource(Res.string.common_not_modified),
+                        onClick = { openStringDialog(dnsListenTitle, OverrideStorageHelper.KEY_DNS_LISTEN, uiState.dnsListen) },
                     )
                     TriStatePreference(
                         title = "DNS IPv6",
@@ -228,7 +238,7 @@ fun NetworkSettingsScreen(
                         onValueChange = { viewModel.updateBoolean(OverrideStorageHelper.KEY_DNS_PREFER_H3, it) },
                     )
                     TriStatePreference(
-                        title = "使用 Hosts",
+                        title = stringResource(Res.string.network_dns_use_hosts),
                         value = uiState.dnsUseHosts,
                         onValueChange = { viewModel.updateBoolean(OverrideStorageHelper.KEY_DNS_USE_HOSTS, it) },
                     )
@@ -246,15 +256,17 @@ fun NetworkSettingsScreen(
                         summary = listSummary(uiState.dnsFallback),
                         onClick = { openListDialog("Fallback", OverrideStorageHelper.KEY_DNS_FALLBACK, uiState.dnsFallback) },
                     )
+                    val defaultNsTitle = stringResource(Res.string.network_dns_default_nameserver)
                     ArrowPreference(
-                        title = "默认 Nameserver",
+                        title = defaultNsTitle,
                         summary = listSummary(uiState.dnsDefaultNameserver),
-                        onClick = { openListDialog("默认 Nameserver", OverrideStorageHelper.KEY_DNS_DEFAULT_NAMESERVER, uiState.dnsDefaultNameserver) },
+                        onClick = { openListDialog(defaultNsTitle, OverrideStorageHelper.KEY_DNS_DEFAULT_NAMESERVER, uiState.dnsDefaultNameserver) },
                     )
+                    val fakeipFilterTitle = stringResource(Res.string.network_dns_fakeip_filter)
                     ArrowPreference(
-                        title = "FakeIP 过滤",
+                        title = fakeipFilterTitle,
                         summary = listSummary(uiState.dnsFakeIpFilter),
-                        onClick = { openListDialog("FakeIP 过滤", OverrideStorageHelper.KEY_DNS_FAKEIP_FILTER, uiState.dnsFakeIpFilter) },
+                        onClick = { openListDialog(fakeipFilterTitle, OverrideStorageHelper.KEY_DNS_FAKEIP_FILTER, uiState.dnsFakeIpFilter) },
                     )
                 }
             }
@@ -301,12 +313,13 @@ private fun LogLevelPreference(
     value: String?,
     onValueChange: (String?) -> Unit,
 ) {
-    val items = listOf("不修改", "Info", "Warning", "Error", "Debug", "Silent")
+    val notModifiedStr = stringResource(Res.string.common_not_modified)
+    val items = listOf(notModifiedStr, "Info", "Warning", "Error", "Debug", "Silent")
     val values = listOf(null, "info", "warning", "error", "debug", "silent")
     val selectedIndex = values.indexOf(value).coerceAtLeast(0)
 
     OverlayDropdownPreference(
-        title = "日志等级",
+        title = stringResource(Res.string.network_log_level),
         summary = items[selectedIndex],
         items = items,
         selectedIndex = selectedIndex,
@@ -319,12 +332,13 @@ private fun DnsEnhancedModePreference(
     value: String?,
     onValueChange: (String?) -> Unit,
 ) {
-    val items = listOf("不修改", "Normal", "FakeIP", "Redir-Host")
+    val notModifiedStr2 = stringResource(Res.string.common_not_modified)
+    val items = listOf(notModifiedStr2, "Normal", "FakeIP", "Redir-Host")
     val values = listOf(null, "normal", "fake-ip", "redir-host")
     val selectedIndex = values.indexOf(value).coerceAtLeast(0)
 
     OverlayDropdownPreference(
-        title = "增强模式",
+        title = stringResource(Res.string.network_dns_enhanced_mode),
         summary = items[selectedIndex],
         items = items,
         selectedIndex = selectedIndex,
@@ -349,7 +363,7 @@ private fun PortEditDialog(
         TextField(
             state = textState,
             modifier = Modifier.fillMaxWidth(),
-            label = "端口号 (0-65535)",
+            label = stringResource(Res.string.network_port_label),
             keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
                 keyboardType = androidx.compose.ui.text.input.KeyboardType.Number,
             ),
@@ -360,7 +374,7 @@ private fun PortEditDialog(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             TextButton(
-                text = "不修改",
+                text = stringResource(Res.string.common_not_modified),
                 modifier = Modifier.weight(1f),
                 onClick = {
                     onReset()
@@ -368,12 +382,12 @@ private fun PortEditDialog(
                 },
             )
             TextButton(
-                text = "取消",
+                text = stringResource(Res.string.common_cancel),
                 modifier = Modifier.weight(1f),
                 onClick = onDismiss,
             )
             TextButton(
-                text = "确定",
+                text = stringResource(Res.string.common_confirm),
                 modifier = Modifier.weight(1f),
                 colors = ButtonDefaults.textButtonColorsPrimary(),
                 onClick = {
@@ -405,7 +419,7 @@ private fun StringEditDialog(
         TextField(
             state = textState,
             modifier = Modifier.fillMaxWidth(),
-            label = "输入值",
+            label = stringResource(Res.string.network_input_value),
         )
         Spacer(Modifier.height(12.dp))
         Row(
@@ -413,7 +427,7 @@ private fun StringEditDialog(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             TextButton(
-                text = "不修改",
+                text = stringResource(Res.string.common_not_modified),
                 modifier = Modifier.weight(1f),
                 onClick = {
                     onReset()
@@ -421,12 +435,12 @@ private fun StringEditDialog(
                 },
             )
             TextButton(
-                text = "取消",
+                text = stringResource(Res.string.common_cancel),
                 modifier = Modifier.weight(1f),
                 onClick = onDismiss,
             )
             TextButton(
-                text = "确定",
+                text = stringResource(Res.string.common_confirm),
                 modifier = Modifier.weight(1f),
                 colors = ButtonDefaults.textButtonColorsPrimary(),
                 onClick = {
@@ -439,10 +453,12 @@ private fun StringEditDialog(
     }
 }
 
-private fun portSummary(port: Int?): String = if (port == null) "不修改" else "$port"
+@Composable
+private fun portSummary(port: Int?): String = if (port == null) stringResource(Res.string.common_not_modified) else "$port"
 
+@Composable
 private fun listSummary(list: List<String>?): String {
-    if (list == null) return "不修改"
-    if (list.isEmpty()) return "已清除"
-    return "${list.size} 条"
+    if (list == null) return stringResource(Res.string.common_not_modified)
+    if (list.isEmpty()) return stringResource(Res.string.common_cleared)
+    return stringResource(Res.string.common_items_count, list.size)
 }

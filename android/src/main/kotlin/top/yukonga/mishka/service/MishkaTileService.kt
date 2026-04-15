@@ -6,8 +6,12 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import top.yukonga.mishka.platform.PlatformStorage
+import top.yukonga.mishka.platform.StorageKeys
 import top.yukonga.mishka.platform.ProxyServiceBridge
 import top.yukonga.mishka.platform.ProxyState
+import top.yukonga.mishka.platform.TunMode
+import top.yukonga.mishka.R
 
 class MishkaTileService : TileService() {
 
@@ -24,10 +28,10 @@ class MishkaTileService : TileService() {
                     else -> Tile.STATE_INACTIVE
                 }
                 tile.subtitle = when (status.state) {
-                    ProxyState.Running -> "已连接"
-                    ProxyState.Starting -> "连接中..."
-                    ProxyState.Error -> "错误"
-                    else -> "未连接"
+                    ProxyState.Running -> getString(R.string.tile_connected)
+                    ProxyState.Starting -> getString(R.string.tile_connecting)
+                    ProxyState.Error -> getString(R.string.tile_error)
+                    else -> getString(R.string.tile_disconnected)
                 }
                 tile.updateTile()
             }
@@ -42,14 +46,24 @@ class MishkaTileService : TileService() {
 
     override fun onClick() {
         super.onClick()
-        val currentState = ProxyServiceBridge.state.value.state
+        val currentState = ProxyServiceBridge.state.value
         // 启动中时忽略点击，防止重复操作
-        if (currentState == ProxyState.Starting) return
+        if (currentState.state == ProxyState.Starting) return
 
-        if (currentState == ProxyState.Running) {
-            MishkaTunService.stop(applicationContext)
+        if (currentState.state == ProxyState.Running) {
+            // 停止时根据当前运行模式路由
+            when (currentState.tunMode) {
+                TunMode.Root -> MishkaRootService.stop(applicationContext)
+                TunMode.Vpn -> MishkaTunService.stop(applicationContext)
+            }
         } else {
-            MishkaTunService.start(applicationContext)
+            // 启动时读取设置中的模式
+            val isRoot = PlatformStorage(applicationContext).getString(StorageKeys.TUN_MODE, "vpn") == "root"
+            if (isRoot) {
+                MishkaRootService.start(applicationContext)
+            } else {
+                MishkaTunService.start(applicationContext)
+            }
         }
     }
 }
