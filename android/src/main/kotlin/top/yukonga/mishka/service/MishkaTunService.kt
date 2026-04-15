@@ -38,7 +38,7 @@ class MishkaTunService : VpnService() {
         super.onCreate()
         NotificationHelper.createChannels(this)
         startForeground(
-            NotificationHelper.NOTIFICATION_ID_VALUE,
+            NotificationHelper.NOTIFICATION_ID_VPN,
             NotificationHelper.buildLoadingNotification(this),
         )
     }

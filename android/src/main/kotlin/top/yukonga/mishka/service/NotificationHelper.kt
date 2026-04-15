@@ -55,9 +55,6 @@ object NotificationHelper {
         )
     }
 
-    @Deprecated("Use createChannels", ReplaceWith("createChannels(context)"))
-    fun createChannel(context: Context) = createChannels(context)
-
     // === VPN 通知 ===
 
     fun buildNotification(context: Context, title: String, content: String): Notification {
@@ -116,9 +113,6 @@ object NotificationHelper {
             .setForegroundServiceBehavior(Notification.FOREGROUND_SERVICE_IMMEDIATE)
             .build()
     }
-
-    @Deprecated("Use NOTIFICATION_ID_VPN", ReplaceWith("NOTIFICATION_ID_VPN"))
-    const val NOTIFICATION_ID_VALUE = NOTIFICATION_ID_VPN
 
     // === 配置更新进度通知 ===
 

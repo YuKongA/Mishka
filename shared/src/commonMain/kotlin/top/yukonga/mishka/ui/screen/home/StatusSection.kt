@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CheckCircleOutline
+import androidx.compose.material.icons.rounded.RemoveCircleOutline
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -70,6 +71,19 @@ private fun StatusContent(
     val isRunning = state.isRunning
     val isStarting = state.isStarting
 
+    val statusIcon = if (isRunning) {
+        Icons.Rounded.CheckCircleOutline
+    } else {
+        Icons.Rounded.RemoveCircleOutline
+    }
+    val statusTint = if (isStarting) {
+        if (isDark) Color(0xFFF9A825) else Color(0xFFFFB300)
+    } else if (isRunning) {
+        if (isDark) Color(0xFF81C784) else Color(0xFF4CAF50)
+    } else {
+        if (isDark) Color(0xFFEF9A9A) else Color(0xFFE53935)
+    }
+
     var showModeDialog by remember { mutableStateOf(false) }
     var showTunStackDialog by remember { mutableStateOf(false) }
 
@@ -98,20 +112,18 @@ private fun StatusContent(
             pressFeedbackType = PressFeedbackType.Tilt,
         ) {
             Box(modifier = Modifier.fillMaxSize()) {
-                if (isRunning) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .offset(38.dp, 45.dp),
-                        contentAlignment = Alignment.BottomEnd,
-                    ) {
-                        Icon(
-                            modifier = Modifier.size(170.dp),
-                            imageVector = Icons.Rounded.CheckCircleOutline,
-                            tint = if (isDark) Color(0xFF2E7D32) else Color(0xFF36D167),
-                            contentDescription = null,
-                        )
-                    }
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .offset(38.dp, 45.dp),
+                    contentAlignment = Alignment.BottomEnd,
+                ) {
+                    Icon(
+                        modifier = Modifier.size(170.dp),
+                        imageVector = statusIcon,
+                        tint = statusTint,
+                        contentDescription = null,
+                    )
                 }
                 Column(
                     modifier = Modifier
@@ -119,16 +131,16 @@ private fun StatusContent(
                         .padding(all = 16.dp),
                 ) {
                     Text(
-                        text = if (isStarting) stringResource(Res.string.home_starting) else if (isRunning) stringResource(Res.string.home_running) else stringResource(Res.string.home_stopped),
+                        text = if (isStarting) {
+                            stringResource(Res.string.home_starting)
+                        } else if (isRunning) {
+                            stringResource(Res.string.home_running)
+                        } else {
+                            stringResource(Res.string.home_stopped)
+                        },
                         fontSize = 20.sp,
                         fontWeight = FontWeight.SemiBold,
-                        color = if (isStarting) {
-                            if (isDark) Color(0xFFFFCC80) else Color(0xFFE65100)
-                        } else if (isRunning) {
-                            if (isDark) Color(0xFF81C784) else Color(0xFF4CAF50)
-                        } else {
-                            if (isDark) Color(0xFFEF9A9A) else Color(0xFFE53935)
-                        },
+                        color = statusTint,
                     )
                     Spacer(Modifier.height(2.dp))
                     Text(
