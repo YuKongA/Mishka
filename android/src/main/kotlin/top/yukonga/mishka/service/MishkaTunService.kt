@@ -6,6 +6,7 @@ import android.net.VpnService
 import android.os.Binder
 import android.os.IBinder
 import android.util.Log
+import top.yukonga.mishka.R
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -57,22 +58,59 @@ class MishkaTunService : VpnService() {
 
             // 1. 建立 VPN 接口，获取 fd
             val fd = try {
+                val storage = PlatformStorage(this@MishkaTunService)
                 Builder().apply {
                     addAddress(TUN_GATEWAY, TUN_SUBNET_PREFIX)
-                    addRoute("0.0.0.0", 0)
-                    addDnsServer(TUN_DNS)
                     setMtu(TUN_MTU)
                     setSession("Mishka")
                     setBlocking(false)
 
+                    // VPN 设置：绕过私有网络
+                    val bypassPrivate = storage.getString("vpn_bypass_private_network", "true") == "true"
+                    if (bypassPrivate) {
+                        resources.getStringArray(R.array.bypass_private_route).forEach { cidr ->
+                            val parts = cidr.split("/")
+                            addRoute(parts[0], parts[1].toInt())
+                        }
+                        addRoute(TUN_DNS, 32)
+                    } else {
+                        addRoute("0.0.0.0", 0)
+                    }
+
+                    // VPN 设置：允许 IPv6
+                    val allowIpv6 = storage.getString("vpn_allow_ipv6", "false") == "true"
+                    if (allowIpv6) {
+                        addAddress(TUN_GATEWAY6, TUN_SUBNET_PREFIX6)
+                        if (bypassPrivate) {
+                            resources.getStringArray(R.array.bypass_private_route6).forEach { cidr ->
+                                val parts = cidr.split("/")
+                                addRoute(parts[0], parts[1].toInt())
+                            }
+                            addRoute(TUN_DNS6, 128)
+                        } else {
+                            addRoute("::", 0)
+                        }
+                    }
+
+                    // VPN 设置：DNS 劫持
+                    val dnsHijacking = storage.getString("vpn_dns_hijacking", "true") == "true"
+                    if (dnsHijacking) {
+                        addDnsServer(TUN_DNS)
+                        if (allowIpv6) addDnsServer(TUN_DNS6)
+                    }
+
+                    // VPN 设置：允许应用绕过
+                    val allowBypass = storage.getString("vpn_allow_bypass", "true") == "true"
+                    if (allowBypass) {
+                        allowBypass()
+                    }
+
                     // 应用代理设置
-                    val storage = PlatformStorage(this@MishkaTunService)
                     val proxyMode = storage.getString("app_proxy_mode", "AllowAll")
                     val packages = storage.getStringSet("app_proxy_packages", emptySet())
 
                     when (proxyMode) {
                         "AllowSelected" -> {
-                            // 白名单模式：允许选中应用 + 自身（自身必须在白名单内才能连接 mihomo API）
                             addAllowedApplication(packageName)
                             packages.forEach { pkg ->
                                 if (pkg != packageName) {
@@ -81,7 +119,6 @@ class MishkaTunService : VpnService() {
                             }
                         }
                         "DenySelected" -> {
-                            // 黑名单模式：排除选中应用 + 排除自身
                             addDisallowedApplication(packageName)
                             packages.forEach { pkg ->
                                 if (pkg != packageName) {
@@ -90,13 +127,30 @@ class MishkaTunService : VpnService() {
                             }
                         }
                         else -> {
-                            // AllowAll：仅排除自身
                             addDisallowedApplication(packageName)
                         }
                     }
 
                     if (android.os.Build.VERSION.SDK_INT >= 29) {
                         setMetered(false)
+
+                        // VPN 设置：系统代理
+                        val systemProxy = storage.getString("vpn_system_proxy", "true") == "true"
+                        if (systemProxy) {
+                            val port = storage.getString("override_mixed_port", "null")
+                                .toIntOrNull() ?: 7890
+                            setHttpProxy(
+                                android.net.ProxyInfo.buildDirectProxy(
+                                    "127.0.0.1",
+                                    port,
+                                    listOf("localhost", "*.local", "127.*", "10.*", "172.16.*",
+                                        "172.17.*", "172.18.*", "172.19.*", "172.20.*",
+                                        "172.21.*", "172.22.*", "172.23.*", "172.24.*",
+                                        "172.25.*", "172.26.*", "172.27.*", "172.28.*",
+                                        "172.29.*", "172.30.*", "172.31.*", "192.168.*"),
+                                )
+                            )
+                        }
                     }
                 }.establish()?.detachFd()
             } catch (e: Exception) {
@@ -213,7 +267,10 @@ class MishkaTunService : VpnService() {
         private const val TUN_MTU = 9000
         private const val TUN_SUBNET_PREFIX = 30
         private const val TUN_GATEWAY = "198.18.0.1"
+        private const val TUN_GATEWAY6 = "fdfe:dcba:9876::1"
+        private const val TUN_SUBNET_PREFIX6 = 126
         private const val TUN_DNS = "198.18.0.2"
+        private const val TUN_DNS6 = "fdfe:dcba:9876::2"
 
         fun start(context: Context, subscriptionId: String? = null) {
             val intent = Intent(context, MishkaTunService::class.java).apply {

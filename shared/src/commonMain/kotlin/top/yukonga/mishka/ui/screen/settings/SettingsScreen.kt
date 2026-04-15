@@ -32,6 +32,7 @@ import top.yukonga.mishka.platform.PlatformStorage
 fun SettingsScreen(
     modifier: Modifier = Modifier,
     bottomPadding: Dp = 0.dp,
+    onNavigateVpnSettings: () -> Unit = {},
     onNavigateNetworkSettings: () -> Unit = {},
     onNavigateMetaSettings: () -> Unit = {},
     onNavigateAppProxy: () -> Unit = {},
@@ -78,6 +79,11 @@ fun SettingsScreen(
                         .padding(horizontal = 12.dp)
                         .padding(bottom = 6.dp),
                 ) {
+                    ArrowPreference(
+                        title = "VPN 设置",
+                        summary = "绕过私有网络、DNS 劫持、IPv6",
+                        onClick = onNavigateVpnSettings,
+                    )
                     ArrowPreference(
                         title = "覆写设置",
                         summary = "端口、DNS、网络选项覆写",

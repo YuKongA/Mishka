@@ -400,8 +400,8 @@ private fun ProxyNodeGrid(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 12.dp)
-            .padding(bottom = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+            .padding(bottom = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         group.all.chunked(2).forEach { row ->
             Row(
@@ -460,7 +460,7 @@ private fun ProxyNodeCard(
     val backgroundColor = if (isSelected) {
         if (isDark) Color(0xFF1A3040) else Color(0xFFE3F2FD)
     } else {
-        MiuixTheme.colorScheme.surfaceVariant
+        MiuixTheme.colorScheme.surface
     }
 
     Box(

@@ -52,6 +52,7 @@ import top.yukonga.mishka.ui.screen.settings.AppProxyScreen
 import top.yukonga.mishka.ui.screen.settings.MetaSettingsScreen
 import top.yukonga.mishka.ui.screen.settings.NetworkSettingsScreen
 import top.yukonga.mishka.ui.screen.settings.SettingsScreen
+import top.yukonga.mishka.ui.screen.settings.VpnSettingsScreen
 import top.yukonga.mishka.ui.screen.subscription.SubscriptionAddScreen
 import top.yukonga.mishka.ui.screen.subscription.SubscriptionAddUrlScreen
 import top.yukonga.mishka.ui.screen.subscription.SubscriptionEditScreen
@@ -217,6 +218,15 @@ fun AppNavigation(
                     )
                 }
             }
+            entry<Route.VpnSettings> {
+                storage?.let {
+                    VpnSettingsScreen(
+                        storage = it,
+                        isSystemProxySupported = true,
+                        onBack = { navigator.pop() },
+                    )
+                }
+            }
             entry<Route.NetworkSettings> {
                 overrideSettingsViewModel?.let {
                     NetworkSettingsScreen(
@@ -354,6 +364,7 @@ private fun MainPage(
 
                 3 -> SettingsScreen(
                     bottomPadding = bottomPadding,
+                    onNavigateVpnSettings = { navigator.push(Route.VpnSettings) },
                     onNavigateNetworkSettings = { navigator.push(Route.NetworkSettings) },
                     onNavigateMetaSettings = { navigator.push(Route.MetaSettings) },
                     onNavigateAppProxy = { navigator.push(Route.AppProxy) },

@@ -9,7 +9,12 @@ actual class PlatformStorage(context: Context) {
         context.getSharedPreferences("mishka_prefs", Context.MODE_PRIVATE)
 
     actual fun getString(key: String, default: String): String =
-        prefs.getString(key, default) ?: default
+        try {
+            prefs.getString(key, default) ?: default
+        } catch (_: ClassCastException) {
+            prefs.edit { remove(key) }
+            default
+        }
 
     actual fun putString(key: String, value: String) {
         prefs.edit { putString(key, value) }
