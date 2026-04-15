@@ -1,6 +1,8 @@
 package top.yukonga.mishka.service
 
 import android.content.Context
+import top.yukonga.mishka.data.repository.OverrideStorageHelper
+import top.yukonga.mishka.platform.PlatformStorage
 import java.io.File
 import java.util.UUID
 
@@ -41,7 +43,7 @@ object ConfigGenerator {
 
     /**
      * 生成最终运行配置。
-     * 以订阅配置为基础，用行过滤移除冲突 key，再注入 Mishka 控制参数。
+     * 以订阅配置为基础，用行过滤移除冲突 key，再注入 Mishka 控制参数和覆写设置。
      *
      * @param tunFd VPN 的 TUN 文件描述符，注入到 tun.file-descriptor
      */
@@ -52,6 +54,8 @@ object ConfigGenerator {
         tunFd: Int = -1,
     ): File {
         val configFile = getConfigFile(context)
+        val storage = PlatformStorage(context)
+        val h = OverrideStorageHelper
 
         val baseConfig = if (subscriptionId != null) {
             val subConfig = getSubscriptionConfigFile(context, subscriptionId)
@@ -60,8 +64,74 @@ object ConfigGenerator {
             ""
         }
 
-        // 行过滤：移除会被 Mishka 注入覆盖的顶层 key
-        val keysToRemove = setOf("external-controller", "secret", "external-ui", "tun")
+        // 读取覆写设置
+        val httpPort = h.readNullableInt(storage, h.KEY_HTTP_PORT)
+        val socksPort = h.readNullableInt(storage, h.KEY_SOCKS_PORT)
+        val redirPort = h.readNullableInt(storage, h.KEY_REDIR_PORT)
+        val tproxyPort = h.readNullableInt(storage, h.KEY_TPROXY_PORT)
+        val mixedPort = h.readNullableInt(storage, h.KEY_MIXED_PORT)
+        val allowLan = h.readNullableBoolean(storage, h.KEY_ALLOW_LAN)
+        val ipv6 = h.readNullableBoolean(storage, h.KEY_IPV6)
+        val bindAddress = h.readNullableString(storage, h.KEY_BIND_ADDRESS)
+        val logLevel = h.readNullableString(storage, h.KEY_LOG_LEVEL)
+
+        val dnsEnable = h.readNullableBoolean(storage, h.KEY_DNS_ENABLE)
+        val dnsListen = h.readNullableString(storage, h.KEY_DNS_LISTEN)
+        val dnsIpv6 = h.readNullableBoolean(storage, h.KEY_DNS_IPV6)
+        val dnsPreferH3 = h.readNullableBoolean(storage, h.KEY_DNS_PREFER_H3)
+        val dnsUseHosts = h.readNullableBoolean(storage, h.KEY_DNS_USE_HOSTS)
+        val dnsEnhancedMode = h.readNullableString(storage, h.KEY_DNS_ENHANCED_MODE)
+        val dnsNameservers = h.readNullableStringList(storage, h.KEY_DNS_NAMESERVERS)
+        val dnsFallback = h.readNullableStringList(storage, h.KEY_DNS_FALLBACK)
+        val dnsDefaultNameserver = h.readNullableStringList(storage, h.KEY_DNS_DEFAULT_NAMESERVER)
+        val dnsFakeIpFilter = h.readNullableStringList(storage, h.KEY_DNS_FAKEIP_FILTER)
+
+        val unifiedDelay = h.readNullableBoolean(storage, h.KEY_UNIFIED_DELAY)
+        val geodataMode = h.readNullableBoolean(storage, h.KEY_GEODATA_MODE)
+        val tcpConcurrent = h.readNullableBoolean(storage, h.KEY_TCP_CONCURRENT)
+        val findProcessMode = h.readNullableString(storage, h.KEY_FIND_PROCESS_MODE)
+
+        val snifferEnable = h.readNullableBoolean(storage, h.KEY_SNIFFER_ENABLE)
+        val snifferForceDnsMapping = h.readNullableBoolean(storage, h.KEY_SNIFFER_FORCE_DNS_MAPPING)
+        val snifferParsePureIp = h.readNullableBoolean(storage, h.KEY_SNIFFER_PARSE_PURE_IP)
+        val snifferOverrideDest = h.readNullableBoolean(storage, h.KEY_SNIFFER_OVERRIDE_DEST)
+        val snifferForceDomain = h.readNullableStringList(storage, h.KEY_SNIFFER_FORCE_DOMAIN)
+        val snifferSkipDomain = h.readNullableStringList(storage, h.KEY_SNIFFER_SKIP_DOMAIN)
+
+        val hasDnsOverrides = dnsEnable != null || dnsListen != null || dnsIpv6 != null ||
+            dnsPreferH3 != null || dnsUseHosts != null || dnsEnhancedMode != null ||
+            dnsNameservers != null || dnsFallback != null || dnsDefaultNameserver != null ||
+            dnsFakeIpFilter != null
+
+        val hasSnifferOverrides = snifferEnable != null || snifferForceDnsMapping != null ||
+            snifferParsePureIp != null || snifferOverrideDest != null ||
+            snifferForceDomain != null || snifferSkipDomain != null
+
+        // 行过滤：移除会被 Mishka 注入或覆写的顶层 key
+        val keysToRemove = buildSet {
+            add("external-controller")
+            add("secret")
+            add("external-ui")
+            add("tun")
+            // 覆写的简单顶层 key
+            if (httpPort != null) add("port")
+            if (socksPort != null) add("socks-port")
+            if (redirPort != null) add("redir-port")
+            if (tproxyPort != null) add("tproxy-port")
+            if (mixedPort != null) add("mixed-port")
+            if (allowLan != null) add("allow-lan")
+            if (ipv6 != null) add("ipv6")
+            if (bindAddress != null) add("bind-address")
+            if (logLevel != null) add("log-level")
+            if (unifiedDelay != null) add("unified-delay")
+            if (geodataMode != null) add("geodata-mode")
+            if (tcpConcurrent != null) add("tcp-concurrent")
+            if (findProcessMode != null) add("find-process-mode")
+            // 覆写的复杂段
+            if (hasDnsOverrides) add("dns")
+            if (hasSnifferOverrides) add("sniffer")
+        }
+
         val filteredLines = if (baseConfig.isNotEmpty()) {
             filterTopLevelKeys(baseConfig, keysToRemove)
         } else {
@@ -94,7 +164,51 @@ object ConfigGenerator {
             appendLine("  dns-hijack:")
             appendLine("    - 0.0.0.0:53")
 
-            if (!baseConfig.contains("dns:")) {
+            // === 覆写：简单顶层 key ===
+            appendLine()
+            appendLine("# === Override settings ===")
+            httpPort?.let { appendLine("port: $it") }
+            socksPort?.let { appendLine("socks-port: $it") }
+            redirPort?.let { appendLine("redir-port: $it") }
+            tproxyPort?.let { appendLine("tproxy-port: $it") }
+            mixedPort?.let { appendLine("mixed-port: $it") }
+            allowLan?.let { appendLine("allow-lan: $it") }
+            ipv6?.let { appendLine("ipv6: $it") }
+            bindAddress?.let { appendLine("bind-address: \"$it\"") }
+            logLevel?.let { appendLine("log-level: $it") }
+            unifiedDelay?.let { appendLine("unified-delay: $it") }
+            geodataMode?.let { appendLine("geodata-mode: $it") }
+            tcpConcurrent?.let { appendLine("tcp-concurrent: $it") }
+            findProcessMode?.let { appendLine("find-process-mode: $it") }
+
+            // === 覆写：DNS 段 ===
+            if (hasDnsOverrides) {
+                appendLine()
+                appendLine("dns:")
+                dnsEnable?.let { appendLine("  enable: $it") }
+                dnsListen?.let { appendLine("  listen: $it") }
+                dnsIpv6?.let { appendLine("  ipv6: $it") }
+                dnsPreferH3?.let { appendLine("  prefer-h3: $it") }
+                dnsUseHosts?.let { appendLine("  use-hosts: $it") }
+                dnsEnhancedMode?.let { appendLine("  enhanced-mode: $it") }
+                dnsNameservers?.let { list ->
+                    appendLine("  nameserver:")
+                    list.forEach { appendLine("    - $it") }
+                }
+                dnsFallback?.let { list ->
+                    appendLine("  fallback:")
+                    list.forEach { appendLine("    - $it") }
+                }
+                dnsDefaultNameserver?.let { list ->
+                    appendLine("  default-nameserver:")
+                    list.forEach { appendLine("    - $it") }
+                }
+                dnsFakeIpFilter?.let { list ->
+                    appendLine("  fake-ip-filter:")
+                    list.forEach { appendLine("    - $it") }
+                }
+            } else if (!baseConfig.contains("dns:")) {
+                // 如果没有覆写也没有订阅 DNS，注入默认 DNS
                 appendLine()
                 appendLine("dns:")
                 appendLine("  enable: true")
@@ -107,7 +221,26 @@ object ConfigGenerator {
                 appendLine("    - https://dns.alidns.com/dns-query")
             }
 
-            if (!baseConfig.contains("mixed-port:")) {
+            // === 覆写：Sniffer 段 ===
+            if (hasSnifferOverrides) {
+                appendLine()
+                appendLine("sniffer:")
+                snifferEnable?.let { appendLine("  enable: $it") }
+                snifferForceDnsMapping?.let { appendLine("  force-dns-mapping: $it") }
+                snifferParsePureIp?.let { appendLine("  parse-pure-ip: $it") }
+                snifferOverrideDest?.let { appendLine("  override-destination: $it") }
+                snifferForceDomain?.let { list ->
+                    appendLine("  force-domain:")
+                    list.forEach { appendLine("    - $it") }
+                }
+                snifferSkipDomain?.let { list ->
+                    appendLine("  skip-domain:")
+                    list.forEach { appendLine("    - $it") }
+                }
+            }
+
+            // 默认端口和模式（如果没有覆写也没有在订阅中）
+            if (mixedPort == null && !baseConfig.contains("mixed-port:")) {
                 appendLine()
                 appendLine("mixed-port: 7890")
             }

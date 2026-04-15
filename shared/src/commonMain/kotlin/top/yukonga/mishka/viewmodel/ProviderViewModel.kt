@@ -45,32 +45,36 @@ class ProviderViewModel : ViewModel() {
         viewModelScope.launch {
             val items = mutableListOf<ProviderItemUi>()
 
-            // 加载代理 provider
+            // 加载代理 provider（过滤 Compatible 类型，同 CMFA）
             repo.getProviders().onSuccess { response ->
-                response.providers.values.forEach { info ->
-                    items.add(
-                        ProviderItemUi(
-                            name = info.name,
-                            type = "代理(${info.type})",
-                            vehicleType = info.vehicleType,
-                            updatedAt = info.updatedAt,
+                response.providers.values
+                    .filter { it.vehicleType != "Compatible" }
+                    .forEach { info ->
+                        items.add(
+                            ProviderItemUi(
+                                name = info.name,
+                                type = "代理(${info.type})",
+                                vehicleType = info.vehicleType,
+                                updatedAt = info.updatedAt,
+                            )
                         )
-                    )
-                }
+                    }
             }
 
-            // 加载规则 provider
+            // 加载规则 provider（过滤 Compatible 类型，同 CMFA）
             repo.getRuleProviders().onSuccess { response ->
-                response.providers.values.forEach { info ->
-                    items.add(
-                        ProviderItemUi(
-                            name = info.name,
-                            type = "规则(${info.vehicleType})",
-                            vehicleType = info.vehicleType,
-                            updatedAt = info.updatedAt,
+                response.providers.values
+                    .filter { it.vehicleType != "Compatible" }
+                    .forEach { info ->
+                        items.add(
+                            ProviderItemUi(
+                                name = info.name,
+                                type = "规则(${info.vehicleType})",
+                                vehicleType = info.vehicleType,
+                                updatedAt = info.updatedAt,
+                            )
                         )
-                    )
-                }
+                    }
             }
 
             _uiState.value = _uiState.value.copy(

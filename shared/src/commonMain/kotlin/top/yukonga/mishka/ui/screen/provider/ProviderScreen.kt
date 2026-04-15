@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -20,11 +21,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.nestedScroll
-import top.yukonga.miuix.kmp.utils.overScrollVertical
-import top.yukonga.miuix.kmp.utils.scrollEndHaptic
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import top.yukonga.mishka.viewmodel.ProviderItemUi
@@ -42,6 +44,8 @@ import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Back
 import top.yukonga.miuix.kmp.icon.extended.Refresh
 import top.yukonga.miuix.kmp.theme.MiuixTheme
+import top.yukonga.miuix.kmp.utils.overScrollVertical
+import top.yukonga.miuix.kmp.utils.scrollEndHaptic
 
 @Composable
 fun ProviderScreen(
@@ -59,10 +63,14 @@ fun ProviderScreen(
                 scrollBehavior = scrollBehavior,
                 navigationIcon = {
                     IconButton(onClick = onBack) {
+                        val layoutDirection = LocalLayoutDirection.current
                         Icon(
                             imageVector = MiuixIcons.Back,
                             contentDescription = "返回",
                             tint = MiuixTheme.colorScheme.onSurface,
+                            modifier = Modifier.graphicsLayer {
+                                scaleX = if (layoutDirection == LayoutDirection.Rtl) -1f else 1f
+                            },
                         )
                     }
                 },
@@ -92,7 +100,10 @@ fun ProviderScreen(
             if (uiState.error.isNotEmpty()) {
                 item(key = "error") {
                     Card(
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp).padding(top = 12.dp, bottom = 6.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp)
+                            .padding(top = 12.dp, bottom = 6.dp),
                         insideMargin = PaddingValues(16.dp),
                     ) {
                         Text(
@@ -130,19 +141,24 @@ fun ProviderScreen(
                     SmallTitle(text = "资源列表")
                 }
 
-                item(key = "provider_card") {
+                items(
+                    items = uiState.providers,
+                    key = { it.name },
+                    contentType = { "provider" },
+                ) { provider ->
                     Card(
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp).padding(bottom = 12.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp)
+                            .padding(bottom = 12.dp),
                     ) {
-                        uiState.providers.forEach { provider ->
-                            ProviderItem(
-                                provider = provider,
-                                onUpdate = {
-                                    val isRule = provider.type.startsWith("规则")
-                                    viewModel.updateProvider(provider.name, isRule)
-                                },
-                            )
-                        }
+                        ProviderItem(
+                            provider = provider,
+                            onUpdate = {
+                                val isRule = provider.type.startsWith("规则")
+                                viewModel.updateProvider(provider.name, isRule)
+                            },
+                        )
                     }
                 }
             }
@@ -163,27 +179,30 @@ private fun ProviderItem(
         title = provider.name,
         summary = provider.type,
         endActions = {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Text(
-                    text = formatUpdatedAt(provider.updatedAt),
-                    fontSize = 12.sp,
-                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                )
-                Image(
-                    modifier = Modifier
-                        .clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = null,
-                            role = Role.Button,
-                            onClick = onUpdate,
-                        ),
-                    imageVector = MiuixIcons.Refresh,
-                    contentDescription = "更新",
-                    colorFilter = ColorFilter.tint(MiuixTheme.colorScheme.onSurfaceVariantSummary)
-                )
+            // Inline 类型不显示更新时间和按钮（同 CMFA）
+            if (provider.vehicleType != "Inline") {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Text(
+                        text = formatUpdatedAt(provider.updatedAt),
+                        fontSize = 12.sp,
+                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                    )
+                    Image(
+                        modifier = Modifier
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null,
+                                role = Role.Button,
+                                onClick = onUpdate,
+                            ),
+                        imageVector = MiuixIcons.Refresh,
+                        contentDescription = "更新",
+                        colorFilter = ColorFilter.tint(MiuixTheme.colorScheme.onSurfaceVariantSummary)
+                    )
+                }
             }
         },
     )

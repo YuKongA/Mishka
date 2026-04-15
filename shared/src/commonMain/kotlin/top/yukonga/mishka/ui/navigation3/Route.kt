@@ -35,5 +35,8 @@ sealed interface Route : NavKey {
     data object AppProxy : Route
 
     @Serializable
+    data object MetaSettings : Route
+
+    @Serializable
     data object About : Route
 }

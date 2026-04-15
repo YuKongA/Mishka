@@ -23,10 +23,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -51,23 +53,33 @@ import io.ktor.client.HttpClient
 import io.ktor.client.request.get
 import io.ktor.client.statement.readRawBytes
 import org.jetbrains.compose.resources.decodeToImageBitmap
+import top.yukonga.mishka.platform.IconDiskCache
+import top.yukonga.mishka.ui.component.ListPopupDefaults.MenuPositionProvider
 import top.yukonga.mishka.viewmodel.ProxyGroupUi
 import top.yukonga.mishka.viewmodel.ProxyUiState
 import top.yukonga.mishka.viewmodel.ProxyViewModel
 import top.yukonga.miuix.kmp.basic.Card
+import top.yukonga.miuix.kmp.basic.DropdownImpl
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
+import top.yukonga.miuix.kmp.basic.ListPopupColumn
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
+import top.yukonga.miuix.kmp.basic.PopupPositionProvider
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TopAppBar
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.basic.ArrowRight
+import top.yukonga.miuix.kmp.icon.extended.More
 import top.yukonga.miuix.kmp.icon.extended.Refresh
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.theme.miuixShape
 import top.yukonga.miuix.kmp.utils.overScrollVertical
 import top.yukonga.miuix.kmp.utils.scrollEndHaptic
+import top.yukonga.miuix.kmp.window.WindowListPopup
+
+// 内存缓存（加速同次会话内的重复访问）
+private val iconMemCache = mutableMapOf<String, ImageBitmap>()
 
 @Composable
 fun ProxyScreen(
@@ -80,6 +92,8 @@ fun ProxyScreen(
     val groups = uiState.groups
 
     var expandedGroups by remember { mutableStateOf(setOf<String>()) }
+    val showPopup = remember { mutableStateOf(false) }
+    var iconCacheVersion by remember { mutableIntStateOf(0) }
 
     Scaffold(
         modifier = modifier,
@@ -98,6 +112,38 @@ fun ProxyScreen(
                                 contentDescription = "刷新",
                                 tint = MiuixTheme.colorScheme.onSurface,
                             )
+                        }
+                        IconButton(
+                            onClick = { showPopup.value = true },
+                            holdDownState = showPopup.value,
+                        ) {
+                            Icon(
+                                imageVector = MiuixIcons.More,
+                                contentDescription = "更多",
+                                tint = MiuixTheme.colorScheme.onSurface,
+                            )
+                        }
+
+                        WindowListPopup(
+                            show = showPopup.value,
+                            popupPositionProvider = MenuPositionProvider,
+                            alignment = PopupPositionProvider.Align.TopEnd,
+                            onDismissRequest = { showPopup.value = false },
+                        ) {
+                            ListPopupColumn {
+                                DropdownImpl(
+                                    text = "刷新图标",
+                                    optionSize = 1,
+                                    isSelected = false,
+                                    index = 0,
+                                    onSelectedIndexChange = {
+                                        iconMemCache.clear()
+                                        IconDiskCache.clear()
+                                        iconCacheVersion++
+                                        showPopup.value = false
+                                    },
+                                )
+                            }
                         }
                     }
                 },
@@ -136,42 +182,45 @@ fun ProxyScreen(
                     bottom = bottomPadding,
                 ),
             ) {
-                item(key = "proxy_groups") {
+                items(
+                    items = groups,
+                    key = { it.name },
+                    contentType = { "group" },
+                ) { group ->
+                    val isExpanded = group.name in expandedGroups
+
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 12.dp)
                             .padding(top = 12.dp),
                     ) {
-                        groups.forEach { group ->
-                            val isExpanded = group.name in expandedGroups
+                        ProxyGroupHeader(
+                            group = group,
+                            isExpanded = isExpanded,
+                            iconCacheVersion = iconCacheVersion,
+                            onToggle = {
+                                expandedGroups = if (isExpanded) {
+                                    expandedGroups - group.name
+                                } else {
+                                    expandedGroups + group.name
+                                }
+                            },
+                        )
 
-                            ProxyGroupHeader(
+                        AnimatedVisibility(
+                            visible = isExpanded,
+                            enter = expandVertically(),
+                            exit = shrinkVertically(),
+                        ) {
+                            ProxyNodeGrid(
                                 group = group,
-                                isExpanded = isExpanded,
-                                onToggle = {
-                                    expandedGroups = if (isExpanded) {
-                                        expandedGroups - group.name
-                                    } else {
-                                        expandedGroups + group.name
+                                onSelect = { proxyName ->
+                                    if (group.type.lowercase() == "selector") {
+                                        viewModel?.selectProxy(group.name, proxyName)
                                     }
                                 },
                             )
-
-                            AnimatedVisibility(
-                                visible = isExpanded,
-                                enter = expandVertically(),
-                                exit = shrinkVertically(),
-                            ) {
-                                ProxyNodeGrid(
-                                    group = group,
-                                    onSelect = { proxyName ->
-                                        if (group.type.lowercase() == "selector") {
-                                            viewModel?.selectProxy(group.name, proxyName)
-                                        }
-                                    },
-                                )
-                            }
                         }
                     }
                 }
@@ -188,6 +237,7 @@ fun ProxyScreen(
 private fun ProxyGroupHeader(
     group: ProxyGroupUi,
     isExpanded: Boolean,
+    iconCacheVersion: Int,
     onToggle: () -> Unit,
 ) {
     val rotation by animateFloatAsState(
@@ -206,6 +256,7 @@ private fun ProxyGroupHeader(
         GroupIcon(
             icon = group.icon,
             name = group.name,
+            cacheVersion = iconCacheVersion,
         )
 
         Spacer(Modifier.width(12.dp))
@@ -273,19 +324,34 @@ private fun ProxyGroupHeader(
 private fun GroupIcon(
     icon: String,
     name: String,
+    cacheVersion: Int,
 ) {
     if (icon.isNotEmpty()) {
-        // 加载网络图标
-        var bitmap by remember(icon) { mutableStateOf<ImageBitmap?>(null) }
+        // 内存缓存 → 磁盘缓存 → 网络
+        var bitmap by remember(icon, cacheVersion) { mutableStateOf(iconMemCache[icon]) }
 
-        LaunchedEffect(icon) {
-            try {
-                val client = HttpClient()
-                val bytes = client.get(icon).readRawBytes()
-                client.close()
-                bitmap = bytes.decodeToImageBitmap()
-            } catch (_: Exception) {
-                // 加载失败，保持 null，显示默认图标
+        if (bitmap == null) {
+            LaunchedEffect(icon, cacheVersion) {
+                try {
+                    // 尝试磁盘缓存
+                    val diskBytes = IconDiskCache.get(icon)
+                    if (diskBytes != null) {
+                        val decoded = diskBytes.decodeToImageBitmap()
+                        iconMemCache[icon] = decoded
+                        bitmap = decoded
+                        return@LaunchedEffect
+                    }
+                    // 网络下载
+                    val client = HttpClient()
+                    val bytes = client.get(icon).readRawBytes()
+                    client.close()
+                    val decoded = bytes.decodeToImageBitmap()
+                    iconMemCache[icon] = decoded
+                    IconDiskCache.put(icon, bytes)
+                    bitmap = decoded
+                } catch (_: Exception) {
+                    // 加载失败，保持 null，显示默认图标
+                }
             }
         }
 

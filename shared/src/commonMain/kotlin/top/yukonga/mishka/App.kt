@@ -14,7 +14,7 @@ import top.yukonga.mishka.viewmodel.HomeViewModel
 import top.yukonga.mishka.viewmodel.LogViewModel
 import top.yukonga.mishka.viewmodel.ProviderViewModel
 import top.yukonga.mishka.viewmodel.ProxyViewModel
-import top.yukonga.mishka.viewmodel.SettingsViewModel
+import top.yukonga.mishka.viewmodel.OverrideSettingsViewModel
 import top.yukonga.mishka.viewmodel.SubscriptionViewModel
 import top.yukonga.miuix.kmp.theme.ColorSchemeMode
 import top.yukonga.miuix.kmp.theme.LocalContentColor
@@ -32,7 +32,7 @@ fun App(
     providerViewModel: ProviderViewModel? = null,
     connectionViewModel: ConnectionViewModel? = null,
     dnsQueryViewModel: DnsQueryViewModel? = null,
-    settingsViewModel: SettingsViewModel? = null,
+    overrideSettingsViewModel: OverrideSettingsViewModel? = null,
     appProxyViewModel: AppProxyViewModel? = null,
     filePicker: FilePicker? = null,
     storage: PlatformStorage? = null,
@@ -64,7 +64,7 @@ fun App(
                 providerViewModel = providerViewModel,
                 connectionViewModel = connectionViewModel,
                 dnsQueryViewModel = dnsQueryViewModel,
-                settingsViewModel = settingsViewModel,
+                overrideSettingsViewModel = overrideSettingsViewModel,
                 appProxyViewModel = appProxyViewModel,
                 filePicker = filePicker,
                 storage = storage,

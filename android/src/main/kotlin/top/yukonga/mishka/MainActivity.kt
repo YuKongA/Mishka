@@ -26,7 +26,7 @@ import top.yukonga.mishka.viewmodel.AppProxyViewModel
 import top.yukonga.mishka.viewmodel.ConnectionViewModel
 import top.yukonga.mishka.viewmodel.DnsQueryViewModel
 import top.yukonga.mishka.viewmodel.HomeViewModel
-import top.yukonga.mishka.viewmodel.SettingsViewModel
+import top.yukonga.mishka.viewmodel.OverrideSettingsViewModel
 import top.yukonga.mishka.viewmodel.LogViewModel
 import top.yukonga.mishka.viewmodel.ProviderViewModel
 import top.yukonga.mishka.viewmodel.ProxyViewModel
@@ -42,7 +42,7 @@ class MainActivity : ComponentActivity() {
     private lateinit var providerViewModel: ProviderViewModel
     private lateinit var connectionViewModel: ConnectionViewModel
     private lateinit var dnsQueryViewModel: DnsQueryViewModel
-    private lateinit var settingsViewModel: SettingsViewModel
+    private lateinit var overrideSettingsViewModel: OverrideSettingsViewModel
     private lateinit var appProxyViewModel: AppProxyViewModel
     private lateinit var filePicker: FilePicker
 
@@ -51,6 +51,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
 
         val storage = PlatformStorage(this)
+        top.yukonga.mishka.platform.IconDiskCache.init(this)
         serviceController = ProxyServiceController(this)
         filePicker = FilePicker(this)
         proxyViewModel = ProxyViewModel()
@@ -58,7 +59,7 @@ class MainActivity : ComponentActivity() {
         providerViewModel = ProviderViewModel()
         connectionViewModel = ConnectionViewModel()
         dnsQueryViewModel = DnsQueryViewModel()
-        settingsViewModel = SettingsViewModel()
+        overrideSettingsViewModel = OverrideSettingsViewModel(storage = storage)
         appProxyViewModel = AppProxyViewModel(
             storage = storage,
             appListProvider = AppListProvider(this),
@@ -92,7 +93,7 @@ class MainActivity : ComponentActivity() {
                         providerViewModel.setRepository(repo)
                         connectionViewModel.setRepository(repo)
                         dnsQueryViewModel.setRepository(repo)
-                        settingsViewModel.setRepository(repo)
+                        overrideSettingsViewModel.setRepository(repo)
                     }
                     else -> {
                         proxyViewModel.setRepository(null)
@@ -100,7 +101,7 @@ class MainActivity : ComponentActivity() {
                         providerViewModel.setRepository(null)
                         connectionViewModel.setRepository(null)
                         dnsQueryViewModel.setRepository(null)
-                        settingsViewModel.setRepository(null)
+                        overrideSettingsViewModel.setRepository(null)
                     }
                 }
             }
@@ -123,7 +124,7 @@ class MainActivity : ComponentActivity() {
                 providerViewModel = providerViewModel,
                 connectionViewModel = connectionViewModel,
                 dnsQueryViewModel = dnsQueryViewModel,
-                settingsViewModel = settingsViewModel,
+                overrideSettingsViewModel = overrideSettingsViewModel,
                 appProxyViewModel = appProxyViewModel,
                 filePicker = filePicker,
                 storage = storage,

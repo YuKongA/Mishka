@@ -49,6 +49,7 @@ import top.yukonga.mishka.ui.screen.provider.ProviderScreen
 import top.yukonga.mishka.ui.screen.proxy.ProxyScreen
 import top.yukonga.mishka.ui.screen.settings.AboutScreen
 import top.yukonga.mishka.ui.screen.settings.AppProxyScreen
+import top.yukonga.mishka.ui.screen.settings.MetaSettingsScreen
 import top.yukonga.mishka.ui.screen.settings.NetworkSettingsScreen
 import top.yukonga.mishka.ui.screen.settings.SettingsScreen
 import top.yukonga.mishka.ui.screen.subscription.SubscriptionAddScreen
@@ -62,7 +63,7 @@ import top.yukonga.mishka.viewmodel.HomeViewModel
 import top.yukonga.mishka.viewmodel.LogViewModel
 import top.yukonga.mishka.viewmodel.ProviderViewModel
 import top.yukonga.mishka.viewmodel.ProxyViewModel
-import top.yukonga.mishka.viewmodel.SettingsViewModel
+import top.yukonga.mishka.viewmodel.OverrideSettingsViewModel
 import top.yukonga.mishka.viewmodel.SubscriptionViewModel
 import top.yukonga.miuix.kmp.basic.NavigationBar
 import top.yukonga.miuix.kmp.basic.NavigationBarItem
@@ -89,7 +90,7 @@ fun AppNavigation(
     providerViewModel: ProviderViewModel? = null,
     connectionViewModel: ConnectionViewModel? = null,
     dnsQueryViewModel: DnsQueryViewModel? = null,
-    settingsViewModel: SettingsViewModel? = null,
+    overrideSettingsViewModel: OverrideSettingsViewModel? = null,
     appProxyViewModel: AppProxyViewModel? = null,
     filePicker: FilePicker? = null,
     storage: top.yukonga.mishka.platform.PlatformStorage? = null,
@@ -186,8 +187,16 @@ fun AppNavigation(
                 }
             }
             entry<Route.NetworkSettings> {
-                settingsViewModel?.let {
+                overrideSettingsViewModel?.let {
                     NetworkSettingsScreen(
+                        viewModel = it,
+                        onBack = { navigator.pop() },
+                    )
+                }
+            }
+            entry<Route.MetaSettings> {
+                overrideSettingsViewModel?.let {
+                    MetaSettingsScreen(
                         viewModel = it,
                         onBack = { navigator.pop() },
                     )
@@ -311,6 +320,7 @@ private fun MainPage(
                 3 -> SettingsScreen(
                     bottomPadding = bottomPadding,
                     onNavigateNetworkSettings = { navigator.push(Route.NetworkSettings) },
+                    onNavigateMetaSettings = { navigator.push(Route.MetaSettings) },
                     onNavigateAppProxy = { navigator.push(Route.AppProxy) },
                     onNavigateAbout = { navigator.push(Route.About) },
                     bootStartManager = bootStartManager,

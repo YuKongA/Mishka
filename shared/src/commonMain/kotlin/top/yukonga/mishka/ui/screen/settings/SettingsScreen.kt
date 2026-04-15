@@ -33,6 +33,7 @@ fun SettingsScreen(
     modifier: Modifier = Modifier,
     bottomPadding: Dp = 0.dp,
     onNavigateNetworkSettings: () -> Unit = {},
+    onNavigateMetaSettings: () -> Unit = {},
     onNavigateAppProxy: () -> Unit = {},
     onNavigateAbout: () -> Unit = {},
     bootStartManager: BootStartManager? = null,
@@ -78,12 +79,17 @@ fun SettingsScreen(
                         .padding(bottom = 6.dp),
                 ) {
                     ArrowPreference(
-                        title = "网络设置",
-                        summary = "代理端口、DNS 等",
+                        title = "覆写设置",
+                        summary = "端口、DNS、网络选项覆写",
                         onClick = onNavigateNetworkSettings,
                     )
                     ArrowPreference(
-                        title = "应用代理",
+                        title = "Meta 设置",
+                        summary = "统一延迟、嗅探器等",
+                        onClick = onNavigateMetaSettings,
+                    )
+                    ArrowPreference(
+                        title = "分应用代理",
                         summary = "选择需要代理的应用",
                         onClick = onNavigateAppProxy,
                     )

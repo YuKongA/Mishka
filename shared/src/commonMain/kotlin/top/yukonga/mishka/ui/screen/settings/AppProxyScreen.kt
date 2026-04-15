@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
@@ -25,15 +26,18 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import top.yukonga.mishka.platform.AppIcon
@@ -44,8 +48,10 @@ import top.yukonga.mishka.ui.component.SearchBarFake
 import top.yukonga.mishka.ui.component.SearchBox
 import top.yukonga.mishka.ui.component.SearchPager
 import top.yukonga.mishka.ui.component.SearchStatus
+import top.yukonga.mishka.ui.util.rememberContentReady
 import top.yukonga.mishka.viewmodel.AppProxyMode
 import top.yukonga.mishka.viewmodel.AppProxyViewModel
+import top.yukonga.miuix.kmp.basic.InfiniteProgressIndicator
 import top.yukonga.miuix.kmp.basic.BasicComponent
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Checkbox
@@ -111,14 +117,18 @@ fun AppProxyScreen(
         topBar = {
             searchStatus.TopAppBarAnim {
                 TopAppBar(
-                    title = "应用代理",
+                    title = "分应用代理",
                     scrollBehavior = scrollBehavior,
                     navigationIcon = {
                         IconButton(onClick = onBack) {
+                            val layoutDirection = LocalLayoutDirection.current
                             Icon(
                                 imageVector = MiuixIcons.Back,
                                 contentDescription = "返回",
                                 tint = MiuixTheme.colorScheme.onSurface,
+                                modifier = Modifier.graphicsLayer {
+                                    scaleX = if (layoutDirection == LayoutDirection.Rtl) -1f else 1f
+                                },
                             )
                         }
                     },
@@ -282,22 +292,17 @@ fun AppProxyScreen(
                             }
                         }
                     } else {
-                        item(key = "search_results") {
-                            Card(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 12.dp)
-                                    .padding(bottom = 12.dp),
-                            ) {
-                                filteredApps.forEach { app ->
-                                    AppItem(
-                                        appName = app.appName,
-                                        packageName = app.packageName,
-                                        isSelected = app.packageName in uiState.selectedPackages,
-                                        onToggle = { viewModel.toggleApp(app.packageName) },
-                                    )
-                                }
-                            }
+                        items(
+                            items = filteredApps,
+                            key = { it.packageName },
+                            contentType = { "app" },
+                        ) { app ->
+                            AppItem(
+                                appName = app.appName,
+                                packageName = app.packageName,
+                                isSelected = app.packageName in uiState.selectedPackages,
+                                onToggle = { viewModel.toggleApp(app.packageName) },
+                            )
                         }
                     }
 
@@ -308,6 +313,8 @@ fun AppProxyScreen(
             }
         },
     ) { innerPadding ->
+        val contentReady = rememberContentReady()
+
         searchStatus.SearchBox {
             LazyColumn(
                 modifier = Modifier
@@ -368,42 +375,35 @@ fun AppProxyScreen(
                     }
                 }
 
-                // 应用列表
-                item(key = "apps_title") {
-                    SmallTitle(text = "应用列表 (${uiState.selectedPackages.size}/${uiState.apps.size})")
-                }
-
-                if (uiState.isLoading) {
-                    item(key = "loading") {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 32.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                        ) {
-                            Text(
-                                text = "加载应用列表...",
-                                fontSize = 14.sp,
-                                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                            )
-                        }
-                    }
-                } else {
-                    item(key = "apps_card") {
-                        Card(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 12.dp)
-                                .padding(bottom = 12.dp),
-                        ) {
-                            filteredApps.forEach { app ->
-                                AppItem(
-                                    appName = app.appName,
-                                    packageName = app.packageName,
-                                    isSelected = app.packageName in uiState.selectedPackages,
-                                    onToggle = { viewModel.toggleApp(app.packageName) },
-                                )
+                // 应用列表（AllowAll 模式下不显示）
+                if (uiState.mode != AppProxyMode.AllowAll) {
+                    if (!contentReady || uiState.isLoading) {
+                        // 导航动画中或加载中 → 进度指示器
+                        item(key = "loading") {
+                            Box(
+                                modifier = Modifier
+                                    .fillParentMaxSize()
+                                    .padding(bottom = bottomPadding),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                InfiniteProgressIndicator()
                             }
+                        }
+                    } else {
+                        item(key = "apps_title") {
+                            SmallTitle(text = "应用列表 (${uiState.selectedPackages.size}/${uiState.apps.size})")
+                        }
+                        items(
+                            items = filteredApps,
+                            key = { it.packageName },
+                            contentType = { "app" },
+                        ) { app ->
+                            AppItem(
+                                appName = app.appName,
+                                packageName = app.packageName,
+                                isSelected = app.packageName in uiState.selectedPackages,
+                                onToggle = { viewModel.toggleApp(app.packageName) },
+                            )
                         }
                     }
                 }
@@ -423,22 +423,28 @@ private fun AppItem(
     isSelected: Boolean,
     onToggle: () -> Unit,
 ) {
-    BasicComponent(
-        title = appName,
-        summary = packageName,
-        startAction = {
-            AppIcon(
-                packageName = packageName,
-                modifier = Modifier.padding(end = 6.dp),
-                size = 40.dp,
-            )
-        },
-        endActions = {
-            Checkbox(
-                state = if (isSelected) ToggleableState.On else ToggleableState.Off,
-                onClick = onToggle,
-            )
-        },
-        onClick = onToggle,
-    )
+    Card(
+        modifier = Modifier
+            .padding(horizontal = 12.dp)
+            .padding(bottom = 12.dp),
+    ) {
+        BasicComponent(
+            title = appName,
+            summary = packageName,
+            startAction = {
+                AppIcon(
+                    packageName = packageName,
+                    modifier = Modifier.padding(end = 6.dp),
+                    size = 40.dp,
+                )
+            },
+            endActions = {
+                Checkbox(
+                    state = if (isSelected) ToggleableState.On else ToggleableState.Off,
+                    onClick = onToggle,
+                )
+            },
+            onClick = onToggle,
+        )
+    }
 }
