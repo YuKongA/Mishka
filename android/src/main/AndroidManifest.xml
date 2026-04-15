@@ -67,6 +67,27 @@
             </intent-filter>
         </receiver>
 
+        <receiver
+            android:name=".service.ProfileReceiver"
+            android:enabled="true"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+                <action android:name="android.intent.action.TIME_SET" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="top.yukonga.mishka.action.PROFILE_REQUEST_UPDATE" />
+                <data android:scheme="uuid" />
+            </intent-filter>
+        </receiver>
+
+        <service
+            android:name=".service.ProfileWorker"
+            android:exported="false"
+            android:foregroundServiceType="specialUse" />
+
     </application>
 
 </manifest>

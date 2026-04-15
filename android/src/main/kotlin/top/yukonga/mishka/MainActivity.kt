@@ -13,7 +13,10 @@ import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
 import top.yukonga.mishka.data.api.MihomoApiClient
 import top.yukonga.mishka.data.api.MihomoWebSocket
+import top.yukonga.mishka.data.database.DataMigration
+import top.yukonga.mishka.data.database.getAppDatabase
 import top.yukonga.mishka.data.repository.MihomoRepository
+import top.yukonga.mishka.service.MihomoValidator
 import top.yukonga.mishka.platform.FilePicker
 import top.yukonga.mishka.platform.PlatformStorage
 import top.yukonga.mishka.platform.ProxyServiceBridge
@@ -51,6 +54,9 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
 
         val storage = PlatformStorage(this)
+        val database = getAppDatabase(this)
+        DataMigration.migrateIfNeeded(storage, database)
+        ConfigGenerator.migrateProfileDirs(this)
         top.yukonga.mishka.platform.IconDiskCache.init(this)
         serviceController = ProxyServiceController(this)
         filePicker = FilePicker(this)
@@ -66,12 +72,25 @@ class MainActivity : ComponentActivity() {
         )
 
         subscriptionViewModel = SubscriptionViewModel(
+            database = database,
             storage = storage,
             onConfigSaved = { subscriptionId, content ->
                 ConfigGenerator.saveSubscriptionConfig(this, subscriptionId, content)
             },
             getSubscriptionDir = { subscriptionId ->
                 ConfigGenerator.getSubscriptionDir(this, subscriptionId).absolutePath
+            },
+            commitPendingToImported = { uuid ->
+                ConfigGenerator.commitPendingToImported(this, uuid)
+            },
+            releasePending = { uuid ->
+                ConfigGenerator.releasePending(this, uuid)
+            },
+            deleteProfileDirs = { uuid ->
+                ConfigGenerator.deleteProfileDirs(this, uuid)
+            },
+            validateWithMihomo = { workDir ->
+                MihomoValidator.validate(this, workDir)
             },
         )
 

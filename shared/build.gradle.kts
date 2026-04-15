@@ -4,6 +4,8 @@ plugins {
     alias(libs.plugins.composeMultiplatform)
     alias(libs.plugins.kotlinMultiplatform)
     alias(libs.plugins.kotlinSerialization)
+    alias(libs.plugins.ksp)
+    alias(libs.plugins.room3)
 }
 
 val generatedSrcDir = layout.buildDirectory.dir("generated/projectConfig")
@@ -43,6 +45,8 @@ kotlin {
             implementation(libs.ktor.client.websockets)
             implementation(libs.androidx.lifecycle.viewmodel)
             implementation(libs.androidx.lifecycle.runtime)
+            api(libs.androidx.room3.runtime)
+            implementation(libs.androidx.sqlite.bundled)
         }
 
         named("androidMain").dependencies {
@@ -69,4 +73,13 @@ val generateVersionInfo by tasks.registering(GenerateVersionInfoTask::class) {
 
 tasks.named("generateComposeResClass").configure {
     dependsOn(generateVersionInfo)
+}
+
+dependencies {
+    add("kspAndroid", libs.androidx.room3.compiler)
+    add("kspDesktop", libs.androidx.room3.compiler)
+}
+
+room3 {
+    schemaDirectory("$projectDir/schemas")
 }

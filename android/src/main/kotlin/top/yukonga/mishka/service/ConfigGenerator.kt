@@ -18,27 +18,114 @@ object ConfigGenerator {
 
     fun getConfigFile(context: Context): File = File(getWorkDir(context), "config.yaml")
 
-    /**
-     * 获取订阅专属目录，mihomo 的 -d 参数指向此处。
-     * provider 缓存文件也会存在这里，切换订阅不会冲突。
-     */
-    fun getSubscriptionDir(context: Context, subscriptionId: String): File {
-        val dir = File(getWorkDir(context), "profiles/$subscriptionId")
+    // === 两阶段目录结构 ===
+
+    fun getImportedDir(context: Context, uuid: String): File {
+        val dir = File(getWorkDir(context), "imported/$uuid")
         if (!dir.exists()) dir.mkdirs()
         return dir
     }
 
-    fun getSubscriptionConfigFile(context: Context, subscriptionId: String): File =
-        File(getSubscriptionDir(context, subscriptionId), "config.yaml")
+    fun getPendingDir(context: Context, uuid: String): File {
+        val dir = File(getWorkDir(context), "pending/$uuid")
+        if (!dir.exists()) dir.mkdirs()
+        return dir
+    }
+
+    fun getProcessingDir(context: Context): File {
+        val dir = File(getWorkDir(context), "processing")
+        if (!dir.exists()) dir.mkdirs()
+        return dir
+    }
 
     /**
-     * 保存订阅配置原始内容到订阅专属目录。
+     * 获取订阅专属目录（已导入的），mihomo 的 -d 参数指向此处。
+     */
+    fun getSubscriptionDir(context: Context, subscriptionId: String): File =
+        getImportedDir(context, subscriptionId)
+
+    fun getSubscriptionConfigFile(context: Context, subscriptionId: String): File =
+        File(getImportedDir(context, subscriptionId), "config.yaml")
+
+    /**
+     * 保存订阅配置到 imported 目录。
      */
     fun saveSubscriptionConfig(context: Context, subscriptionId: String, content: String): File {
-        val dir = getSubscriptionDir(context, subscriptionId)
+        val dir = getImportedDir(context, subscriptionId)
         val file = File(dir, "config.yaml")
         file.writeText(content)
         return file
+    }
+
+    /**
+     * 保存配置到 pending 目录。
+     */
+    fun savePendingConfig(context: Context, uuid: String, content: String): File {
+        val dir = getPendingDir(context, uuid)
+        val file = File(dir, "config.yaml")
+        file.writeText(content)
+        return file
+    }
+
+    /**
+     * commit：将 pending 移动到 imported（通过 processing 沙箱中转）。
+     */
+    fun commitPendingToImported(context: Context, uuid: String) {
+        val pending = getPendingDir(context, uuid)
+        val imported = getImportedDir(context, uuid)
+        if (pending.exists()) {
+            imported.deleteRecursively()
+            pending.copyRecursively(imported, overwrite = true)
+            pending.deleteRecursively()
+        }
+    }
+
+    /**
+     * release：丢弃 pending 目录。
+     */
+    fun releasePending(context: Context, uuid: String) {
+        val pending = File(getWorkDir(context), "pending/$uuid")
+        if (pending.exists()) pending.deleteRecursively()
+    }
+
+    /**
+     * delete：同时删除 imported 和 pending 目录。
+     */
+    fun deleteProfileDirs(context: Context, uuid: String) {
+        val imported = File(getWorkDir(context), "imported/$uuid")
+        val pending = File(getWorkDir(context), "pending/$uuid")
+        if (imported.exists()) imported.deleteRecursively()
+        if (pending.exists()) pending.deleteRecursively()
+    }
+
+    /**
+     * clone：复制 imported 文件到新 pending 目录。
+     */
+    fun cloneImportedToPending(context: Context, sourceUuid: String, targetUuid: String) {
+        val source = getImportedDir(context, sourceUuid)
+        val target = getPendingDir(context, targetUuid)
+        if (source.exists()) {
+            source.copyRecursively(target, overwrite = true)
+        }
+    }
+
+    /**
+     * 迁移旧版 profiles/{id}/ 目录到 imported/{id}/。
+     */
+    fun migrateProfileDirs(context: Context) {
+        val oldProfilesDir = File(getWorkDir(context), "profiles")
+        if (!oldProfilesDir.exists()) return
+        val importedBaseDir = File(getWorkDir(context), "imported")
+        importedBaseDir.mkdirs()
+        oldProfilesDir.listFiles()?.forEach { subDir ->
+            if (subDir.isDirectory) {
+                val target = File(importedBaseDir, subDir.name)
+                if (!target.exists()) {
+                    subDir.copyRecursively(target, overwrite = true)
+                }
+            }
+        }
+        oldProfilesDir.deleteRecursively()
     }
 
     /**

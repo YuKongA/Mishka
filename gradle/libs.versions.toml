@@ -1,6 +1,7 @@
 [versions]
 agp = "9.1.1"
 kotlin = "2.3.20"
+ksp = "2.3.6"
 compose-multiplatform = "1.10.3"
 components-resources = "1.10.3"
 material-icons-extended = "1.7.3"
@@ -8,6 +9,8 @@ miuix = "0.9.0"
 kotlinx-serialization = "1.11.0"
 kotlinx-coroutines = "1.10.2"
 ktor = "3.4.2"
+room3 = "3.0.0-alpha03"
+sqlite = "2.6.2"
 androidx-activity = "1.13.0"
 androidx-lifecycle = "2.10.0"
 androidx-navigation3 = "1.1.0"
@@ -33,6 +36,9 @@ ktor-client-websockets = { module = "io.ktor:ktor-client-websockets", version.re
 androidx-activity = { module = "androidx.activity:activity-compose", version.ref = "androidx-activity" }
 androidx-lifecycle-viewmodel = { module = "org.jetbrains.androidx.lifecycle:lifecycle-viewmodel-compose", version.ref = "androidx-lifecycle" }
 androidx-lifecycle-runtime = { module = "org.jetbrains.androidx.lifecycle:lifecycle-runtime-compose", version.ref = "androidx-lifecycle" }
+androidx-room3-runtime = { module = "androidx.room3:room3-runtime", version.ref = "room3" }
+androidx-room3-compiler = { module = "androidx.room3:room3-compiler", version.ref = "room3" }
+androidx-sqlite-bundled = { module = "androidx.sqlite:sqlite-bundled", version.ref = "sqlite" }
 
 [plugins]
 androidApplication = { id = "com.android.application", version.ref = "agp" }
@@ -41,3 +47,5 @@ kotlinMultiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref =
 kotlinSerialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
 composeCompiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 composeMultiplatform = { id = "org.jetbrains.compose", version.ref = "compose-multiplatform" }
+ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
+room3 = { id = "androidx.room3", version.ref = "room3" }
