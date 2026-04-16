@@ -67,6 +67,7 @@ class HomeViewModel(
     private var systemInfoJob: Job? = null
     private var startTime: Long = 0
     private var uptimeJob: Job? = null
+    private var mihomoPid: Int = -1
     private val systemInfo = PlatformSystemInfo()
 
     init {
@@ -82,6 +83,7 @@ class HomeViewModel(
                         val ws = MihomoWebSocket(client)
                         repository = MihomoRepository(client, ws)
                         startTime = if (status.startTime > 0) status.startTime else System.currentTimeMillis()
+                        mihomoPid = status.mihomoPid
                         connectToMihomo()
                     }
                     ProxyState.Stopping -> {
@@ -179,7 +181,7 @@ class HomeViewModel(
         systemInfoJob = viewModelScope.launch {
             while (true) {
                 val networkInfo = systemInfo.getNetworkInfo()
-                val cpu = systemInfo.getCpuUsage()
+                val cpu = systemInfo.getCpuUsage(mihomoPid)
                 _uiState.value = _uiState.value.copy(
                     localIp = networkInfo.localIp,
                     interfaceName = networkInfo.interfaceName,
@@ -305,6 +307,7 @@ class HomeViewModel(
         uptimeJob?.cancel()
         repository?.close()
         repository = null
+        mihomoPid = -1
     }
 
     override fun onCleared() {

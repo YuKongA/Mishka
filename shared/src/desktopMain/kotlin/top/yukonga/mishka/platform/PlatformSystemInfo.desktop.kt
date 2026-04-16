@@ -25,7 +25,7 @@ actual class PlatformSystemInfo actual constructor() {
         return NetworkInfoData()
     }
 
-    actual fun getCpuUsage(): Float {
+    actual fun getCpuUsage(pid: Int): Float {
         try {
             val osBean = ManagementFactory.getOperatingSystemMXBean()
             val load = osBean.systemLoadAverage

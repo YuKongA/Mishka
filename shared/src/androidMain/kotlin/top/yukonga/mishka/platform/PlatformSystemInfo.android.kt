@@ -6,9 +6,7 @@ import java.net.NetworkInterface
 
 actual class PlatformSystemInfo actual constructor() {
 
-    private var prevIdle = 0L
-    private var prevTotal = 0L
-    private var prevAppCpuTime = 0L
+    private var prevCpuTime = 0L
     private var prevRealTime = 0L
 
     actual fun getNetworkInfo(): NetworkInfoData {
@@ -37,76 +35,55 @@ actual class PlatformSystemInfo actual constructor() {
         return NetworkInfoData()
     }
 
-    actual fun getCpuUsage(): Float {
-        tryProcStat()?.let { return it }
-        tryLoadAvg()?.let { return it }
-        trySelfStat()?.let { return it }
-        return -1f
+    actual fun getCpuUsage(pid: Int): Float {
+        if (pid <= 0) return -1f
+        val line = readProcStat(pid) ?: return -1f
+        return parseProcStat(line)
     }
 
-    private fun tryProcStat(): Float? {
+    private fun readProcStat(pid: Int): String? {
+        // 直接读取（VPN 模式同 UID 可访问）
+        try {
+            val line = File("/proc/$pid/stat").bufferedReader().use { it.readLine() }
+            if (line != null) return line
+        } catch (_: Exception) {
+        }
+        // fallback: 通过 su 读取（ROOT 模式不同 UID）
         return try {
-            val line = File("/proc/stat").bufferedReader().use { it.readLine() } ?: return null
-            val values = line.substringAfter("cpu").trim().split("\\s+".toRegex()).map { it.toLong() }
-            if (values.size < 4) return null
-
-            val idle = values[3] + (values.getOrNull(4) ?: 0L)
-            val total = values.sum()
-
-            if (prevTotal == 0L) {
-                prevIdle = idle
-                prevTotal = total
-                return null
-            }
-
-            val diffIdle = idle - prevIdle
-            val diffTotal = total - prevTotal
-            prevIdle = idle
-            prevTotal = total
-
-            if (diffTotal == 0L) 0f
-            else (diffTotal - diffIdle).toFloat() / diffTotal * 100
+            val process = Runtime.getRuntime().exec(arrayOf("su", "-c", "cat /proc/$pid/stat"))
+            val line = process.inputStream.bufferedReader().use { it.readLine() }
+            process.waitFor()
+            line
         } catch (_: Exception) {
             null
         }
     }
 
-    private fun tryLoadAvg(): Float? {
+    private fun parseProcStat(line: String): Float {
         return try {
-            val line = File("/proc/loadavg").bufferedReader().use { it.readLine() } ?: return null
-            val load = line.split(" ")[0].toFloat()
-            val cpus = Runtime.getRuntime().availableProcessors()
-            (load / cpus * 100).coerceIn(0f, 100f)
-        } catch (_: Exception) {
-            null
-        }
-    }
-
-    private fun trySelfStat(): Float? {
-        return try {
-            val line = File("/proc/self/stat").bufferedReader().use { it.readLine() } ?: return null
             val parts = line.substringAfterLast(')').trim().split(" ")
-            if (parts.size < 13) return null
+            if (parts.size < 13) return -1f
+            // utime(14) + stime(15)，索引从 ')' 后第一个字段(state)开始为 0
             val utime = parts[11].toLong()
             val stime = parts[12].toLong()
             val cpuTime = utime + stime
             val realTime = android.os.SystemClock.elapsedRealtime()
 
-            if (prevAppCpuTime == 0L) {
-                prevAppCpuTime = cpuTime
+            if (prevCpuTime == 0L) {
+                prevCpuTime = cpuTime
                 prevRealTime = realTime
-                return null
+                return -1f
             }
 
-            val cpuDiff = cpuTime - prevAppCpuTime
+            val cpuDiff = cpuTime - prevCpuTime
             val timeDiff = realTime - prevRealTime
-            prevAppCpuTime = cpuTime
+            prevCpuTime = cpuTime
             prevRealTime = realTime
 
             if (timeDiff == 0L) 0f
             else (cpuDiff.toFloat() * 10 / timeDiff * 100).coerceIn(0f, 100f)
         } catch (_: Exception) {
-            null
+            -1f
         }
     }
 }

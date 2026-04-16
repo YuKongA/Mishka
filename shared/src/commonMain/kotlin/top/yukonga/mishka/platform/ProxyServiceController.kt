@@ -19,6 +19,7 @@ data class ProxyServiceStatus(
     val errorMessage: String = "",
     val tunMode: TunMode = TunMode.Vpn,
     val startTime: Long = 0L,
+    val mihomoPid: Int = -1,
 )
 
 expect class ProxyServiceController {

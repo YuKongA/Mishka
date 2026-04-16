@@ -91,7 +91,7 @@ class MishkaRootService : Service() {
                     val existingStartTime = storage.getString(StorageKeys.ROOT_START_TIME, "").toLongOrNull() ?: System.currentTimeMillis()
                     val ec = OverrideStorageHelper.readNullableString(storage, OverrideStorageHelper.KEY_EXTERNAL_CONTROLLER) ?: "127.0.0.1:9090"
                     Log.i(TAG, "Reconnected to existing mihomo: pid=$existingPid")
-                    ProxyServiceBridge.updateState(ProxyServiceStatus(ProxyState.Running, secret = existingSecret, externalController = ec, tunMode = TunMode.Root, startTime = existingStartTime))
+                    ProxyServiceBridge.updateState(ProxyServiceStatus(ProxyState.Running, secret = existingSecret, externalController = ec, tunMode = TunMode.Root, startTime = existingStartTime, mihomoPid = runner.pid))
                     dynamicNotification.startOrFallbackStatic(storage, existingSecret, ec, TunMode.Root)
                     storage.putString(StorageKeys.SERVICE_WAS_RUNNING, "true")
                     val workDir = if (subscriptionId != null) ProfileFileOps.getSubscriptionDir(this@MishkaRootService, subscriptionId) else ConfigGenerator.getWorkDir(this@MishkaRootService)
@@ -137,7 +137,7 @@ class MishkaRootService : Service() {
             persistState(storage, runner.secret, startTime)
 
             // 7. 更新状态和通知
-            ProxyServiceBridge.updateState(ProxyServiceStatus(ProxyState.Running, secret = runner.secret, externalController = result.externalController, tunMode = TunMode.Root, startTime = startTime))
+            ProxyServiceBridge.updateState(ProxyServiceStatus(ProxyState.Running, secret = runner.secret, externalController = result.externalController, tunMode = TunMode.Root, startTime = startTime, mihomoPid = runner.pid))
             dynamicNotification.startOrFallbackStatic(storage, runner.secret, result.externalController, TunMode.Root)
             storage.putString(StorageKeys.SERVICE_WAS_RUNNING, "true")
             Log.i(TAG, "Proxy running (ROOT)")

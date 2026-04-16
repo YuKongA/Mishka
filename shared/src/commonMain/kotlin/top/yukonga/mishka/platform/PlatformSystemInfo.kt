@@ -7,5 +7,5 @@ data class NetworkInfoData(
 
 expect class PlatformSystemInfo() {
     fun getNetworkInfo(): NetworkInfoData
-    fun getCpuUsage(): Float
+    fun getCpuUsage(pid: Int = -1): Float
 }

@@ -245,7 +245,7 @@ class MishkaTunService : VpnService() {
             }
 
             // 4. 更新通知和状态
-            ProxyServiceBridge.updateState(ProxyServiceStatus(ProxyState.Running, secret = runner.secret, externalController = result.externalController, tunMode = TunMode.Vpn, startTime = System.currentTimeMillis()))
+            ProxyServiceBridge.updateState(ProxyServiceStatus(ProxyState.Running, secret = runner.secret, externalController = result.externalController, tunMode = TunMode.Vpn, startTime = System.currentTimeMillis(), mihomoPid = runner.pid))
 
             dynamicNotification.startOrFallbackStatic(storage, runner.secret, result.externalController)
             // 记录运行状态，用于开机自启判断
