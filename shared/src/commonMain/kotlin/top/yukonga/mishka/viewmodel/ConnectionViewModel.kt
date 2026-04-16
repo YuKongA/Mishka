@@ -63,11 +63,10 @@ class ConnectionViewModel : ViewModel() {
         _uiState.value = _uiState.value.copy(searchQuery = query)
     }
 
-    fun filteredConnections(): List<ConnectionInfo> {
-        val state = _uiState.value
-        val query = state.searchQuery.lowercase()
-        if (query.isBlank()) return state.connections
-        return state.connections.filter { conn ->
+    fun filteredConnections(searchQuery: String = _uiState.value.searchQuery): List<ConnectionInfo> {
+        val query = searchQuery.lowercase()
+        if (query.isBlank()) return _uiState.value.connections
+        return _uiState.value.connections.filter { conn ->
             conn.metadata.host.lowercase().contains(query) ||
                 conn.metadata.process.lowercase().contains(query) ||
                 conn.rule.lowercase().contains(query) ||

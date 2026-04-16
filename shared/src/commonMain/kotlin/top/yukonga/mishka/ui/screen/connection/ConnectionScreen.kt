@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -106,28 +107,37 @@ fun ConnectionScreen(
     val density = LocalDensity.current
 
     // 搜索状态
-    var searchStatus by remember { mutableStateOf(SearchStatus(label = "")) }
     val searchLabel = stringResource(Res.string.connection_search)
-    if (searchStatus.label != searchLabel) {
-        searchStatus = searchStatus.copy(label = searchLabel)
+    var searchStatus by remember { mutableStateOf(SearchStatus(label = searchLabel)) }
+
+    // 语言变更时同步 label
+    LaunchedEffect(searchLabel) {
+        if (searchStatus.label != searchLabel) {
+            searchStatus = searchStatus.copy(label = searchLabel)
+        }
     }
 
-    // 搜索文本同步到 ViewModel
+    // 搜索过滤（直接传入 searchText，避免组合期间写入 ViewModel 状态）
     val searchText = searchStatus.searchText
-    viewModel.setSearchQuery(searchText)
 
     val filteredConnections = remember(searchText, uiState.connections) {
-        viewModel.filteredConnections()
+        viewModel.filteredConnections(searchText)
     }
 
     // 更新搜索结果状态
-    val resultStatus = when {
-        searchText.isEmpty() -> SearchStatus.ResultStatus.DEFAULT
-        filteredConnections.isEmpty() -> SearchStatus.ResultStatus.EMPTY
-        else -> SearchStatus.ResultStatus.SHOW
+    val resultStatus by remember(searchText, filteredConnections) {
+        derivedStateOf {
+            when {
+                searchText.isEmpty() -> SearchStatus.ResultStatus.DEFAULT
+                filteredConnections.isEmpty() -> SearchStatus.ResultStatus.EMPTY
+                else -> SearchStatus.ResultStatus.SHOW
+            }
+        }
     }
-    if (searchStatus.resultStatus != resultStatus) {
-        searchStatus = searchStatus.copy(resultStatus = resultStatus)
+    LaunchedEffect(resultStatus) {
+        if (searchStatus.resultStatus != resultStatus) {
+            searchStatus = searchStatus.copy(resultStatus = resultStatus)
+        }
     }
 
     val dynamicTopPadding by remember {
@@ -272,7 +282,7 @@ fun ConnectionScreen(
                     }
                 } else {
                     // 统计信息
-                    item(key = "stats") {
+                    item(key = "stats", contentType = "stats") {
                         StatsCard(
                             connectionCount = uiState.connections.size,
                             uploadTotal = uiState.uploadTotal,
@@ -280,18 +290,22 @@ fun ConnectionScreen(
                         )
                     }
 
-                    item(key = "connection_title") {
+                    item(key = "connection_title", contentType = "title") {
                         SmallTitle(text = stringResource(Res.string.connection_list))
                     }
 
-                    items(uiState.connections, key = { it.id }) { conn ->
+                    items(
+                        items = uiState.connections,
+                        key = { it.id },
+                        contentType = { "connection" },
+                    ) { conn ->
                         ConnectionItem(
                             connection = conn,
                             onClose = { viewModel.closeConnection(conn.id) },
                         )
                     }
 
-                    item(key = "bottom_spacer") {
+                    item(key = "bottom_spacer", contentType = "spacer") {
                         Spacer(Modifier.navigationBarsPadding())
                     }
                 }

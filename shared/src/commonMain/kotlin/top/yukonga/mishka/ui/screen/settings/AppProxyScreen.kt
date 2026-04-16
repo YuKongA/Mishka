@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -106,28 +107,42 @@ fun AppProxyScreen(
     val density = LocalDensity.current
     val clipboardManager = LocalClipboardManager.current
 
-    var searchStatus by remember { mutableStateOf(SearchStatus(label = "")) }
     val searchLabel = stringResource(Res.string.app_proxy_search)
-    if (searchStatus.label != searchLabel) {
-        searchStatus = searchStatus.copy(label = searchLabel)
+    var searchStatus by remember { mutableStateOf(SearchStatus(label = searchLabel)) }
+
+    // 语言变更时同步 label
+    LaunchedEffect(searchLabel) {
+        if (searchStatus.label != searchLabel) {
+            searchStatus = searchStatus.copy(label = searchLabel)
+        }
     }
 
-    // 搜索文本同步到 ViewModel
+    // 搜索过滤（直接传入 searchText，避免组合期间写入 ViewModel 状态）
     val searchText = searchStatus.searchText
-    viewModel.setSearchQuery(searchText)
+
+    // 同步搜索词到 ViewModel（selectAll/invertSelection 等操作需要）
+    LaunchedEffect(searchText) {
+        viewModel.setSearchQuery(searchText)
+    }
 
     val filteredApps = remember(searchText, uiState.apps, uiState.showSystemApps, uiState.selectedPackages) {
-        viewModel.filteredApps()
+        viewModel.filteredApps(searchText)
     }
 
     // 更新搜索结果状态
-    val resultStatus = when {
-        searchText.isEmpty() -> SearchStatus.ResultStatus.DEFAULT
-        filteredApps.isEmpty() -> SearchStatus.ResultStatus.EMPTY
-        else -> SearchStatus.ResultStatus.SHOW
+    val resultStatus by remember(searchText, filteredApps) {
+        derivedStateOf {
+            when {
+                searchText.isEmpty() -> SearchStatus.ResultStatus.DEFAULT
+                filteredApps.isEmpty() -> SearchStatus.ResultStatus.EMPTY
+                else -> SearchStatus.ResultStatus.SHOW
+            }
+        }
     }
-    if (searchStatus.resultStatus != resultStatus) {
-        searchStatus = searchStatus.copy(resultStatus = resultStatus)
+    LaunchedEffect(resultStatus) {
+        if (searchStatus.resultStatus != resultStatus) {
+            searchStatus = searchStatus.copy(resultStatus = resultStatus)
+        }
     }
 
     val dynamicTopPadding by remember {

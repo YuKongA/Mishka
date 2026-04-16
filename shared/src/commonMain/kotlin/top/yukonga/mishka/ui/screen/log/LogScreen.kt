@@ -43,6 +43,7 @@ import mishka.shared.generated.resources.log_title
 import mishka.shared.generated.resources.log_waiting
 import org.jetbrains.compose.resources.stringResource
 import top.yukonga.mishka.data.model.LogMessage
+import top.yukonga.mishka.viewmodel.IndexedLog
 import top.yukonga.mishka.viewmodel.LogViewModel
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Icon
@@ -125,7 +126,7 @@ fun LogScreen(
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             if (logs.isEmpty()) {
-                item(key = "empty") {
+                item(key = "empty", contentType = "empty") {
                     Column(
                         modifier = Modifier.fillParentMaxSize(),
                         horizontalAlignment = Alignment.CenterHorizontally,
@@ -140,11 +141,15 @@ fun LogScreen(
                 }
             }
 
-            items(logs.size, key = { it }) { index ->
-                LogCard(logs[index])
+            items(
+                items = logs,
+                key = { it.id },
+                contentType = { "log" },
+            ) { indexedLog ->
+                LogCard(indexedLog.message)
             }
 
-            item(key = "bottom_spacer") {
+            item(key = "bottom_spacer", contentType = "spacer") {
                 Spacer(Modifier.navigationBarsPadding())
             }
         }

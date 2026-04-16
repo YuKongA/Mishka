@@ -17,13 +17,16 @@ data class LogUiState(
     val level: String = "info",
 )
 
+data class IndexedLog(val id: Long, val message: LogMessage)
+
 class LogViewModel : ViewModel() {
 
     private val _uiState = MutableStateFlow(LogUiState())
     val uiState: StateFlow<LogUiState> = _uiState.asStateFlow()
 
-    private val _logs = MutableStateFlow<List<LogMessage>>(emptyList())
-    val logs: StateFlow<List<LogMessage>> = _logs.asStateFlow()
+    private var nextLogId = 0L
+    private val _logs = MutableStateFlow<List<IndexedLog>>(emptyList())
+    val logs: StateFlow<List<IndexedLog>> = _logs.asStateFlow()
 
     private var repository: MihomoRepository? = null
     private var logJob: Job? = null
@@ -32,6 +35,7 @@ class LogViewModel : ViewModel() {
         if (repo == null) {
             disconnect()
             _logs.value = emptyList()
+            nextLogId = 0L
         }
         repository = repo
     }
@@ -58,7 +62,7 @@ class LogViewModel : ViewModel() {
                     _uiState.value = _uiState.value.copy(isConnected = false)
                 }
                 .collect { log ->
-                    _logs.update { (it + log).takeLast(500) }
+                    _logs.update { (it + IndexedLog(nextLogId++, log)).takeLast(500) }
                 }
         }
     }
@@ -66,11 +70,13 @@ class LogViewModel : ViewModel() {
     fun setLevel(level: String) {
         _uiState.value = _uiState.value.copy(level = level)
         _logs.value = emptyList()
+        nextLogId = 0L
         startLogCollection()
     }
 
     fun clearLogs() {
         _logs.value = emptyList()
+        nextLogId = 0L
     }
 
     override fun onCleared() {

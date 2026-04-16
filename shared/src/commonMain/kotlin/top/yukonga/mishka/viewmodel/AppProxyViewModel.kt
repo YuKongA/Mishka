@@ -63,9 +63,9 @@ class AppProxyViewModel(
         }
     }
 
-    fun filteredApps(): List<AppInfo> {
+    fun filteredApps(searchQuery: String = _uiState.value.searchQuery): List<AppInfo> {
         val state = _uiState.value
-        val query = state.searchQuery.lowercase()
+        val query = searchQuery.lowercase()
 
         return state.apps
             .filter { app ->
