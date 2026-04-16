@@ -219,7 +219,7 @@ class MishkaTunService : VpnService() {
             }
 
             // 4. 更新通知和状态
-            ProxyServiceBridge.updateState(ProxyServiceStatus(ProxyState.Running, secret = runner.secret, tunMode = TunMode.Vpn))
+            ProxyServiceBridge.updateState(ProxyServiceStatus(ProxyState.Running, secret = runner.secret, tunMode = TunMode.Vpn, startTime = System.currentTimeMillis()))
 
             dynamicNotification.startOrFallbackStatic(storage, runner.secret)
             // 记录运行状态，用于开机自启判断
@@ -230,13 +230,16 @@ class MishkaTunService : VpnService() {
 
     private fun stopProxy() {
         Log.i(TAG, "Stopping proxy...")
+        ProxyServiceBridge.updateState(ProxyServiceStatus(ProxyState.Stopping, tunMode = TunMode.Vpn))
         dynamicNotification.stop()
-        runner.stop()
-        closeTunFd()
-        ProxyServiceBridge.updateState(ProxyServiceStatus(ProxyState.Stopped))
-        PlatformStorage(this).putString(StorageKeys.SERVICE_WAS_RUNNING, "false")
-        stopForeground(STOP_FOREGROUND_REMOVE)
-        stopSelf()
+        scope.launch(Dispatchers.IO) {
+            runner.stop()
+            closeTunFd()
+            ProxyServiceBridge.updateState(ProxyServiceStatus(ProxyState.Stopped))
+            PlatformStorage(this@MishkaTunService).putString(StorageKeys.SERVICE_WAS_RUNNING, "false")
+            stopForeground(STOP_FOREGROUND_REMOVE)
+            stopSelf()
+        }
     }
 
     private fun closeTunFd() {

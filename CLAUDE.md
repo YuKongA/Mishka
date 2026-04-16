@@ -36,7 +36,7 @@ Mishka/
 │   │   │   ├── api/                  MihomoApiClient（REST）+ MihomoWebSocket（流）
 │   │   │   ├── database/             Room 3.0 KMP（AppDatabase + 3 Entity + 3 DAO + DataMigration）
 │   │   │   ├── model/                12 个 @Serializable 数据模型
-│   │   │   └── repository/           MihomoRepository + SubscriptionRepository + SubscriptionFetcher + ConfigProcessor
+│   │   │   └── repository/           MihomoRepository + SubscriptionRepository + SubscriptionFetcher + ConfigProcessor + V2RayConverter
 │   │   ├── platform/                 9 个 expect 声明 + ProfileFileManager 接口
 │   │   ├── ui/
 │   │   │   ├── navigation/           AppNavigation（主导航树 + HorizontalPager）
@@ -94,7 +94,9 @@ MainActivity → App → AppNavigation
 - **进程模型**：单进程（VpnService 和 UI 同进程），ROOT 模式 mihomo 为独立 root 进程
 - **数据持久化**：Room 3.0 KMP（结构化数据）+ PlatformStorage（简单偏好设置）+ StorageKeys（key 常量）
 - **订阅管理**：Pending/Imported 两阶段编辑模型（对齐 CMFA ProfileManager）
-- **配置校验**：mihomo -t 进程完整校验（ProcessBuilder，不需要 TUN fd）
+- **订阅格式兼容**：User-Agent `clash.meta` + V2RayConverter 自动检测 base64/V2Ray 订阅并转换为 mihomo YAML（支持 vmess/vless/trojan/ss/ssr/hysteria/hysteria2/tuic）
+- **GeoIP 共享**：geodata/ 共享目录 + 符号链接（失败则复制），避免每个订阅重复下载 MMDB
+- **配置校验**：mihomo -t 进程完整校验（ProcessBuilder，不需要 TUN fd，超时 90s）
 - **国际化**：默认英文 + 中文（zh-rCN），Compose Resources `stringResource()` + Android `getString()`
   - Compose 层：`shared/src/commonMain/composeResources/values/strings.xml`（~180 key）
   - Android 层：`android/src/main/res/values/strings.xml`（通知/Tile/错误）
@@ -130,8 +132,13 @@ DELETE → 两表都删除 + 清理文件目录
 ```
 files/mihomo/
 ├── config.yaml                 最终运行配置（ConfigGenerator 生成）
+├── geodata/                    共享 GeoIP 文件（符号链接到各订阅目录）
+│   ├── Country.mmdb
+│   ├── geoip.dat
+│   └── geosite.dat
 ├── imported/{uuid}/            已验证的稳定配置
 │   ├── config.yaml
+│   ├── Country.mmdb → ../../geodata/Country.mmdb
 │   └── providers/
 ├── pending/{uuid}/             编辑中的草稿
 │   ├── config.yaml
@@ -195,23 +202,23 @@ files/mihomo/
 
 ## Android 服务层
 
-| 组件                       | 用途                                                  |
-| -------------------------- | ----------------------------------------------------- |
-| MishkaTunService           | VpnService + JNI fork+exec 启动 mihomo                |
-| MishkaRootService          | ROOT TUN 模式前台服务（su 启动 mihomo，进程重连）     |
-| RootHelper                 | root 检测/启动/终止/存活检查/残留清理                 |
-| DynamicNotificationManager | 动态通知（WebSocket 流量），两个 Service 共用          |
-| MishkaTileService          | Quick Settings Tile 一键启停代理（双模式路由）        |
-| BootReceiver               | 开机自启（默认 disabled，动态启用）                   |
-| ConfigGenerator            | 运行配置生成（writeRunConfig + YAML 行过滤）          |
-| ProfileFileOps             | 订阅文件操作（imported/pending/processing 目录管理）  |
-| AndroidProfileFileManager  | ProfileFileManager 接口的 Android 实现                |
-| MihomoRunner               | mihomo 进程管理（VPN: JNI fork+exec / ROOT: su）      |
-| MihomoValidator            | mihomo -t 配置校验（ProcessBuilder）                  |
-| ProcessHelper              | JNI 包装（nativeForkExec/nativeKill/nativeWaitpid）   |
-| NotificationHelper         | 三层通知渠道（VPN/更新进度/更新结果）                 |
-| ProfileReceiver            | AlarmManager 调度自动更新                             |
-| ProfileWorker              | 前台服务执行后台配置更新                              |
+| 组件                       | 用途                                                              |
+| -------------------------- | ----------------------------------------------------------------- |
+| MishkaTunService           | VpnService + JNI fork+exec 启动 mihomo                            |
+| MishkaRootService          | ROOT TUN 模式前台服务（su 启动 mihomo，进程重连）                 |
+| RootHelper                 | root 检测/启动/终止/存活检查/残留清理                             |
+| DynamicNotificationManager | 动态通知（WebSocket 流量），两个 Service 共用                     |
+| MishkaTileService          | Quick Settings Tile 一键启停代理（双模式路由）                    |
+| BootReceiver               | 开机自启（默认 disabled，动态启用）                               |
+| ConfigGenerator            | 运行配置生成（writeRunConfig + YAML 行过滤）                      |
+| ProfileFileOps             | 订阅文件操作（imported/pending/processing 目录管理 + GeoIP 共享） |
+| AndroidProfileFileManager  | ProfileFileManager 接口的 Android 实现                            |
+| MihomoRunner               | mihomo 进程管理（VPN: JNI fork+exec / ROOT: su）                  |
+| MihomoValidator            | mihomo -t 配置校验（ProcessBuilder，超时 90s）                    |
+| ProcessHelper              | JNI 包装（nativeForkExec/nativeKill/nativeWaitpid）               |
+| NotificationHelper         | 三层通知渠道（VPN/更新进度/更新结果）                             |
+| ProfileReceiver            | AlarmManager 调度自动更新                                         |
+| ProfileWorker              | 前台服务执行后台配置更新                                          |
 
 ## 数据模型
 
@@ -231,7 +238,9 @@ ConnectionInfo, DelayResult, DnsQuery, LogMessage, MemoryData, MihomoConfig, Pro
 
 - mihomo 二进制放在 jniLibs 中（命名为 libmihomo.so），通过 `jniLibs.useLegacyPackaging = true` 确保解压到 nativeLibraryDir
 - Android 的 ProcessBuilder 会 fork 后关闭所有非标准 fd，需用 JNI fork+exec 绕过（`process_helper.c`），保留 VPN TUN fd 继承
-- 配置校验使用 `mihomo -t -d <workDir>`（ProcessBuilder，不需要 TUN fd），解析 level=error/fatal 提取错误信息
+- 配置校验使用 `mihomo -t -d <workDir>`（ProcessBuilder，不需要 TUN fd，超时 90s），解析 level=error/fatal 提取错误信息
+- 订阅导入兼容 V2Ray 格式：User-Agent `clash.meta` 让订阅服务返回 YAML；若仍为 base64 V2Ray 链接，V2RayConverter 自动解码转换（对齐 CMFA converter.go）
+- GeoIP 文件通过 geodata/ 共享目录 + 符号链接（失败则复制）避免每个订阅重复下载 MMDB
 - ConfigGenerator 使用行过滤合并 YAML（移除 external-controller/secret 后追加），避免引入 YAML 解析库
 - 订阅管理采用 Pending/Imported 两阶段模型（对齐 CMFA），每个订阅有独立目录（imported/{uuid}/），mihomo -d 指向此处
 - Room 3.0 KMP 跨平台数据库，BundledSQLiteDriver 统一 Android/Desktop，DCL 单例

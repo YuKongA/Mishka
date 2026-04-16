@@ -62,8 +62,9 @@ class MishkaRootService : Service() {
             val existingSecret = storage.getString(StorageKeys.ROOT_MIHOMO_SECRET, "")
             if (existingPid > 0 && existingSecret.isNotEmpty()) {
                 if (runner.attachToExisting(existingPid, existingSecret, subscriptionId)) {
+                    val existingStartTime = storage.getString(StorageKeys.ROOT_START_TIME, "").toLongOrNull() ?: System.currentTimeMillis()
                     Log.i(TAG, "Reconnected to existing mihomo: pid=$existingPid")
-                    ProxyServiceBridge.updateState(ProxyServiceStatus(ProxyState.Running, secret = existingSecret, tunMode = TunMode.Root))
+                    ProxyServiceBridge.updateState(ProxyServiceStatus(ProxyState.Running, secret = existingSecret, tunMode = TunMode.Root, startTime = existingStartTime))
                     dynamicNotification.startOrFallbackStatic(storage, existingSecret)
                     storage.putString(StorageKeys.SERVICE_WAS_RUNNING, "true")
                     return@launch
@@ -102,37 +103,43 @@ class MishkaRootService : Service() {
                 return@launch
             }
 
-            // 6. 持久化 PID 和 secret（用于 app 重启后重连）
-            persistState(storage, runner.secret)
+            // 6. 持久化 PID、secret 和启动时间（用于 app 重启后重连）
+            val startTime = System.currentTimeMillis()
+            persistState(storage, runner.secret, startTime)
 
             // 7. 更新状态和通知
-            ProxyServiceBridge.updateState(ProxyServiceStatus(ProxyState.Running, secret = runner.secret, tunMode = TunMode.Root))
+            ProxyServiceBridge.updateState(ProxyServiceStatus(ProxyState.Running, secret = runner.secret, tunMode = TunMode.Root, startTime = startTime))
             dynamicNotification.startOrFallbackStatic(storage, runner.secret)
             storage.putString(StorageKeys.SERVICE_WAS_RUNNING, "true")
             Log.i(TAG, "Proxy running (ROOT)")
         }
     }
 
-    private fun persistState(storage: PlatformStorage, secret: String) {
+    private fun persistState(storage: PlatformStorage, secret: String, startTime: Long) {
         storage.putString(StorageKeys.ROOT_MIHOMO_PID, runner.pid.toString())
         storage.putString(StorageKeys.ROOT_MIHOMO_SECRET, secret)
+        storage.putString(StorageKeys.ROOT_START_TIME, startTime.toString())
     }
 
     private fun clearPersistedState(storage: PlatformStorage) {
         storage.putString(StorageKeys.ROOT_MIHOMO_PID, "")
         storage.putString(StorageKeys.ROOT_MIHOMO_SECRET, "")
+        storage.putString(StorageKeys.ROOT_START_TIME, "")
     }
 
     private fun stopProxy() {
         Log.i(TAG, "Stopping proxy (ROOT)...")
+        ProxyServiceBridge.updateState(ProxyServiceStatus(ProxyState.Stopping, tunMode = TunMode.Root))
         dynamicNotification.stop()
-        runner.stop()
-        ProxyServiceBridge.updateState(ProxyServiceStatus(ProxyState.Stopped))
-        val storage = PlatformStorage(this)
-        clearPersistedState(storage)
-        storage.putString(StorageKeys.SERVICE_WAS_RUNNING, "false")
-        stopForeground(STOP_FOREGROUND_REMOVE)
-        stopSelf()
+        scope.launch(Dispatchers.IO) {
+            runner.stop()
+            ProxyServiceBridge.updateState(ProxyServiceStatus(ProxyState.Stopped))
+            val storage = PlatformStorage(this@MishkaRootService)
+            clearPersistedState(storage)
+            storage.putString(StorageKeys.SERVICE_WAS_RUNNING, "false")
+            stopForeground(STOP_FOREGROUND_REMOVE)
+            stopSelf()
+        }
     }
 
     override fun onDestroy() {

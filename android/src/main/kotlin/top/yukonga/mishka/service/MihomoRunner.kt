@@ -56,6 +56,8 @@ class MihomoRunner(private val context: Context) {
             ConfigGenerator.getWorkDir(context)
         }
 
+        ProfileFileOps.ensureGeodataLinks(context, workDir)
+
         try {
             val args = arrayOf(
                 "-d", workDir.absolutePath,
@@ -116,7 +118,10 @@ class MihomoRunner(private val context: Context) {
         if (childPid > 0) {
             Log.i(TAG, "Stopping mihomo pid=$childPid (root=$isRootMode)")
             if (isRootMode) {
-                RootHelper.killAsRoot(childPid)
+                val killed = RootHelper.killAsRoot(childPid)
+                if (!killed) {
+                    RootHelper.killMihomoByName()
+                }
             } else {
                 ProcessHelper.nativeKill(childPid)
                 try {

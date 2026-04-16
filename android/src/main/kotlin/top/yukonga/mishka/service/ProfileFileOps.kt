@@ -89,6 +89,60 @@ object ProfileFileOps {
         }
     }
 
+    // === GeoIP 共享管理 ===
+
+    private val GEODATA_FILES = listOf(
+        "Country.mmdb", "country.mmdb",
+        "geoip.dat", "GeoIP.dat",
+        "geosite.dat", "GeoSite.dat",
+        "ASN.mmdb", "asn.mmdb",
+    )
+
+    fun getGeodataDir(context: Context): File {
+        val dir = File(getWorkDir(context), "geodata")
+        if (!dir.exists()) dir.mkdirs()
+        return dir
+    }
+
+    /**
+     * 为订阅目录创建 GeoIP 文件的符号链接（失败则复制）。
+     * 确保 mihomo -t/-d 在订阅目录下能找到 GeoIP 文件。
+     */
+    fun ensureGeodataLinks(context: Context, subscriptionDir: File) {
+        val geodataDir = getGeodataDir(context)
+        for (fileName in GEODATA_FILES) {
+            val source = File(geodataDir, fileName)
+            val target = File(subscriptionDir, fileName)
+            if (source.exists() && !target.exists()) {
+                try {
+                    java.nio.file.Files.createSymbolicLink(target.toPath(), source.toPath())
+                } catch (_: Exception) {
+                    try {
+                        source.copyTo(target, overwrite = false)
+                    } catch (_: Exception) {
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * 校验成功后，收集订阅目录中新下载的 GeoIP 文件到共享目录。
+     */
+    fun collectGeodataFiles(context: Context, subscriptionDir: File) {
+        val geodataDir = getGeodataDir(context)
+        for (fileName in GEODATA_FILES) {
+            val file = File(subscriptionDir, fileName)
+            if (file.exists() && !java.nio.file.Files.isSymbolicLink(file.toPath())) {
+                try {
+                    val target = File(geodataDir, fileName)
+                    file.copyTo(target, overwrite = true)
+                } catch (_: Exception) {
+                }
+            }
+        }
+    }
+
     // === 迁移 ===
 
     fun migrateProfileDirs(context: Context) {

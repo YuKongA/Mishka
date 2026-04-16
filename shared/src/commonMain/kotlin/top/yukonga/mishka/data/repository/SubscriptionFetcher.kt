@@ -17,10 +17,17 @@ class SubscriptionFetcher {
      */
     suspend fun fetch(subscription: Subscription): FetchResult {
         val response: HttpResponse = client.get(subscription.url) {
-            header("User-Agent", "Mishka/1.0 (mihomo)")
+            header("User-Agent", "clash.meta")
         }
 
-        val configContent = response.bodyAsText()
+        val rawContent = response.bodyAsText()
+
+        // 检测 V2Ray 格式并转换为 mihomo YAML
+        val configContent = if (V2RayConverter.isV2RaySubscription(rawContent)) {
+            V2RayConverter.convert(rawContent)
+        } else {
+            rawContent
+        }
 
         // 解析 subscription-userinfo 头
         // 格式: upload=xxx; download=xxx; total=xxx; expire=xxx
@@ -83,7 +90,7 @@ class SubscriptionFetcher {
      */
     suspend fun downloadBytes(url: String): ByteArray {
         val response = client.get(url) {
-            header("User-Agent", "Mishka/1.0 (mihomo)")
+            header("User-Agent", "clash.meta")
         }
         return response.body()
     }

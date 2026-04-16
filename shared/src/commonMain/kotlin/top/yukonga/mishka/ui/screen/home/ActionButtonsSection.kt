@@ -16,6 +16,7 @@ import mishka.shared.generated.resources.home_restart
 import mishka.shared.generated.resources.home_start
 import mishka.shared.generated.resources.home_starting_btn
 import mishka.shared.generated.resources.home_stop
+import mishka.shared.generated.resources.home_stopping_btn
 import org.jetbrains.compose.resources.stringResource
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.TextButton
@@ -28,9 +29,10 @@ fun LazyListScope.actionButtonsSection(
     onStart: () -> Unit = {},
     isRunning: Boolean = false,
     isStarting: Boolean = false,
+    isStopping: Boolean = false,
 ) {
     item(key = "actions") {
-        ActionButtonsRow(onRestart, onStop, onReload, onStart, isRunning, isStarting)
+        ActionButtonsRow(onRestart, onStop, onReload, onStart, isRunning, isStarting, isStopping)
     }
 }
 
@@ -42,6 +44,7 @@ private fun ActionButtonsRow(
     onStart: () -> Unit,
     isRunning: Boolean,
     isStarting: Boolean,
+    isStopping: Boolean,
 ) {
     val isDark = isSystemInDarkTheme()
 
@@ -85,6 +88,14 @@ private fun ActionButtonsRow(
                     textColor = if (isDark) Color(0xFF42A5F5) else Color(0xFF1E88E5),
                     disabledTextColor = if (isDark) Color(0xFF42A5F5).copy(alpha = 0.5f) else Color(0xFF1E88E5).copy(alpha = 0.5f),
                 ),
+            )
+        } else if (isStopping) {
+            TextButton(
+                text = stringResource(Res.string.home_stopping_btn),
+                onClick = {},
+                modifier = Modifier.weight(1f),
+                enabled = false,
+                colors = ButtonDefaults.textButtonColorsPrimary(),
             )
         } else {
             TextButton(

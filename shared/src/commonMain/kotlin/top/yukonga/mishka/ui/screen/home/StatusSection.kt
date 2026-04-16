@@ -37,6 +37,7 @@ import mishka.shared.generated.resources.home_mode
 import mishka.shared.generated.resources.home_running
 import mishka.shared.generated.resources.home_starting
 import mishka.shared.generated.resources.home_stopped
+import mishka.shared.generated.resources.home_stopping
 import mishka.shared.generated.resources.home_switch_mode
 import mishka.shared.generated.resources.home_switch_tun_stack
 import org.jetbrains.compose.resources.stringResource
@@ -70,13 +71,14 @@ private fun StatusContent(
     val isDark = isSystemInDarkTheme()
     val isRunning = state.isRunning
     val isStarting = state.isStarting
+    val isStopping = state.isStopping
 
     val statusIcon = if (isRunning) {
         Icons.Rounded.CheckCircleOutline
     } else {
         Icons.Rounded.RemoveCircleOutline
     }
-    val statusTint = if (isStarting) {
+    val statusTint = if (isStarting || isStopping) {
         if (isDark) Color(0xFFF9A825) else Color(0xFFFFB300)
     } else if (isRunning) {
         if (isDark) Color(0xFF81C784) else Color(0xFF4CAF50)
@@ -100,7 +102,7 @@ private fun StatusContent(
         Card(
             modifier = Modifier.weight(1f).fillMaxHeight(),
             colors = CardDefaults.defaultColors(
-                color = if (isStarting) {
+                color = if (isStarting || isStopping) {
                     if (isDark) Color(0xFF3A3420) else Color(0xFFFFF8E1)
                 } else if (isRunning) {
                     if (isDark) Color(0xFF1A3825) else Color(0xFFDFFAE4)
@@ -131,7 +133,9 @@ private fun StatusContent(
                         .padding(all = 16.dp),
                 ) {
                     Text(
-                        text = if (isStarting) {
+                        text = if (isStopping) {
+                            stringResource(Res.string.home_stopping)
+                        } else if (isStarting) {
                             stringResource(Res.string.home_starting)
                         } else if (isRunning) {
                             stringResource(Res.string.home_running)

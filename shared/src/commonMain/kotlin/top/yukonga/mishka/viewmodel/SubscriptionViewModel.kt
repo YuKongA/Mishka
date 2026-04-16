@@ -243,7 +243,12 @@ class SubscriptionViewModel(
             importProgress = ImportProgress("验证配置...")
         )
         yield()
-        val error = fileManager.validate(fileManager.getDir(subscription.id))
+        val workDir = fileManager.getDir(subscription.id)
+        fileManager.ensureGeodataAvailable(workDir)
+        val error = fileManager.validate(workDir)
+        if (error == null) {
+            fileManager.collectGeodata(workDir)
+        }
         if (error != null) {
             throw ConfigValidationException(error)
         }
@@ -269,7 +274,12 @@ class SubscriptionViewModel(
             importProgress = ImportProgress("验证配置...")
         )
         yield()
-        val error = fileManager.validate(fileManager.getDir(subscription.id))
+        val workDir = fileManager.getDir(subscription.id)
+        fileManager.ensureGeodataAvailable(workDir)
+        val error = fileManager.validate(workDir)
+        if (error == null) {
+            fileManager.collectGeodata(workDir)
+        }
         if (error != null) {
             throw ConfigValidationException(error)
         }

@@ -16,6 +16,7 @@ object StorageKeys {
     // ROOT 模式持久化
     const val ROOT_MIHOMO_PID = "root_mihomo_pid"
     const val ROOT_MIHOMO_SECRET = "root_mihomo_secret"
+    const val ROOT_START_TIME = "root_start_time"
 
     // 订阅
     const val ACTIVE_PROFILE_UUID = "active_profile_uuid"

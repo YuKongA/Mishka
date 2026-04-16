@@ -26,6 +26,7 @@ import top.yukonga.mishka.util.FormatUtils
 data class HomeUiState(
     val isRunning: Boolean = false,
     val isStarting: Boolean = false,
+    val isStopping: Boolean = false,
     val uptime: String = "",
     val mode: String = "--",
     val tunStack: String = "",
@@ -80,8 +81,12 @@ class HomeViewModel(
                         val client = MihomoApiClient(secret = status.secret)
                         val ws = MihomoWebSocket(client)
                         repository = MihomoRepository(client, ws)
-                        startTime = System.currentTimeMillis()
+                        startTime = if (status.startTime > 0) status.startTime else System.currentTimeMillis()
                         connectToMihomo()
+                    }
+                    ProxyState.Stopping -> {
+                        disconnect()
+                        _uiState.value = _uiState.value.copy(isRunning = false, isStopping = true)
                     }
                     ProxyState.Stopped -> {
                         disconnect()

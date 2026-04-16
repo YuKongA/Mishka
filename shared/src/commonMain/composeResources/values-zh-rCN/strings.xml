@@ -31,6 +31,7 @@
     <!-- Home - Status -->
     <string name="home_starting">启动中</string>
     <string name="home_running">运行中</string>
+    <string name="home_stopping">停止中</string>
     <string name="home_stopped">已停止</string>
     <string name="home_mode">模式</string>
     <string name="home_tun">TUN</string>
@@ -43,6 +44,7 @@
     <string name="home_reload">热重载</string>
     <string name="home_start">启动</string>
     <string name="home_starting_btn">启动中...</string>
+    <string name="home_stopping_btn">停止中...</string>
 
     <!-- Home - Quick Entries -->
     <string name="home_providers">外部资源</string>
@@ -278,4 +280,9 @@
 
     <!-- Provider -->
     <string name="provider_update">更新</string>
+
+    <!-- Subscription errors -->
+    <string name="error_v2ray_convert_failed">无法解析订阅：不支持的格式</string>
+    <string name="error_geodata_timeout">GeoIP 数据下载超时，请检查网络后重试</string>
+    <string name="error_no_valid_proxies">订阅中未找到有效的代理节点</string>
 </resources>

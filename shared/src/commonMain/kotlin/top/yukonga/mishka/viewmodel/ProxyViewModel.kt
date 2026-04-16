@@ -73,11 +73,16 @@ class ProxyViewModel(
                             val lastDelay = proxy?.history?.lastOrNull()?.delay
                             if (lastDelay != null && lastDelay > 0) {
                                 delays[proxyName] = lastDelay
+                            } else if (lastDelay == 0) {
+                                // delay=0 表示 healthcheck 超时/失败，映射为 -1 让 UI 显示"超时"
+                                delays[proxyName] = -1
                             } else if (proxy != null && proxy.now.isNotEmpty()) {
                                 val nowProxy = allProxies[proxy.now]
                                 val nowDelay = nowProxy?.history?.lastOrNull()?.delay
                                 if (nowDelay != null && nowDelay > 0) {
                                     delays[proxyName] = nowDelay
+                                } else if (nowDelay == 0) {
+                                    delays[proxyName] = -1
                                 }
                             }
                             if (proxy != null && proxy.type.isNotEmpty()) {

@@ -31,6 +31,7 @@
     <!-- Home - Status -->
     <string name="home_starting">Starting</string>
     <string name="home_running">Running</string>
+    <string name="home_stopping">Stopping</string>
     <string name="home_stopped">Stopped</string>
     <string name="home_mode">Mode</string>
     <string name="home_tun">TUN</string>
@@ -43,6 +44,7 @@
     <string name="home_reload">Hot Reload</string>
     <string name="home_start">Start</string>
     <string name="home_starting_btn">Starting...</string>
+    <string name="home_stopping_btn">Stopping...</string>
 
     <!-- Home - Quick Entries -->
     <string name="home_providers">Providers</string>
@@ -278,4 +280,9 @@
 
     <!-- Provider -->
     <string name="provider_update">Update</string>
+
+    <!-- Subscription errors -->
+    <string name="error_v2ray_convert_failed">Failed to parse subscription: unsupported format</string>
+    <string name="error_geodata_timeout">GeoIP data download timed out, please check network and retry</string>
+    <string name="error_no_valid_proxies">No valid proxy nodes found in subscription</string>
 </resources>

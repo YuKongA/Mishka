@@ -12,4 +12,6 @@ interface ProfileFileManager {
     fun deleteDirs(uuid: String)
     fun cloneFiles(sourceUuid: String, targetUuid: String)
     suspend fun validate(workDir: String): String?
+    fun ensureGeodataAvailable(workDir: String)
+    fun collectGeodata(workDir: String)
 }

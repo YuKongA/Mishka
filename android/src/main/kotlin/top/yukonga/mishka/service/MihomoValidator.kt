@@ -13,7 +13,7 @@ import java.io.File
 object MihomoValidator {
 
     private const val TAG = "MihomoValidator"
-    private const val TIMEOUT_MS = 30_000L
+    private const val TIMEOUT_MS = 90_000L
 
     /**
      * 对指定工作目录运行 mihomo -t 校验配置。
@@ -75,6 +75,13 @@ object MihomoValidator {
      * mihomo 日志格式: time="..." level=error msg="..."
      */
     private fun parseErrorMessage(output: String): String {
+        // 检查 GeoIP 下载超时
+        if (output.contains("can't download MMDB") || output.contains("can't download GeoIP") ||
+            output.contains("context deadline exceeded") && output.contains("GeoIP")
+        ) {
+            return "GeoIP 数据下载超时，请检查网络后重试"
+        }
+
         // 查找 level=error 或 level=fatal 的行
         val errorLines = output.lines().filter { line ->
             line.contains("level=error") || line.contains("level=fatal")

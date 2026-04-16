@@ -67,6 +67,7 @@ fun HomeScreen(
                 onStart = onStartProxy,
                 isRunning = uiState.isRunning,
                 isStarting = uiState.isStarting,
+                isStopping = uiState.isStopping,
             )
             quickEntriesSection(
                 onNavigateLog = onNavigateLog,

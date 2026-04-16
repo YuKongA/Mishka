@@ -29,7 +29,7 @@ object RootHelper {
      */
     fun startAsRoot(binary: String, args: Array<String>, workDir: String, logFile: String): Int {
         val argsStr = args.joinToString(" ") { "\"$it\"" }
-        val command = "cd \"$workDir\" && \"$binary\" $argsStr > \"$logFile\" 2>&1 & echo \$!"
+        val command = "cd \"$workDir\" || exit 1; \"$binary\" $argsStr > \"$logFile\" 2>&1 & echo \$!"
         Log.i(TAG, "Starting as root: su -c \"$command\"")
         return try {
             val process = ProcessBuilder("su", "-c", command)
@@ -72,15 +72,69 @@ object RootHelper {
         }
     }
 
-    fun killAsRoot(pid: Int) {
+    fun killAsRoot(pid: Int): Boolean {
         try {
             Log.i(TAG, "Killing root process: pid=$pid")
-            val process = ProcessBuilder("su", "-c", "kill $pid")
+            // SIGTERM
+            runRootCommand("kill $pid")
+            for (i in 1..6) {
+                Thread.sleep(500)
+                if (!isAliveAsRoot(pid)) {
+                    Log.i(TAG, "Process $pid terminated after SIGTERM")
+                    return true
+                }
+            }
+            // SIGKILL（进程无法优雅清理，需要手动清理 TUN 残留）
+            Log.w(TAG, "Process $pid still alive after SIGTERM, sending SIGKILL")
+            runRootCommand("kill -9 $pid")
+            for (i in 1..4) {
+                Thread.sleep(500)
+                if (!isAliveAsRoot(pid)) {
+                    Log.i(TAG, "Process $pid terminated after SIGKILL")
+                    cleanupRootNetwork()
+                    return true
+                }
+            }
+            Log.e(TAG, "Process $pid still alive after SIGKILL")
+            return false
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to kill root process: ${e.message}")
+            return false
+        }
+    }
+
+    fun killMihomoByName() {
+        try {
+            Log.w(TAG, "Falling back to pkill for libmihomo.so")
+            runRootCommand("pkill -TERM -f libmihomo.so")
+            Thread.sleep(1000)
+            runRootCommand("pkill -9 -f libmihomo.so")
+            cleanupRootNetwork()
+        } catch (_: Exception) {
+        }
+    }
+
+    /**
+     * 清理 Root 模式 mihomo 被 SIGKILL 后残留的 TUN 设备和路由表。
+     * SIGKILL 不给进程清理机会，需要手动清理。
+     */
+    private fun cleanupRootNetwork() {
+        try {
+            Log.i(TAG, "Cleaning up root network state")
+            runRootCommand("ip link delete Meta 2>/dev/null; true")
+        } catch (_: Exception) {
+        }
+    }
+
+    private fun runRootCommand(command: String): Boolean {
+        return try {
+            val process = ProcessBuilder("su", "-c", command)
                 .redirectErrorStream(true)
                 .start()
             process.waitFor(3, TimeUnit.SECONDS)
-        } catch (e: Exception) {
-            Log.w(TAG, "Failed to kill root process: ${e.message}")
+            process.exitValue() == 0
+        } catch (_: Exception) {
+            false
         }
     }
 

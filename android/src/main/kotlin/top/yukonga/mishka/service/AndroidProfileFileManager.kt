@@ -31,4 +31,12 @@ class AndroidProfileFileManager(private val context: Context) : ProfileFileManag
     override suspend fun validate(workDir: String): String? {
         return MihomoValidator.validate(context, workDir)
     }
+
+    override fun ensureGeodataAvailable(workDir: String) {
+        ProfileFileOps.ensureGeodataLinks(context, java.io.File(workDir))
+    }
+
+    override fun collectGeodata(workDir: String) {
+        ProfileFileOps.collectGeodataFiles(context, java.io.File(workDir))
+    }
 }

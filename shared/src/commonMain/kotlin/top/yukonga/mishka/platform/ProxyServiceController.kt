@@ -6,6 +6,7 @@ enum class ProxyState {
     Stopped,
     Starting,
     Running,
+    Stopping,
     Error,
 }
 
@@ -16,6 +17,7 @@ data class ProxyServiceStatus(
     val secret: String = "",
     val errorMessage: String = "",
     val tunMode: TunMode = TunMode.Vpn,
+    val startTime: Long = 0L,
 )
 
 expect class ProxyServiceController {
