@@ -14,17 +14,24 @@ actual class PlatformSystemInfo actual constructor() {
     actual fun getNetworkInfo(): NetworkInfoData {
         try {
             val interfaces = NetworkInterface.getNetworkInterfaces() ?: return NetworkInfoData()
+            var fallback: NetworkInfoData? = null
             for (intf in interfaces) {
                 if (intf.isLoopback || !intf.isUp) continue
                 for (addr in intf.inetAddresses) {
                     if (addr is Inet4Address && !addr.isLoopbackAddress) {
-                        return NetworkInfoData(
-                            localIp = addr.hostAddress ?: "0.0.0.0",
-                            interfaceName = intf.name,
-                        )
+                        val ip = addr.hostAddress ?: "0.0.0.0"
+                        val info = NetworkInfoData(localIp = ip, interfaceName = intf.name)
+                        // 优先返回 TUN 接口（198.18.0.0/15 地址段）
+                        if (ip.startsWith("198.18.") || ip.startsWith("198.19.")) {
+                            return info
+                        }
+                        if (fallback == null) {
+                            fallback = info
+                        }
                     }
                 }
             }
+            return fallback ?: NetworkInfoData()
         } catch (_: Exception) {
         }
         return NetworkInfoData()

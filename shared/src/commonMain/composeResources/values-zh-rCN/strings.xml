@@ -167,6 +167,8 @@
     <string name="settings_tun_root_summary">ROOT（需要 Root 权限）</string>
     <string name="settings_vpn_settings">VPN 设置</string>
     <string name="settings_vpn_summary">绕过私有网络、DNS 劫持、IPv6</string>
+    <string name="settings_tun_device">TUN 设备名称</string>
+    <string name="settings_tun_device_summary">ROOT 模式的网络接口名称</string>
     <string name="settings_override_settings">覆写设置</string>
     <string name="settings_override_summary">端口、DNS、网络选项覆写</string>
     <string name="settings_meta_settings">Meta 设置</string>

@@ -1,10 +1,15 @@
 package top.yukonga.mishka.ui.screen.settings
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -39,23 +44,32 @@ import mishka.shared.generated.resources.settings_title
 import mishka.shared.generated.resources.settings_tun_mode
 import mishka.shared.generated.resources.settings_tun_root_summary
 import mishka.shared.generated.resources.settings_tun_vpn_summary
+import mishka.shared.generated.resources.settings_tun_device
+import mishka.shared.generated.resources.settings_tun_device_summary
 import mishka.shared.generated.resources.settings_vpn_settings
 import mishka.shared.generated.resources.settings_vpn_summary
+import mishka.shared.generated.resources.common_cancel
+import mishka.shared.generated.resources.common_confirm
+import mishka.shared.generated.resources.network_input_value
 import org.jetbrains.compose.resources.stringResource
 import top.yukonga.mishka.platform.BootStartManager
 import top.yukonga.mishka.platform.PlatformStorage
 import top.yukonga.mishka.platform.ProxyServiceBridge
 import top.yukonga.mishka.platform.StorageKeys
+import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.SmallTitle
+import top.yukonga.miuix.kmp.basic.TextButton
+import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.basic.TopAppBar
 import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.preference.OverlayDropdownPreference
 import top.yukonga.miuix.kmp.preference.SwitchPreference
 import top.yukonga.miuix.kmp.utils.overScrollVertical
 import top.yukonga.miuix.kmp.utils.scrollEndHaptic
+import top.yukonga.miuix.kmp.window.WindowDialog
 
 @Composable
 fun SettingsScreen(
@@ -87,6 +101,11 @@ fun SettingsScreen(
     var tunModeIndex by remember {
         mutableIntStateOf(if (storage?.getString(StorageKeys.TUN_MODE, "vpn") == "root") 1 else 0)
     }
+    var tunDevice by remember {
+        mutableStateOf(storage?.getString(StorageKeys.ROOT_TUN_DEVICE, "Mishka") ?: "Mishka")
+    }
+    var showTunDeviceDialog by remember { mutableStateOf(false) }
+    val tunDeviceTextState = rememberTextFieldState()
 
     val themeSystemStr = stringResource(Res.string.settings_theme_system)
     val themeLightStr = stringResource(Res.string.settings_theme_light)
@@ -143,6 +162,16 @@ fun SettingsScreen(
                             title = stringResource(Res.string.settings_vpn_settings),
                             summary = stringResource(Res.string.settings_vpn_summary),
                             onClick = onNavigateVpnSettings,
+                        )
+                    }
+                    if (tunModeIndex == 1) {
+                        ArrowPreference(
+                            title = stringResource(Res.string.settings_tun_device),
+                            summary = tunDevice,
+                            onClick = {
+                                tunDeviceTextState.edit { replace(0, length, tunDevice) }
+                                showTunDeviceDialog = true
+                            },
                         )
                     }
                     ArrowPreference(
@@ -227,6 +256,41 @@ fun SettingsScreen(
                     )
                 }
             }
+        }
+    }
+
+    // TUN 设备名称编辑 Dialog
+    WindowDialog(
+        show = showTunDeviceDialog,
+        title = stringResource(Res.string.settings_tun_device),
+        onDismissRequest = { showTunDeviceDialog = false },
+    ) {
+        TextField(
+            state = tunDeviceTextState,
+            modifier = Modifier.fillMaxWidth(),
+            label = stringResource(Res.string.network_input_value),
+        )
+        Spacer(Modifier.height(12.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            TextButton(
+                text = stringResource(Res.string.common_cancel),
+                modifier = Modifier.weight(1f),
+                onClick = { showTunDeviceDialog = false },
+            )
+            TextButton(
+                text = stringResource(Res.string.common_confirm),
+                modifier = Modifier.weight(1f),
+                colors = ButtonDefaults.textButtonColorsPrimary(),
+                onClick = {
+                    val value = tunDeviceTextState.text.toString().trim().ifEmpty { "Mishka" }
+                    storage?.putString(StorageKeys.ROOT_TUN_DEVICE, value)
+                    tunDevice = value
+                    showTunDeviceDialog = false
+                },
+            )
         }
     }
 }

@@ -149,6 +149,8 @@ object ConfigGenerator {
             appendLine("  enable: true")
             if (rootMode) {
                 // ROOT 模式：mihomo 自行创建 TUN 设备和管理路由表
+                val tunDevice = storage.getString(StorageKeys.ROOT_TUN_DEVICE, "Mishka")
+                appendLine("  device: $tunDevice")
                 appendLine("  auto-route: true")
                 appendLine("  auto-detect-interface: true")
                 // 分应用代理：通过 mihomo 的 include/exclude-package 实现

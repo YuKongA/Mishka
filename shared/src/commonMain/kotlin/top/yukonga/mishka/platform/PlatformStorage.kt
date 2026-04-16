@@ -33,6 +33,9 @@ object StorageKeys {
     const val APP_PROXY_MODE = "app_proxy_mode"
     const val APP_PROXY_PACKAGES = "app_proxy_packages"
 
+    // ROOT 设置
+    const val ROOT_TUN_DEVICE = "root_tun_device"
+
     // 通用设置
     const val DARK_MODE = "dark_mode"
     const val DYNAMIC_NOTIFICATION = "dynamic_notification"

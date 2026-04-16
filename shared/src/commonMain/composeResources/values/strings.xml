@@ -167,6 +167,8 @@
     <string name="settings_tun_root_summary">ROOT (requires root)</string>
     <string name="settings_vpn_settings">VPN Settings</string>
     <string name="settings_vpn_summary">Bypass private network, DNS hijacking, IPv6</string>
+    <string name="settings_tun_device">TUN Device Name</string>
+    <string name="settings_tun_device_summary">Network interface name for ROOT mode</string>
     <string name="settings_override_settings">Override Settings</string>
     <string name="settings_override_summary">Ports, DNS, network overrides</string>
     <string name="settings_meta_settings">Meta Settings</string>

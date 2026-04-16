@@ -72,7 +72,7 @@ object RootHelper {
         }
     }
 
-    fun killAsRoot(pid: Int): Boolean {
+    fun killAsRoot(pid: Int, tunDevice: String = "Mishka"): Boolean {
         try {
             Log.i(TAG, "Killing root process: pid=$pid")
             // SIGTERM
@@ -91,7 +91,7 @@ object RootHelper {
                 Thread.sleep(500)
                 if (!isAliveAsRoot(pid)) {
                     Log.i(TAG, "Process $pid terminated after SIGKILL")
-                    cleanupRootNetwork()
+                    cleanupRootNetwork(tunDevice)
                     return true
                 }
             }
@@ -103,13 +103,13 @@ object RootHelper {
         }
     }
 
-    fun killMihomoByName() {
+    fun killMihomoByName(tunDevice: String = "Mishka") {
         try {
             Log.w(TAG, "Falling back to pkill for libmihomo.so")
             runRootCommand("pkill -TERM -f libmihomo.so")
             Thread.sleep(1000)
             runRootCommand("pkill -9 -f libmihomo.so")
-            cleanupRootNetwork()
+            cleanupRootNetwork(tunDevice)
         } catch (_: Exception) {
         }
     }
@@ -118,10 +118,10 @@ object RootHelper {
      * 清理 Root 模式 mihomo 被 SIGKILL 后残留的 TUN 设备和路由表。
      * SIGKILL 不给进程清理机会，需要手动清理。
      */
-    private fun cleanupRootNetwork() {
+    private fun cleanupRootNetwork(tunDevice: String) {
         try {
             Log.i(TAG, "Cleaning up root network state")
-            runRootCommand("ip link delete Meta 2>/dev/null; true")
+            runRootCommand("ip link delete $tunDevice 2>/dev/null; true")
         } catch (_: Exception) {
         }
     }

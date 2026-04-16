@@ -6,6 +6,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import top.yukonga.mishka.R
+import top.yukonga.mishka.platform.PlatformStorage
+import top.yukonga.mishka.platform.StorageKeys
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
@@ -108,9 +110,10 @@ class MihomoRunner(private val context: Context) {
         if (childPid > 0) {
             Log.i(TAG, "Stopping mihomo pid=$childPid (root=$isRootMode)")
             if (isRootMode) {
-                val killed = RootHelper.killAsRoot(childPid)
+                val tunDevice = PlatformStorage(context).getString(StorageKeys.ROOT_TUN_DEVICE, "Mishka")
+                val killed = RootHelper.killAsRoot(childPid, tunDevice)
                 if (!killed) {
-                    RootHelper.killMihomoByName()
+                    RootHelper.killMihomoByName(tunDevice)
                 }
             } else {
                 ProcessHelper.nativeKill(childPid)
