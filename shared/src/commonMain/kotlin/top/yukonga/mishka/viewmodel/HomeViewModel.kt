@@ -78,7 +78,7 @@ class HomeViewModel(
                     }
                     ProxyState.Running -> {
                         _uiState.value = _uiState.value.copy(isStarting = false, isRunning = true)
-                        val client = MihomoApiClient(secret = status.secret)
+                        val client = MihomoApiClient(baseUrl = "http://${status.externalController}", secret = status.secret)
                         val ws = MihomoWebSocket(client)
                         repository = MihomoRepository(client, ws)
                         startTime = if (status.startTime > 0) status.startTime else System.currentTimeMillis()

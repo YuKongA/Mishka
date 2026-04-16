@@ -15,6 +15,7 @@ enum class TunMode { Vpn, Root }
 data class ProxyServiceStatus(
     val state: ProxyState = ProxyState.Stopped,
     val secret: String = "",
+    val externalController: String = "127.0.0.1:9090",
     val errorMessage: String = "",
     val tunMode: TunMode = TunMode.Vpn,
     val startTime: Long = 0L,

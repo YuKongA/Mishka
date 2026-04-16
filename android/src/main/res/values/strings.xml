@@ -38,6 +38,7 @@
     <string name="error_fork_failed">fork+exec failed</string>
     <string name="error_root_start_failed">root start failed</string>
     <string name="error_mihomo_exited">mihomo process exited immediately</string>
+    <string name="error_api_not_ready">mihomo process is running but API is not responding</string>
     <string name="error_mihomo_start_failed">mihomo start failed:\n%1$s</string>
     <string name="error_generic_start_failed">Start failed: %1$s</string>
 </resources>

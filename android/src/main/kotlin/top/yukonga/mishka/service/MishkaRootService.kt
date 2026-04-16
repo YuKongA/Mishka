@@ -10,6 +10,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import top.yukonga.mishka.data.repository.OverrideStorageHelper
 import top.yukonga.mishka.platform.PlatformStorage
 import top.yukonga.mishka.platform.StorageKeys
 import top.yukonga.mishka.platform.ProxyServiceBridge
@@ -63,9 +64,10 @@ class MishkaRootService : Service() {
             if (existingPid > 0 && existingSecret.isNotEmpty()) {
                 if (runner.attachToExisting(existingPid, existingSecret, subscriptionId)) {
                     val existingStartTime = storage.getString(StorageKeys.ROOT_START_TIME, "").toLongOrNull() ?: System.currentTimeMillis()
+                    val ec = OverrideStorageHelper.readNullableString(storage, OverrideStorageHelper.KEY_EXTERNAL_CONTROLLER) ?: "127.0.0.1:9090"
                     Log.i(TAG, "Reconnected to existing mihomo: pid=$existingPid")
-                    ProxyServiceBridge.updateState(ProxyServiceStatus(ProxyState.Running, secret = existingSecret, tunMode = TunMode.Root, startTime = existingStartTime))
-                    dynamicNotification.startOrFallbackStatic(storage, existingSecret)
+                    ProxyServiceBridge.updateState(ProxyServiceStatus(ProxyState.Running, secret = existingSecret, externalController = ec, tunMode = TunMode.Root, startTime = existingStartTime))
+                    dynamicNotification.startOrFallbackStatic(storage, existingSecret, ec)
                     storage.putString(StorageKeys.SERVICE_WAS_RUNNING, "true")
                     return@launch
                 }
@@ -87,9 +89,9 @@ class MishkaRootService : Service() {
             }
 
             // 4. 生成配置（rootMode = true，不注入 tunFd）
-            val secret = ConfigGenerator.generateSecret()
-            runner.secret = secret
-            ConfigGenerator.writeRunConfig(this@MishkaRootService, secret, subscriptionId, tunFd = -1, rootMode = true)
+            val result = ConfigGenerator.writeRunConfig(this@MishkaRootService, ConfigGenerator.generateSecret(), subscriptionId, tunFd = -1, rootMode = true)
+            runner.secret = result.secret
+            runner.externalController = result.externalController
 
             // 5. 以 root 启动 mihomo
             val success = runner.start(subscriptionId, useRoot = true)
@@ -108,8 +110,8 @@ class MishkaRootService : Service() {
             persistState(storage, runner.secret, startTime)
 
             // 7. 更新状态和通知
-            ProxyServiceBridge.updateState(ProxyServiceStatus(ProxyState.Running, secret = runner.secret, tunMode = TunMode.Root, startTime = startTime))
-            dynamicNotification.startOrFallbackStatic(storage, runner.secret)
+            ProxyServiceBridge.updateState(ProxyServiceStatus(ProxyState.Running, secret = runner.secret, externalController = result.externalController, tunMode = TunMode.Root, startTime = startTime))
+            dynamicNotification.startOrFallbackStatic(storage, runner.secret, result.externalController)
             storage.putString(StorageKeys.SERVICE_WAS_RUNNING, "true")
             Log.i(TAG, "Proxy running (ROOT)")
         }

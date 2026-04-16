@@ -117,7 +117,7 @@ class MainActivity : ComponentActivity() {
             ProxyServiceBridge.state.collect { status ->
                 when (status.state) {
                     ProxyState.Running -> {
-                        val client = MihomoApiClient(secret = status.secret)
+                        val client = MihomoApiClient(baseUrl = "http://${status.externalController}", secret = status.secret)
                         val ws = MihomoWebSocket(client)
                         val repo = MihomoRepository(client, ws)
                         proxyViewModel.setRepository(repo)

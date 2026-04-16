@@ -26,6 +26,7 @@ data class OverrideUiState(
     val mixedPort: Int? = null,
     val allowLan: Boolean? = null,
     val ipv6: Boolean? = null,
+    val externalController: String? = null,
     val bindAddress: String? = null,
     val logLevel: String? = null,
     // DNS
@@ -82,6 +83,7 @@ class OverrideSettingsViewModel(
             mixedPort = h.readNullableInt(storage, h.KEY_MIXED_PORT),
             allowLan = h.readNullableBoolean(storage, h.KEY_ALLOW_LAN),
             ipv6 = h.readNullableBoolean(storage, h.KEY_IPV6),
+            externalController = h.readNullableString(storage, h.KEY_EXTERNAL_CONTROLLER),
             bindAddress = h.readNullableString(storage, h.KEY_BIND_ADDRESS),
             logLevel = h.readNullableString(storage, h.KEY_LOG_LEVEL),
             dnsEnable = h.readNullableBoolean(storage, h.KEY_DNS_ENABLE),
@@ -149,6 +151,7 @@ class OverrideSettingsViewModel(
         OverrideStorageHelper.writeNullableString(storage, key, value)
         val state = _uiState.value
         _uiState.value = when (key) {
+            OverrideStorageHelper.KEY_EXTERNAL_CONTROLLER -> state.copy(externalController = value)
             OverrideStorageHelper.KEY_BIND_ADDRESS -> state.copy(bindAddress = value)
             OverrideStorageHelper.KEY_LOG_LEVEL -> state.copy(logLevel = value)
             OverrideStorageHelper.KEY_DNS_LISTEN -> state.copy(dnsListen = value)

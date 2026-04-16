@@ -210,6 +210,7 @@
     <string name="network_options">网络选项</string>
     <string name="network_allow_lan">允许局域网</string>
     <string name="network_ipv6">IPv6</string>
+    <string name="network_external_controller">外部控制器</string>
     <string name="network_bind_address">绑定地址</string>
     <string name="network_log_level">日志等级</string>
     <string name="network_dns">DNS</string>

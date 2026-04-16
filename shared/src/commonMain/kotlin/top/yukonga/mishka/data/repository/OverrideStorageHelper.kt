@@ -22,6 +22,7 @@ object OverrideStorageHelper {
     const val KEY_MIXED_PORT = "override_mixed_port"
     const val KEY_ALLOW_LAN = "override_allow_lan"
     const val KEY_IPV6 = "override_ipv6"
+    const val KEY_EXTERNAL_CONTROLLER = "override_external_controller"
     const val KEY_BIND_ADDRESS = "override_bind_address"
     const val KEY_LOG_LEVEL = "override_log_level"
 

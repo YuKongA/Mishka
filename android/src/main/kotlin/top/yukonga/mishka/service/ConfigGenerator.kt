@@ -11,6 +11,12 @@ import java.util.UUID
  * 运行配置生成器：生成 mihomo 最终运行配置。
  * 订阅文件操作已拆分到 ProfileFileOps。
  */
+data class RunConfigResult(
+    val configFile: File,
+    val externalController: String,
+    val secret: String,
+)
+
 object ConfigGenerator {
 
     fun generateSecret(): String = UUID.randomUUID().toString().take(16)
@@ -36,7 +42,7 @@ object ConfigGenerator {
         subscriptionId: String? = null,
         tunFd: Int = -1,
         rootMode: Boolean = false,
-    ): File {
+    ): RunConfigResult {
         val configFile = getConfigFile(context)
         val storage = PlatformStorage(context)
         val h = OverrideStorageHelper
@@ -49,6 +55,15 @@ object ConfigGenerator {
         }
 
         // 读取覆写设置
+        val externalControllerOverride = h.readNullableString(storage, h.KEY_EXTERNAL_CONTROLLER)
+        val configExternalController = extractTopLevelValue(baseConfig, "external-controller")
+        val configController = externalControllerOverride ?: configExternalController ?: "127.0.0.1:9090"
+        // API 客户端连接地址：0.0.0.0 替换为 127.0.0.1（0.0.0.0 是监听地址，不可用于连接）
+        val effectiveController = configController.replace("0.0.0.0", "127.0.0.1")
+
+        val configSecret = extractTopLevelValue(baseConfig, "secret")
+        val effectiveSecret = configSecret ?: secret
+
         val httpPort = h.readNullableInt(storage, h.KEY_HTTP_PORT)
         val socksPort = h.readNullableInt(storage, h.KEY_SOCKS_PORT)
         val redirPort = h.readNullableInt(storage, h.KEY_REDIR_PORT)
@@ -95,7 +110,6 @@ object ConfigGenerator {
         val keysToRemove = buildSet {
             add("external-controller")
             add("secret")
-            add("external-ui")
             add("tun")
             if (httpPort != null) add("port")
             if (socksPort != null) add("socks-port")
@@ -127,8 +141,8 @@ object ConfigGenerator {
             }
 
             appendLine("# === Mishka injected ===")
-            appendLine("external-controller: 127.0.0.1:9090")
-            appendLine("secret: \"$secret\"")
+            appendLine("external-controller: $configController")
+            appendLine("secret: \"$effectiveSecret\"")
 
             appendLine()
             appendLine("tun:")
@@ -252,7 +266,7 @@ object ConfigGenerator {
         }
 
         configFile.writeText(config)
-        return configFile
+        return RunConfigResult(configFile, effectiveController, effectiveSecret)
     }
 
     private fun filterTopLevelKeys(content: String, keysToRemove: Set<String>): String {
@@ -280,5 +294,15 @@ object ConfigGenerator {
         }
 
         return result.joinToString("\n")
+    }
+
+    private fun extractTopLevelValue(content: String, key: String): String? {
+        if (content.isEmpty()) return null
+        for (line in content.lines()) {
+            if (!line.startsWith(" ") && !line.startsWith("\t") && line.startsWith("$key:")) {
+                return line.substringAfter(":").trim().removeSurrounding("\"")
+            }
+        }
+        return null
     }
 }

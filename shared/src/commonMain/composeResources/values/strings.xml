@@ -210,6 +210,7 @@
     <string name="network_options">Network Options</string>
     <string name="network_allow_lan">Allow LAN</string>
     <string name="network_ipv6">IPv6</string>
+    <string name="network_external_controller">External Controller</string>
     <string name="network_bind_address">Bind Address</string>
     <string name="network_log_level">Log Level</string>
     <string name="network_dns">DNS</string>

@@ -33,6 +33,7 @@ import mishka.shared.generated.resources.common_items_count
 import mishka.shared.generated.resources.common_not_modified
 import mishka.shared.generated.resources.network_allow_lan
 import mishka.shared.generated.resources.network_bind_address
+import mishka.shared.generated.resources.network_external_controller
 import mishka.shared.generated.resources.network_dns
 import mishka.shared.generated.resources.network_dns_default_nameserver
 import mishka.shared.generated.resources.network_dns_enable
@@ -219,6 +220,12 @@ fun NetworkSettingsScreen(
                         title = "IPv6",
                         value = uiState.ipv6,
                         onValueChange = { viewModel.updateBoolean(OverrideStorageHelper.KEY_IPV6, it) },
+                    )
+                    val extControllerTitle = stringResource(Res.string.network_external_controller)
+                    ArrowPreference(
+                        title = extControllerTitle,
+                        summary = uiState.externalController ?: stringResource(Res.string.common_not_modified),
+                        onClick = { openStringDialog(extControllerTitle, OverrideStorageHelper.KEY_EXTERNAL_CONTROLLER, uiState.externalController) },
                     )
                     val bindAddrTitle = stringResource(Res.string.network_bind_address)
                     ArrowPreference(

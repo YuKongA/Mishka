@@ -201,9 +201,9 @@ class MishkaTunService : VpnService() {
             }
 
             // 2. 生成配置（注入 file-descriptor）
-            val secret = ConfigGenerator.generateSecret()
-            runner.secret = secret
-            ConfigGenerator.writeRunConfig(this@MishkaTunService, secret, subscriptionId, tunFd = fd)
+            val result = ConfigGenerator.writeRunConfig(this@MishkaTunService, ConfigGenerator.generateSecret(), subscriptionId, tunFd = fd)
+            runner.secret = result.secret
+            runner.externalController = result.externalController
 
             // 3. 启动 mihomo 核心
             val success = runner.start(subscriptionId)
@@ -219,9 +219,9 @@ class MishkaTunService : VpnService() {
             }
 
             // 4. 更新通知和状态
-            ProxyServiceBridge.updateState(ProxyServiceStatus(ProxyState.Running, secret = runner.secret, tunMode = TunMode.Vpn, startTime = System.currentTimeMillis()))
+            ProxyServiceBridge.updateState(ProxyServiceStatus(ProxyState.Running, secret = runner.secret, externalController = result.externalController, tunMode = TunMode.Vpn, startTime = System.currentTimeMillis()))
 
-            dynamicNotification.startOrFallbackStatic(storage, runner.secret)
+            dynamicNotification.startOrFallbackStatic(storage, runner.secret, result.externalController)
             // 记录运行状态，用于开机自启判断
             PlatformStorage(this@MishkaTunService).putString(StorageKeys.SERVICE_WAS_RUNNING, "true")
             Log.i(TAG, "Proxy running, fd=$fd")

@@ -390,7 +390,14 @@ private fun DefaultGroupIcon(name: String) {
         contentAlignment = Alignment.Center,
     ) {
         Text(
-            text = name.firstOrNull()?.toString() ?: "",
+            text = if (name.isEmpty()) "" else {
+                val first = name[0]
+                if (first.isHighSurrogate() && name.length > 1 && name[1].isLowSurrogate()) {
+                    name.substring(0, 2)
+                } else {
+                    first.toString()
+                }
+            },
             fontSize = 16.sp,
             fontWeight = FontWeight.Bold,
             color = MiuixTheme.colorScheme.primary.copy(0.8f),

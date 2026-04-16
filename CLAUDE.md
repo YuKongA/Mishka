@@ -229,7 +229,14 @@ ConnectionInfo, DelayResult, DnsQuery, LogMessage, MemoryData, MihomoConfig, Pro
 ## 构建命令
 
 ```bash
-./gradlew downloadMihomo          # 下载 mihomo 二进制（首次必须）
+# 编译 mihomo 二进制（首次必须，需要 Go 环境）
+cd D:/GitHub/mihomo
+GOOS=android GOARCH=arm64 CGO_ENABLED=0 go build \
+  -tags "cmfa,mishka,with_gvisor" -trimpath \
+  -ldflags "-s -w -X 'github.com/metacubex/mihomo/constant.Version=v1.19.23'" \
+  -o /path/to/Mishka/android/src/main/jniLibs/arm64-v8a/libmihomo.so .
+
+# 构建 APK
 ./gradlew :android:assembleDebug  # 构建 Android Debug APK
 ./gradlew :android:assembleRelease # 构建 Android Release APK
 ```

@@ -38,6 +38,7 @@
     <string name="error_fork_failed">fork+exec 失败</string>
     <string name="error_root_start_failed">root 启动失败</string>
     <string name="error_mihomo_exited">mihomo 进程启动后立即退出</string>
+    <string name="error_api_not_ready">mihomo 进程运行中但 API 无响应</string>
     <string name="error_mihomo_start_failed">mihomo 启动失败:\n%1$s</string>
     <string name="error_generic_start_failed">启动失败: %1$s</string>
 </resources>

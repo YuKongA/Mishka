@@ -30,9 +30,9 @@ class DynamicNotificationManager(
     private var trafficJob: Job? = null
     private var screenReceiver: BroadcastReceiver? = null
 
-    fun start(secret: String, profileName: String) {
+    fun start(secret: String, profileName: String, externalController: String = "127.0.0.1:9090") {
         val notificationManager = context.getSystemService(NotificationManager::class.java)
-        val apiClient = MihomoApiClient(secret = secret)
+        val apiClient = MihomoApiClient(baseUrl = "http://$externalController", secret = secret)
         val webSocket = MihomoWebSocket(apiClient)
 
         var isScreenOn = context.getSystemService(PowerManager::class.java)?.isInteractive ?: true
@@ -71,11 +71,11 @@ class DynamicNotificationManager(
     /**
      * 根据设置启动动态通知或显示静态通知。
      */
-    fun startOrFallbackStatic(storage: PlatformStorage, secret: String) {
+    fun startOrFallbackStatic(storage: PlatformStorage, secret: String, externalController: String = "127.0.0.1:9090") {
         val isDynamic = storage.getString(StorageKeys.DYNAMIC_NOTIFICATION, "true") == "true"
         if (isDynamic) {
             val profileName = storage.getString(StorageKeys.ACTIVE_PROFILE_NAME, "Mishka")
-            start(secret, profileName)
+            start(secret, profileName, externalController)
         } else {
             val notification = NotificationHelper.buildRunningNotification(context)
             context.getSystemService(NotificationManager::class.java)
