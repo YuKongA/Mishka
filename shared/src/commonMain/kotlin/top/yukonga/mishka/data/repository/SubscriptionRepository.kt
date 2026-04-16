@@ -15,6 +15,7 @@ import top.yukonga.mishka.data.database.PendingEntity
 import top.yukonga.mishka.data.database.SelectionDao
 import top.yukonga.mishka.data.model.Subscription
 import top.yukonga.mishka.platform.PlatformStorage
+import top.yukonga.mishka.platform.ProxyServiceBridge
 import top.yukonga.mishka.platform.StorageKeys
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
@@ -231,11 +232,15 @@ class SubscriptionRepository(
 
     // === 活跃配置管理 ===
 
-    fun setActive(id: String) {
+    suspend fun setActive(id: String) {
         _activeUuid.value = id
         storage.putString(StorageKeys.ACTIVE_PROFILE_UUID, id)
-        val name = _subscriptions.value.find { it.id == id }?.name ?: ""
+        val name = _subscriptions.value.find { it.id == id }?.name
+            ?: importedDao.queryByUUID(id)?.name
+            ?: ""
         storage.putString(StorageKeys.ACTIVE_PROFILE_NAME, name)
+        // 通知正在运行的 Service 刷新通知中的订阅名称
+        ProxyServiceBridge.requestNotificationRefresh()
     }
 
     fun getActive(): Subscription? {

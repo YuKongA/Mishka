@@ -44,6 +44,7 @@ import mishka.shared.generated.resources.settings_vpn_summary
 import org.jetbrains.compose.resources.stringResource
 import top.yukonga.mishka.platform.BootStartManager
 import top.yukonga.mishka.platform.PlatformStorage
+import top.yukonga.mishka.platform.ProxyServiceBridge
 import top.yukonga.mishka.platform.StorageKeys
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
@@ -178,6 +179,7 @@ fun SettingsScreen(
                         onCheckedChange = { checked ->
                             storage?.putString(StorageKeys.DYNAMIC_NOTIFICATION, if (checked) "true" else "false")
                             isDynamicNotificationEnabled = checked
+                            ProxyServiceBridge.requestNotificationRefresh()
                         },
                     )
                     if (bootStartManager != null) {

@@ -15,6 +15,7 @@ import top.yukonga.mishka.data.api.MihomoApiClient
 import top.yukonga.mishka.data.api.MihomoWebSocket
 import top.yukonga.mishka.platform.PlatformStorage
 import top.yukonga.mishka.platform.StorageKeys
+import top.yukonga.mishka.platform.TunMode
 import top.yukonga.mishka.util.FormatUtils
 
 /**
@@ -71,13 +72,14 @@ class DynamicNotificationManager(
     /**
      * 根据设置启动动态通知或显示静态通知。
      */
-    fun startOrFallbackStatic(storage: PlatformStorage, secret: String, externalController: String = "127.0.0.1:9090") {
+    fun startOrFallbackStatic(storage: PlatformStorage, secret: String, externalController: String = "127.0.0.1:9090", tunMode: TunMode = TunMode.Vpn) {
         val isDynamic = storage.getString(StorageKeys.DYNAMIC_NOTIFICATION, "true") == "true"
         if (isDynamic) {
             val profileName = storage.getString(StorageKeys.ACTIVE_PROFILE_NAME, "Mishka")
             start(secret, profileName, externalController)
         } else {
-            val notification = NotificationHelper.buildRunningNotification(context)
+            val mode = if (tunMode == TunMode.Root) "Root" else "VpnService"
+            val notification = NotificationHelper.buildRunningNotification(context, mode)
             context.getSystemService(NotificationManager::class.java)
                 ?.notify(NotificationHelper.NOTIFICATION_ID_VPN, notification)
         }

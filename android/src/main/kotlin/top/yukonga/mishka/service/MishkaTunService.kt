@@ -34,6 +34,7 @@ class MishkaTunService : VpnService() {
     private val dynamicNotification by lazy { DynamicNotificationManager(this, scope) }
     private var tunFd: Int = -1
     private var monitorJob: Job? = null
+    private var notificationRefreshJob: Job? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -42,6 +43,20 @@ class MishkaTunService : VpnService() {
             NotificationHelper.NOTIFICATION_ID_VPN,
             NotificationHelper.buildLoadingNotification(this),
         )
+        // 监听动态通知设置变化，实时切换通知样式
+        notificationRefreshJob = scope.launch {
+            ProxyServiceBridge.notificationRefresh.collect {
+                val state = ProxyServiceBridge.state.value
+                if (state.state == ProxyState.Running && state.tunMode == TunMode.Vpn) {
+                    dynamicNotification.stop()
+                    dynamicNotification.startOrFallbackStatic(
+                        PlatformStorage(this@MishkaTunService),
+                        state.secret,
+                        state.externalController,
+                    )
+                }
+            }
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -320,6 +335,7 @@ class MishkaTunService : VpnService() {
     }
 
     override fun onDestroy() {
+        notificationRefreshJob?.cancel()
         monitorJob?.cancel()
         dynamicNotification.stop()
         runner.stop()

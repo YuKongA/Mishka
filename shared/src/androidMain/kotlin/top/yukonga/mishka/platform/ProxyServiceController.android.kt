@@ -92,6 +92,17 @@ actual class ProxyServiceController(private val context: Context) {
             return
         }
 
+        // ROOT 模式：app 被杀后 mihomo 进程仍存活，重新打开时尝试重连
+        if (wasRunning && getTunMode() == TunMode.Root) {
+            val hasPid = storage.getString(StorageKeys.ROOT_MIHOMO_PID, "").isNotEmpty()
+            if (hasPid) {
+                val subscriptionId = storage.getString(StorageKeys.ACTIVE_PROFILE_UUID, "").ifEmpty { null }
+                start(subscriptionId)
+                return
+            }
+            storage.putString(StorageKeys.SERVICE_WAS_RUNNING, "false")
+        }
+
         if (wasRunning && getTunMode() == TunMode.Vpn) {
             storage.putString(StorageKeys.SERVICE_WAS_RUNNING, "false")
         }

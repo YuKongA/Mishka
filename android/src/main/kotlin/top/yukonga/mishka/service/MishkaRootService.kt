@@ -33,6 +33,7 @@ class MishkaRootService : Service() {
     private val runner by lazy { MihomoRunner(this) }
     private val dynamicNotification by lazy { DynamicNotificationManager(this, scope) }
     private var monitorJob: Job? = null
+    private var notificationRefreshJob: Job? = null
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -43,6 +44,21 @@ class MishkaRootService : Service() {
             NotificationHelper.NOTIFICATION_ID_VPN,
             NotificationHelper.buildLoadingNotification(this),
         )
+        // 监听动态通知设置变化，实时切换通知样式
+        notificationRefreshJob = scope.launch {
+            ProxyServiceBridge.notificationRefresh.collect {
+                val state = ProxyServiceBridge.state.value
+                if (state.state == ProxyState.Running && state.tunMode == TunMode.Root) {
+                    dynamicNotification.stop()
+                    dynamicNotification.startOrFallbackStatic(
+                        PlatformStorage(this@MishkaRootService),
+                        state.secret,
+                        state.externalController,
+                        TunMode.Root,
+                    )
+                }
+            }
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -76,7 +92,7 @@ class MishkaRootService : Service() {
                     val ec = OverrideStorageHelper.readNullableString(storage, OverrideStorageHelper.KEY_EXTERNAL_CONTROLLER) ?: "127.0.0.1:9090"
                     Log.i(TAG, "Reconnected to existing mihomo: pid=$existingPid")
                     ProxyServiceBridge.updateState(ProxyServiceStatus(ProxyState.Running, secret = existingSecret, externalController = ec, tunMode = TunMode.Root, startTime = existingStartTime))
-                    dynamicNotification.startOrFallbackStatic(storage, existingSecret, ec)
+                    dynamicNotification.startOrFallbackStatic(storage, existingSecret, ec, TunMode.Root)
                     storage.putString(StorageKeys.SERVICE_WAS_RUNNING, "true")
                     val workDir = if (subscriptionId != null) ProfileFileOps.getSubscriptionDir(this@MishkaRootService, subscriptionId) else ConfigGenerator.getWorkDir(this@MishkaRootService)
                     startProcessMonitor(workDir)
@@ -122,7 +138,7 @@ class MishkaRootService : Service() {
 
             // 7. 更新状态和通知
             ProxyServiceBridge.updateState(ProxyServiceStatus(ProxyState.Running, secret = runner.secret, externalController = result.externalController, tunMode = TunMode.Root, startTime = startTime))
-            dynamicNotification.startOrFallbackStatic(storage, runner.secret, result.externalController)
+            dynamicNotification.startOrFallbackStatic(storage, runner.secret, result.externalController, TunMode.Root)
             storage.putString(StorageKeys.SERVICE_WAS_RUNNING, "true")
             Log.i(TAG, "Proxy running (ROOT)")
 
@@ -200,6 +216,7 @@ class MishkaRootService : Service() {
     }
 
     override fun onDestroy() {
+        notificationRefreshJob?.cancel()
         monitorJob?.cancel()
         dynamicNotification.stop()
         // 注意：onDestroy 不 kill mihomo，让它继续运行以便重连
