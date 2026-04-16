@@ -112,12 +112,6 @@ val downloadGeoFiles = tasks.register<DownloadGeoFilesTask>("downloadGeoFiles") 
     outputDir.set(layout.projectDirectory.dir("src/main/assets"))
 }
 
-tasks.configureEach {
-    if (name.startsWith("assemble") || name.startsWith("merge") && name.contains("Assets")) {
-        dependsOn(downloadGeoFiles)
-    }
-}
-
 androidComponents {
     onVariants(selector().withBuildType("release")) {
         it.packaging.resources.excludes.add("**")
