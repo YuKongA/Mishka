@@ -179,7 +179,8 @@ class MihomoApiClient(
     fun getWebSocketUrl(path: String): String {
         val wsBase = baseUrl.replace("http://", "ws://").replace("https://", "wss://")
         return if (secret.isNotEmpty()) {
-            "$wsBase$path?token=$secret"
+            val separator = if ("?" in path) "&" else "?"
+            "$wsBase$path${separator}token=$secret"
         } else {
             "$wsBase$path"
         }

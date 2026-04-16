@@ -154,9 +154,14 @@ object ConfigGenerator {
                 // 分应用代理：通过 mihomo 的 include/exclude-package 实现
                 val proxyMode = storage.getString(StorageKeys.APP_PROXY_MODE, "AllowAll")
                 val packages = storage.getStringSet(StorageKeys.APP_PROXY_PACKAGES, emptySet())
-                if (proxyMode == "AllowSelected" && packages.isNotEmpty()) {
+                if (proxyMode == "AllowSelected") {
                     appendLine("  include-package:")
-                    packages.forEach { appendLine("    - $it") }
+                    if (packages.isNotEmpty()) {
+                        packages.forEach { appendLine("    - $it") }
+                    } else {
+                        // 空列表时用无效包名占位，确保不代理任何应用
+                        appendLine("    - \"-\"")
+                    }
                 } else if (proxyMode == "DenySelected" && packages.isNotEmpty()) {
                     appendLine("  exclude-package:")
                     packages.forEach { appendLine("    - $it") }
@@ -300,7 +305,7 @@ object ConfigGenerator {
         if (content.isEmpty()) return null
         for (line in content.lines()) {
             if (!line.startsWith(" ") && !line.startsWith("\t") && line.startsWith("$key:")) {
-                return line.substringAfter(":").trim().removeSurrounding("\"")
+                return line.substringAfter(":").trim().removeSurrounding("\"").ifEmpty { null }
             }
         }
         return null

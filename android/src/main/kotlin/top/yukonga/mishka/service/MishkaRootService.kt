@@ -7,17 +7,21 @@ import android.os.IBinder
 import android.util.Log
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.io.File
+import top.yukonga.mishka.R
 import top.yukonga.mishka.data.repository.OverrideStorageHelper
 import top.yukonga.mishka.platform.PlatformStorage
-import top.yukonga.mishka.platform.StorageKeys
 import top.yukonga.mishka.platform.ProxyServiceBridge
 import top.yukonga.mishka.platform.ProxyServiceStatus
 import top.yukonga.mishka.platform.ProxyState
+import top.yukonga.mishka.platform.StorageKeys
 import top.yukonga.mishka.platform.TunMode
-import top.yukonga.mishka.R
 
 /**
  * ROOT TUN 模式前台服务。
@@ -28,6 +32,7 @@ class MishkaRootService : Service() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val runner by lazy { MihomoRunner(this) }
     private val dynamicNotification by lazy { DynamicNotificationManager(this, scope) }
+    private var monitorJob: Job? = null
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -47,6 +52,10 @@ class MishkaRootService : Service() {
                 startProxy(subscriptionId)
             }
             ACTION_STOP -> stopProxy()
+            ACTION_RESTART -> {
+                val subscriptionId = intent.getStringExtra(EXTRA_SUBSCRIPTION_ID)
+                restartProxy(subscriptionId)
+            }
         }
         return START_STICKY
     }
@@ -69,6 +78,8 @@ class MishkaRootService : Service() {
                     ProxyServiceBridge.updateState(ProxyServiceStatus(ProxyState.Running, secret = existingSecret, externalController = ec, tunMode = TunMode.Root, startTime = existingStartTime))
                     dynamicNotification.startOrFallbackStatic(storage, existingSecret, ec)
                     storage.putString(StorageKeys.SERVICE_WAS_RUNNING, "true")
+                    val workDir = if (subscriptionId != null) ProfileFileOps.getSubscriptionDir(this@MishkaRootService, subscriptionId) else ConfigGenerator.getWorkDir(this@MishkaRootService)
+                    startProcessMonitor(workDir)
                     return@launch
                 }
                 Log.i(TAG, "Existing process pid=$existingPid no longer alive, restarting")
@@ -114,6 +125,34 @@ class MishkaRootService : Service() {
             dynamicNotification.startOrFallbackStatic(storage, runner.secret, result.externalController)
             storage.putString(StorageKeys.SERVICE_WAS_RUNNING, "true")
             Log.i(TAG, "Proxy running (ROOT)")
+
+            val workDir = if (subscriptionId != null) ProfileFileOps.getSubscriptionDir(this@MishkaRootService, subscriptionId) else ConfigGenerator.getWorkDir(this@MishkaRootService)
+            startProcessMonitor(workDir)
+        }
+    }
+
+    private fun startProcessMonitor(workDir: File) {
+        monitorJob?.cancel()
+        monitorJob = scope.launch(Dispatchers.IO) {
+            delay(10_000)
+            while (runner.isRunning) {
+                delay(5_000)
+            }
+            // ROOT 进程异常退出
+            val logContent = RootHelper.readLogFile(File(workDir, "mihomo.log").absolutePath)
+            val errorMsg = if (logContent.isNotBlank()) {
+                getString(R.string.error_mihomo_start_failed, logContent)
+            } else {
+                getString(R.string.error_mihomo_exited)
+            }
+            Log.e(TAG, "mihomo process died unexpectedly (ROOT): $errorMsg")
+            val storage = PlatformStorage(this@MishkaRootService)
+            clearPersistedState(storage)
+            storage.putString(StorageKeys.SERVICE_WAS_RUNNING, "false")
+            ProxyServiceBridge.updateState(ProxyServiceStatus(ProxyState.Error, errorMessage = errorMsg, tunMode = TunMode.Root))
+            dynamicNotification.stop()
+            stopForeground(STOP_FOREGROUND_REMOVE)
+            stopSelf()
         }
     }
 
@@ -129,22 +168,39 @@ class MishkaRootService : Service() {
         storage.putString(StorageKeys.ROOT_START_TIME, "")
     }
 
-    private fun stopProxy() {
-        Log.i(TAG, "Stopping proxy (ROOT)...")
+    private fun restartProxy(subscriptionId: String?) {
+        Log.i(TAG, "Restarting proxy (ROOT)...")
+        monitorJob?.cancel()
         ProxyServiceBridge.updateState(ProxyServiceStatus(ProxyState.Stopping, tunMode = TunMode.Root))
         dynamicNotification.stop()
         scope.launch(Dispatchers.IO) {
             runner.stop()
-            ProxyServiceBridge.updateState(ProxyServiceStatus(ProxyState.Stopped))
+            val storage = PlatformStorage(this@MishkaRootService)
+            clearPersistedState(storage)
+            withContext(Dispatchers.Main) {
+                startProxy(subscriptionId)
+            }
+        }
+    }
+
+    private fun stopProxy() {
+        Log.i(TAG, "Stopping proxy (ROOT)...")
+        monitorJob?.cancel()
+        ProxyServiceBridge.updateState(ProxyServiceStatus(ProxyState.Stopping, tunMode = TunMode.Root))
+        dynamicNotification.stop()
+        scope.launch(Dispatchers.IO) {
+            runner.stop()
             val storage = PlatformStorage(this@MishkaRootService)
             clearPersistedState(storage)
             storage.putString(StorageKeys.SERVICE_WAS_RUNNING, "false")
+            ProxyServiceBridge.updateState(ProxyServiceStatus(ProxyState.Stopped))
             stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf()
         }
     }
 
     override fun onDestroy() {
+        monitorJob?.cancel()
         dynamicNotification.stop()
         // 注意：onDestroy 不 kill mihomo，让它继续运行以便重连
         ProxyServiceBridge.updateState(ProxyServiceStatus(ProxyState.Stopped))
@@ -157,6 +213,7 @@ class MishkaRootService : Service() {
         private const val TAG = "MishkaRootService"
         const val ACTION_START = "top.yukonga.mishka.ROOT_START"
         const val ACTION_STOP = "top.yukonga.mishka.ROOT_STOP"
+        const val ACTION_RESTART = "top.yukonga.mishka.ROOT_RESTART"
         const val EXTRA_SUBSCRIPTION_ID = "subscription_id"
 
         fun start(context: Context, subscriptionId: String? = null) {

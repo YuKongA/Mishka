@@ -31,7 +31,7 @@ class MihomoWebSocket(
     ) { text -> json.decodeFromString<TrafficData>(text) }
 
     fun logsFlow(level: String = "info"): Flow<LogMessage> = webSocketFlow(
-        apiClient.getWebSocketUrl("/logs") + "&level=$level",
+        apiClient.getWebSocketUrl("/logs?level=$level"),
     ) { text -> json.decodeFromString<LogMessage>(text) }
 
     fun memoryFlow(): Flow<MemoryData> = webSocketFlow(

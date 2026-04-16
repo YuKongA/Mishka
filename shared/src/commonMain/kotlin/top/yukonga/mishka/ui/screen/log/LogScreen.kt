@@ -17,6 +17,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -65,12 +66,18 @@ fun LogScreen(
     bottomPadding: Dp = 0.dp,
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val logs by viewModel.logs.collectAsState()
     val scrollBehavior = MiuixScrollBehavior()
     val listState = rememberLazyListState()
 
-    LaunchedEffect(uiState.logs.size) {
-        if (uiState.logs.isNotEmpty()) {
-            listState.animateScrollToItem(uiState.logs.lastIndex)
+    DisposableEffect(Unit) {
+        viewModel.connect()
+        onDispose { viewModel.disconnect() }
+    }
+
+    LaunchedEffect(logs.size) {
+        if (logs.isNotEmpty()) {
+            listState.animateScrollToItem(logs.lastIndex)
         }
     }
 
@@ -117,7 +124,7 @@ fun LogScreen(
             ),
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            if (uiState.logs.isEmpty()) {
+            if (logs.isEmpty()) {
                 item(key = "empty") {
                     Column(
                         modifier = Modifier.fillParentMaxSize(),
@@ -133,8 +140,8 @@ fun LogScreen(
                 }
             }
 
-            items(uiState.logs, key = null) { log ->
-                LogCard(log)
+            items(logs.size, key = { it }) { index ->
+                LogCard(logs[index])
             }
 
             item(key = "bottom_spacer") {

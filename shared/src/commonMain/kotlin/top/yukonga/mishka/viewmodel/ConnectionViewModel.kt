@@ -30,7 +30,13 @@ class ConnectionViewModel : ViewModel() {
 
     fun setRepository(repo: MihomoRepository?) {
         repository = repo
-        if (repo != null) startConnectionCollection()
+        if (repo != null) {
+            startConnectionCollection()
+        } else {
+            connectionJob?.cancel()
+            connectionJob = null
+            _uiState.value = ConnectionUiState()
+        }
     }
 
     private fun startConnectionCollection() {

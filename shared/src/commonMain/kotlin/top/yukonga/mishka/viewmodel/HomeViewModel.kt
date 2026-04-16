@@ -74,7 +74,7 @@ class HomeViewModel(
             serviceController.status.collect { status ->
                 when (status.state) {
                     ProxyState.Starting -> {
-                        _uiState.value = _uiState.value.copy(isStarting = true)
+                        _uiState.value = _uiState.value.copy(isStarting = true, isStopping = false)
                     }
                     ProxyState.Running -> {
                         _uiState.value = _uiState.value.copy(isStarting = false, isRunning = true)
@@ -204,11 +204,7 @@ class HomeViewModel(
     }
 
     fun restartProxy() {
-        viewModelScope.launch {
-            serviceController.stop()
-            delay(500)
-            serviceController.start(getActiveSubscriptionId())
-        }
+        serviceController.restart(getActiveSubscriptionId())
     }
 
     fun switchMode(mode: String) {

@@ -93,6 +93,7 @@ class MainActivity : ComponentActivity() {
         appProxyViewModel = AppProxyViewModel(
             storage = storage,
             appListProvider = AppListProvider(this),
+            serviceController = serviceController,
         )
 
         val fileManager = AndroidProfileFileManager(this)

@@ -245,7 +245,11 @@ class SubscriptionViewModel(
         yield()
         val workDir = fileManager.getDir(subscription.id)
         fileManager.ensureGeodataAvailable(workDir)
-        val error = fileManager.validate(workDir)
+        val error = fileManager.validate(workDir) { provider ->
+            _uiState.value = _uiState.value.copy(
+                importProgress = ImportProgress("$provider")
+            )
+        }
         if (error == null) {
             fileManager.collectGeodata(workDir)
         }
@@ -276,7 +280,11 @@ class SubscriptionViewModel(
         yield()
         val workDir = fileManager.getDir(subscription.id)
         fileManager.ensureGeodataAvailable(workDir)
-        val error = fileManager.validate(workDir)
+        val error = fileManager.validate(workDir) { provider ->
+            _uiState.value = _uiState.value.copy(
+                importProgress = ImportProgress(provider)
+            )
+        }
         if (error == null) {
             fileManager.collectGeodata(workDir)
         }

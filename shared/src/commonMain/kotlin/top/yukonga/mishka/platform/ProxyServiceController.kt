@@ -25,6 +25,7 @@ expect class ProxyServiceController {
     val status: StateFlow<ProxyServiceStatus>
     fun start(subscriptionId: String? = null)
     fun stop()
+    fun restart(subscriptionId: String? = null)
     fun requestVpnPermission()
     fun hasVpnPermission(): Boolean
     fun hasRootPermission(): Boolean

@@ -17,6 +17,10 @@ actual class ProxyServiceController {
         // Desktop: TODO
     }
 
+    actual fun restart(subscriptionId: String?) {
+        // Desktop: TODO
+    }
+
     actual fun requestVpnPermission() {
         // Desktop: 不需要 VPN 权限
     }

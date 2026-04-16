@@ -1,38 +1,39 @@
 package top.yukonga.mishka.service
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
 import android.net.VpnService
-import android.os.Binder
-import android.os.IBinder
+import android.os.ParcelFileDescriptor
+import android.system.Os
+import android.system.OsConstants
 import android.util.Log
-import top.yukonga.mishka.R
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import top.yukonga.mishka.R
 import top.yukonga.mishka.platform.PlatformStorage
-import top.yukonga.mishka.platform.StorageKeys
 import top.yukonga.mishka.platform.ProxyServiceBridge
 import top.yukonga.mishka.platform.ProxyServiceStatus
 import top.yukonga.mishka.platform.ProxyState
+import top.yukonga.mishka.platform.StorageKeys
 import top.yukonga.mishka.platform.TunMode
+import java.io.File
+import java.io.FileDescriptor
 
+@SuppressLint("VpnServicePolicy")
 class MishkaTunService : VpnService() {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val runner by lazy { MihomoRunner(this) }
     private val dynamicNotification by lazy { DynamicNotificationManager(this, scope) }
     private var tunFd: Int = -1
-
-    inner class LocalBinder : Binder() {
-        val service: MishkaTunService get() = this@MishkaTunService
-    }
-
-    private val binder = LocalBinder()
-
-    override fun onBind(intent: Intent?): IBinder = binder
+    private var monitorJob: Job? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -50,14 +51,24 @@ class MishkaTunService : VpnService() {
                 startProxy(subscriptionId)
             }
             ACTION_STOP -> stopProxy()
+            ACTION_RESTART -> {
+                val subscriptionId = intent.getStringExtra(EXTRA_SUBSCRIPTION_ID)
+                restartProxy(subscriptionId)
+            }
         }
         return START_STICKY
     }
 
+    @SuppressLint("NewApi")
     private fun startProxy(subscriptionId: String? = null) {
         scope.launch {
             Log.i(TAG, "Starting proxy, subscription: $subscriptionId")
             ProxyServiceBridge.updateState(ProxyServiceStatus(ProxyState.Starting, tunMode = TunMode.Vpn))
+
+            // 清理可能残留的 VPN 模式 mihomo 进程（防止端口冲突）
+            if (runner.isRunning) {
+                runner.stop()
+            }
 
             // 清理可能残留的 root mihomo 进程（防止端口冲突）
             // 仅在曾使用过 ROOT 模式时才调用 su，避免无 root 设备触发授权弹窗
@@ -189,11 +200,11 @@ class MishkaTunService : VpnService() {
             // 清除 O_CLOEXEC 标志，使 fd 能被子进程（mihomo）继承
             // Android 默认给 fd 设置 O_CLOEXEC，fork+exec 时会关闭，导致 mihomo 拿不到 fd
             try {
-                val pfd = android.os.ParcelFileDescriptor.adoptFd(fd)
-                val flags = android.system.Os.fcntlInt(pfd.fileDescriptor, android.system.OsConstants.F_GETFD, 0)
+                val pfd = ParcelFileDescriptor.adoptFd(fd)
+                val flags = Os.fcntlInt(pfd.fileDescriptor, OsConstants.F_GETFD, 0)
                 Log.i(TAG, "fd=$fd flags before: $flags")
-                android.system.Os.fcntlInt(pfd.fileDescriptor, android.system.OsConstants.F_SETFD, flags and android.system.OsConstants.FD_CLOEXEC.inv())
-                val flagsAfter = android.system.Os.fcntlInt(pfd.fileDescriptor, android.system.OsConstants.F_GETFD, 0)
+                Os.fcntlInt(pfd.fileDescriptor, OsConstants.F_SETFD, flags and OsConstants.FD_CLOEXEC.inv())
+                val flagsAfter = Os.fcntlInt(pfd.fileDescriptor, OsConstants.F_GETFD, 0)
                 Log.i(TAG, "fd=$fd flags after: $flagsAfter")
                 pfd.detachFd() // 释放所有权，防止 GC 关闭 fd
             } catch (e: Exception) {
@@ -225,31 +236,81 @@ class MishkaTunService : VpnService() {
             // 记录运行状态，用于开机自启判断
             PlatformStorage(this@MishkaTunService).putString(StorageKeys.SERVICE_WAS_RUNNING, "true")
             Log.i(TAG, "Proxy running, fd=$fd")
+
+            // 5. 启动进程存活监测
+            val monitorWorkDir = if (subscriptionId != null) {
+                ProfileFileOps.getSubscriptionDir(this@MishkaTunService, subscriptionId)
+            } else {
+                ConfigGenerator.getWorkDir(this@MishkaTunService)
+            }
+            startProcessMonitor(monitorWorkDir)
         }
     }
 
-    private fun stopProxy() {
-        Log.i(TAG, "Stopping proxy...")
-        ProxyServiceBridge.updateState(ProxyServiceStatus(ProxyState.Stopping, tunMode = TunMode.Vpn))
-        dynamicNotification.stop()
-        scope.launch(Dispatchers.IO) {
-            runner.stop()
+    @SuppressLint("StringFormatInvalid")
+    private fun startProcessMonitor(workDir: File) {
+        monitorJob?.cancel()
+        monitorJob = scope.launch(Dispatchers.IO) {
+            // 等待一段时间再开始监测，避免与 waitForReady 重叠
+            delay(10_000)
+            while (runner.isRunning) {
+                delay(5_000)
+            }
+            // 进程异常退出
+            val logFile = File(workDir, "mihomo.log")
+            val logContent = if (logFile.exists()) logFile.readText().trim().lines().takeLast(10).joinToString("\n") else ""
+            val errorMsg = if (logContent.isNotBlank()) {
+                getString(R.string.error_mihomo_start_failed, logContent)
+            } else {
+                getString(R.string.error_mihomo_exited)
+            }
+            Log.e(TAG, "mihomo process died unexpectedly: $errorMsg")
+            ProxyServiceBridge.updateState(ProxyServiceStatus(ProxyState.Error, errorMessage = errorMsg))
             closeTunFd()
-            ProxyServiceBridge.updateState(ProxyServiceStatus(ProxyState.Stopped))
             PlatformStorage(this@MishkaTunService).putString(StorageKeys.SERVICE_WAS_RUNNING, "false")
             stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf()
         }
     }
 
+    private fun restartProxy(subscriptionId: String?) {
+        Log.i(TAG, "Restarting proxy...")
+        monitorJob?.cancel()
+        ProxyServiceBridge.updateState(ProxyServiceStatus(ProxyState.Stopping, tunMode = TunMode.Vpn))
+        dynamicNotification.stop()
+        scope.launch(Dispatchers.IO) {
+            runner.stop()
+            closeTunFd()
+            withContext(Dispatchers.Main) {
+                startProxy(subscriptionId)
+            }
+        }
+    }
+
+    private fun stopProxy() {
+        Log.i(TAG, "Stopping proxy...")
+        monitorJob?.cancel()
+        ProxyServiceBridge.updateState(ProxyServiceStatus(ProxyState.Stopping, tunMode = TunMode.Vpn))
+        dynamicNotification.stop()
+        scope.launch(Dispatchers.IO) {
+            runner.stop()
+            closeTunFd()
+            PlatformStorage(this@MishkaTunService).putString(StorageKeys.SERVICE_WAS_RUNNING, "false")
+            ProxyServiceBridge.updateState(ProxyServiceStatus(ProxyState.Stopped))
+            stopForeground(STOP_FOREGROUND_REMOVE)
+            stopSelf()
+        }
+    }
+
+    @SuppressLint("DiscouragedPrivateApi")
     private fun closeTunFd() {
         if (tunFd >= 0) {
             try {
-                val fileDescriptor = java.io.FileDescriptor()
-                val field = java.io.FileDescriptor::class.java.getDeclaredField("descriptor")
+                val fileDescriptor = FileDescriptor()
+                val field = FileDescriptor::class.java.getDeclaredField("descriptor")
                 field.isAccessible = true
                 field.setInt(fileDescriptor, tunFd)
-                android.system.Os.close(fileDescriptor)
+                Os.close(fileDescriptor)
                 Log.i(TAG, "Closed tun fd=$tunFd")
             } catch (e: Exception) {
                 Log.w(TAG, "Failed to close tun fd=$tunFd: $e")
@@ -259,9 +320,11 @@ class MishkaTunService : VpnService() {
     }
 
     override fun onDestroy() {
+        monitorJob?.cancel()
         dynamicNotification.stop()
         runner.stop()
         closeTunFd()
+        PlatformStorage(this).putString(StorageKeys.SERVICE_WAS_RUNNING, "false")
         ProxyServiceBridge.updateState(ProxyServiceStatus(ProxyState.Stopped))
         scope.cancel()
         Log.i(TAG, "MishkaTunService destroyed")
@@ -270,13 +333,24 @@ class MishkaTunService : VpnService() {
 
     override fun onRevoke() {
         Log.i(TAG, "VPN revoked by system")
-        stopProxy()
+        monitorJob?.cancel()
+        ProxyServiceBridge.updateState(ProxyServiceStatus(ProxyState.Stopping, tunMode = TunMode.Vpn))
+        dynamicNotification.stop()
+        PlatformStorage(this).putString(StorageKeys.SERVICE_WAS_RUNNING, "false")
+        scope.launch(Dispatchers.IO) {
+            runner.stop()
+            closeTunFd()
+            ProxyServiceBridge.updateState(ProxyServiceStatus(ProxyState.Stopped))
+            stopForeground(STOP_FOREGROUND_REMOVE)
+            stopSelf()
+        }
     }
 
     companion object {
         private const val TAG = "MishkaTunService"
         const val ACTION_START = "top.yukonga.mishka.START"
         const val ACTION_STOP = "top.yukonga.mishka.STOP"
+        const val ACTION_RESTART = "top.yukonga.mishka.RESTART"
         const val EXTRA_SUBSCRIPTION_ID = "subscription_id"
 
         private const val TUN_MTU = 9000

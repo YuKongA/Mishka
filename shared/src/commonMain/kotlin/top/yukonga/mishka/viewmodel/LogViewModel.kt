@@ -7,12 +7,12 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import top.yukonga.mishka.data.model.LogMessage
 import top.yukonga.mishka.data.repository.MihomoRepository
 
 data class LogUiState(
-    val logs: List<LogMessage> = emptyList(),
     val isConnected: Boolean = false,
     val level: String = "info",
 )
@@ -22,12 +22,29 @@ class LogViewModel : ViewModel() {
     private val _uiState = MutableStateFlow(LogUiState())
     val uiState: StateFlow<LogUiState> = _uiState.asStateFlow()
 
+    private val _logs = MutableStateFlow<List<LogMessage>>(emptyList())
+    val logs: StateFlow<List<LogMessage>> = _logs.asStateFlow()
+
     private var repository: MihomoRepository? = null
     private var logJob: Job? = null
 
     fun setRepository(repo: MihomoRepository?) {
+        if (repo == null) {
+            disconnect()
+            _logs.value = emptyList()
+        }
         repository = repo
-        if (repo != null) startLogCollection()
+    }
+
+    fun connect() {
+        if (logJob?.isActive == true) return
+        startLogCollection()
+    }
+
+    fun disconnect() {
+        logJob?.cancel()
+        logJob = null
+        _uiState.value = _uiState.value.copy(isConnected = false)
     }
 
     private fun startLogCollection() {
@@ -41,21 +58,19 @@ class LogViewModel : ViewModel() {
                     _uiState.value = _uiState.value.copy(isConnected = false)
                 }
                 .collect { log ->
-                    val current = _uiState.value.logs
-                    // 保持最近 500 条
-                    val updated = (current + log).takeLast(500)
-                    _uiState.value = _uiState.value.copy(logs = updated)
+                    _logs.update { (it + log).takeLast(500) }
                 }
         }
     }
 
     fun setLevel(level: String) {
-        _uiState.value = _uiState.value.copy(level = level, logs = emptyList())
+        _uiState.value = _uiState.value.copy(level = level)
+        _logs.value = emptyList()
         startLogCollection()
     }
 
     fun clearLogs() {
-        _uiState.value = _uiState.value.copy(logs = emptyList())
+        _logs.value = emptyList()
     }
 
     override fun onCleared() {

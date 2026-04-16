@@ -4,6 +4,8 @@
 #include <string.h>
 #include <errno.h>
 #include <signal.h>
+#include <fcntl.h>
+#include <sys/stat.h>
 #include <sys/wait.h>
 #include <android/log.h>
 
@@ -20,36 +22,54 @@
  */
 JNIEXPORT jint JNICALL
 Java_top_yukonga_mishka_service_ProcessHelper_nativeForkExec(
-        JNIEnv *env, jclass clazz,
-        jstring jBinary, jobjectArray jArgs, jstring jWorkDir) {
+    JNIEnv *env, jclass clazz,
+    jstring jBinary, jobjectArray jArgs, jstring jWorkDir, jstring jLogFile)
+{
 
     const char *binary = (*env)->GetStringUTFChars(env, jBinary, NULL);
     const char *workDir = (*env)->GetStringUTFChars(env, jWorkDir, NULL);
+    const char *logFile = jLogFile ? (*env)->GetStringUTFChars(env, jLogFile, NULL) : NULL;
 
     int argc = (*env)->GetArrayLength(env, jArgs);
     // argv: [binary, args..., NULL]
-    char **argv = (char **) calloc(argc + 2, sizeof(char *));
+    char **argv = (char **)calloc(argc + 2, sizeof(char *));
     argv[0] = strdup(binary);
-    for (int i = 0; i < argc; i++) {
-        jstring jArg = (jstring) (*env)->GetObjectArrayElement(env, jArgs, i);
+    for (int i = 0; i < argc; i++)
+    {
+        jstring jArg = (jstring)(*env)->GetObjectArrayElement(env, jArgs, i);
         const char *arg = (*env)->GetStringUTFChars(env, jArg, NULL);
         argv[i + 1] = strdup(arg);
         (*env)->ReleaseStringUTFChars(env, jArg, arg);
     }
     argv[argc + 1] = NULL;
 
-    LOGI("fork+exec: %s, workDir=%s", binary, workDir);
+    LOGI("fork+exec: %s, workDir=%s, logFile=%s", binary, workDir, logFile ? logFile : "(null)");
 
     pid_t pid = fork();
 
-    if (pid == 0) {
+    if (pid == 0)
+    {
         // 子进程：不关闭任何 fd，直接 exec
-        if (chdir(workDir) != 0) {
+        if (chdir(workDir) != 0)
+        {
             LOGE("chdir failed: %s", strerror(errno));
         }
 
-        // 重定向 stdout/stderr 合并
-        dup2(STDERR_FILENO, STDOUT_FILENO);
+        // 重定向 stdout/stderr 到日志文件（或合并到 stderr）
+        if (logFile)
+        {
+            int logFd = open(logFile, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+            if (logFd >= 0)
+            {
+                dup2(logFd, STDOUT_FILENO);
+                dup2(logFd, STDERR_FILENO);
+                close(logFd);
+            }
+        }
+        else
+        {
+            dup2(STDERR_FILENO, STDOUT_FILENO);
+        }
 
         execv(binary, argv);
         // exec 失败
@@ -59,18 +79,24 @@ Java_top_yukonga_mishka_service_ProcessHelper_nativeForkExec(
 
     // 父进程：清理
     int result = (pid > 0) ? pid : -1;
-    if (pid < 0) {
+    if (pid < 0)
+    {
         LOGE("fork failed: %s", strerror(errno));
-    } else {
+    }
+    else
+    {
         LOGI("child pid=%d", pid);
     }
 
-    for (int i = 0; argv[i] != NULL; i++) {
+    for (int i = 0; argv[i] != NULL; i++)
+    {
         free(argv[i]);
     }
     free(argv);
     (*env)->ReleaseStringUTFChars(env, jBinary, binary);
     (*env)->ReleaseStringUTFChars(env, jWorkDir, workDir);
+    if (logFile)
+        (*env)->ReleaseStringUTFChars(env, jLogFile, logFile);
 
     return result;
 }
@@ -80,8 +106,10 @@ Java_top_yukonga_mishka_service_ProcessHelper_nativeForkExec(
  */
 JNIEXPORT void JNICALL
 Java_top_yukonga_mishka_service_ProcessHelper_nativeKill(
-        JNIEnv *env, jclass clazz, jint pid) {
-    if (pid > 0) {
+    JNIEnv *env, jclass clazz, jint pid)
+{
+    if (pid > 0)
+    {
         LOGI("killing pid=%d", pid);
         kill(pid, SIGTERM);
     }
@@ -92,7 +120,8 @@ Java_top_yukonga_mishka_service_ProcessHelper_nativeKill(
  */
 JNIEXPORT jint JNICALL
 Java_top_yukonga_mishka_service_ProcessHelper_nativeWaitpid(
-        JNIEnv *env, jclass clazz, jint pid) {
+    JNIEnv *env, jclass clazz, jint pid)
+{
     int status = 0;
     waitpid(pid, &status, 0);
     return WIFEXITED(status) ? WEXITSTATUS(status) : -1;

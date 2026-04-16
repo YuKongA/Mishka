@@ -5,6 +5,7 @@ import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.util.concurrent.TimeUnit
 
 /**
  * 使用 mihomo -t 进行完整配置校验。
@@ -22,18 +23,20 @@ object MihomoValidator {
      * @param workDir 工作目录（包含 config.yaml 和 providers/）
      * @return null 表示校验通过，否则返回错误信息
      */
-    suspend fun validate(context: Context, workDir: String): String? = withContext(Dispatchers.IO) {
+    suspend fun validate(
+        context: Context, workDir: String, onProgress: ((String) -> Unit)? = null
+    ): String? = withContext(Dispatchers.IO) {
         val binary = getMihomoBinary(context)
         if (binary == null) {
             Log.e(TAG, "mihomo binary not found")
-            return@withContext "mihomo 二进制文件未找到"
+            return@withContext "mihomo binary not found"
         }
 
         binary.setExecutable(true)
 
         val configFile = File(workDir, "config.yaml")
         if (!configFile.exists()) {
-            return@withContext "配置文件不存在: ${configFile.absolutePath}"
+            return@withContext "Configuration file does not exist: ${configFile.absolutePath}"
         }
 
         try {
@@ -47,13 +50,22 @@ object MihomoValidator {
                 .redirectErrorStream(true)
                 .start()
 
-            val output = process.inputStream.bufferedReader().use { it.readText() }
+            val outputBuilder = StringBuilder()
+            process.inputStream.bufferedReader().useLines { lines ->
+                for (line in lines) {
+                    outputBuilder.appendLine(line)
+                    if (onProgress != null) {
+                        parseProgressLine(line)?.let { onProgress(it) }
+                    }
+                }
+            }
+            val output = outputBuilder.toString()
 
-            val exited = process.waitFor(TIMEOUT_MS, java.util.concurrent.TimeUnit.MILLISECONDS)
+            val exited = process.waitFor(TIMEOUT_MS, TimeUnit.MILLISECONDS)
             if (!exited) {
                 process.destroyForcibly()
                 Log.e(TAG, "mihomo -t timed out")
-                return@withContext "配置校验超时"
+                return@withContext "mihomo -t timed out"
             }
 
             val exitCode = process.exitValue()
@@ -66,7 +78,7 @@ object MihomoValidator {
             }
         } catch (e: Exception) {
             Log.e(TAG, "mihomo -t failed", e)
-            "配置校验失败: ${e.message}"
+            "mihomo -t failed: ${e.message}"
         }
     }
 
@@ -79,7 +91,7 @@ object MihomoValidator {
         if (output.contains("can't download MMDB") || output.contains("can't download GeoIP") ||
             output.contains("context deadline exceeded") && output.contains("GeoIP")
         ) {
-            return "GeoIP 数据下载超时，请检查网络后重试"
+            return "can't download GeoIP"
         }
 
         // 查找 level=error 或 level=fatal 的行
@@ -94,17 +106,30 @@ object MihomoValidator {
                 msgRegex.find(line)?.groupValues?.get(1)
             }
             if (messages.isNotEmpty()) {
-                return "配置无效: ${messages.joinToString("; ")}"
+                return "Invalid configuration: ${messages.joinToString("; ")}"
             }
         }
 
         // 如果没有标准格式的错误信息，返回最后几行
         val lastLines = output.lines().filter { it.isNotBlank() }.takeLast(3)
         return if (lastLines.isNotEmpty()) {
-            "配置无效: ${lastLines.joinToString(" ")}"
+            "Invalid configuration: ${lastLines.joinToString(" ")}"
         } else {
-            "配置校验失败（未知错误）"
+            "Configuration verification failed (unknown error)"
         }
+    }
+
+    private val providerRegex = Regex("""msg=".*?(?:provider|Provider)\s+(.+?)[\s"]""")
+
+    /**
+     * 从 mihomo 日志行中提取进度信息。
+     * 例如: time="..." level=info msg="Start initial provider xxx"
+     */
+    private fun parseProgressLine(line: String): String? {
+        if (line.contains("level=error") || line.contains("level=fatal")) return null
+        val match = providerRegex.find(line)
+        if (match != null) return match.groupValues[1]
+        return null
     }
 
     private fun getMihomoBinary(context: Context): File? {

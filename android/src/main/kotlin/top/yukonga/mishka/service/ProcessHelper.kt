@@ -12,9 +12,10 @@ object ProcessHelper {
 
     /**
      * fork+exec 启动进程，子进程继承所有 fd。
+     * @param logFile 日志文件路径，子进程的 stdout/stderr 将重定向到此文件；null 则不捕获
      * @return 子进程 PID，失败返回 -1
      */
-    external fun nativeForkExec(binary: String, args: Array<String>, workDir: String): Int
+    external fun nativeForkExec(binary: String, args: Array<String>, workDir: String, logFile: String? = null): Int
 
     /** 发送 SIGTERM */
     external fun nativeKill(pid: Int)

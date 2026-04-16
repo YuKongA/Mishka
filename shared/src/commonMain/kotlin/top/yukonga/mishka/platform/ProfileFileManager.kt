@@ -11,7 +11,7 @@ interface ProfileFileManager {
     fun releasePending(uuid: String)
     fun deleteDirs(uuid: String)
     fun cloneFiles(sourceUuid: String, targetUuid: String)
-    suspend fun validate(workDir: String): String?
+    suspend fun validate(workDir: String, onProgress: ((String) -> Unit)? = null): String?
     fun ensureGeodataAvailable(workDir: String)
     fun collectGeodata(workDir: String)
 }

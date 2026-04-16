@@ -9,6 +9,9 @@ import kotlinx.coroutines.launch
 import top.yukonga.mishka.platform.AppInfo
 import top.yukonga.mishka.platform.AppListProvider
 import top.yukonga.mishka.platform.PlatformStorage
+import top.yukonga.mishka.platform.ProxyServiceBridge
+import top.yukonga.mishka.platform.ProxyServiceController
+import top.yukonga.mishka.platform.ProxyState
 import top.yukonga.mishka.platform.StorageKeys
 
 enum class AppProxyMode { AllowAll, AllowSelected, DenySelected }
@@ -25,10 +28,15 @@ data class AppProxyUiState(
 class AppProxyViewModel(
     private val storage: PlatformStorage,
     private val appListProvider: AppListProvider,
+    private val serviceController: ProxyServiceController? = null,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(AppProxyUiState())
     val uiState: StateFlow<AppProxyUiState> = _uiState.asStateFlow()
+
+    // 进入页面时的快照，用于检测配置是否变更
+    private var initialMode: AppProxyMode = AppProxyMode.AllowAll
+    private var initialPackages: Set<String> = emptySet()
 
     init {
         loadSavedState()
@@ -40,6 +48,9 @@ class AppProxyViewModel(
         val mode = try { AppProxyMode.valueOf(modeStr) } catch (_: Exception) { AppProxyMode.AllowAll }
 
         val packages = storage.getStringSet(StorageKeys.APP_PROXY_PACKAGES, emptySet())
+
+        initialMode = mode
+        initialPackages = packages
 
         _uiState.value = _uiState.value.copy(mode = mode, selectedPackages = packages)
     }
@@ -93,8 +104,9 @@ class AppProxyViewModel(
 
     fun invertSelection() {
         val current = _uiState.value.selectedPackages
-        val all = _uiState.value.apps.map { it.packageName }.toSet()
-        val inverted = all - current
+        val visible = filteredApps().map { it.packageName }.toSet()
+        // 保留不可见的已选项，对可见项取反
+        val inverted = (current - visible) + (visible - current)
         _uiState.value = _uiState.value.copy(selectedPackages = inverted)
         savePackages(inverted)
     }
@@ -124,5 +136,21 @@ class AppProxyViewModel(
 
     private fun savePackages(packages: Set<String>) {
         storage.putStringSet(StorageKeys.APP_PROXY_PACKAGES, packages)
+    }
+
+    /** 配置变更时，若代理运行中则自动重启服务 */
+    fun applyIfChanged() {
+        val state = _uiState.value
+        val changed = state.mode != initialMode || state.selectedPackages != initialPackages
+        if (!changed) return
+
+        val proxyState = ProxyServiceBridge.state.value.state
+        if (proxyState == ProxyState.Running || proxyState == ProxyState.Starting) {
+            serviceController?.restart()
+        }
+
+        // 更新快照
+        initialMode = state.mode
+        initialPackages = state.selectedPackages
     }
 }

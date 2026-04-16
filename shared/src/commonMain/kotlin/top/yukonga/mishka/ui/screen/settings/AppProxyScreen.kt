@@ -25,7 +25,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
@@ -55,7 +54,6 @@ import mishka.shared.generated.resources.app_proxy_import
 import mishka.shared.generated.resources.app_proxy_invert
 import mishka.shared.generated.resources.app_proxy_mode
 import mishka.shared.generated.resources.app_proxy_no_match
-import mishka.shared.generated.resources.app_proxy_running_hint
 import mishka.shared.generated.resources.app_proxy_search
 import mishka.shared.generated.resources.app_proxy_select_all
 import mishka.shared.generated.resources.app_proxy_show_system
@@ -64,8 +62,6 @@ import mishka.shared.generated.resources.common_back
 import mishka.shared.generated.resources.common_more
 import org.jetbrains.compose.resources.stringResource
 import top.yukonga.mishka.platform.AppIcon
-import top.yukonga.mishka.platform.ProxyServiceBridge
-import top.yukonga.mishka.platform.ProxyState
 import top.yukonga.mishka.ui.component.ListPopupDefaults.MenuPositionProvider
 import top.yukonga.mishka.ui.component.SearchBarFake
 import top.yukonga.mishka.ui.component.SearchBox
@@ -105,8 +101,6 @@ fun AppProxyScreen(
     bottomPadding: Dp = 0.dp,
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    val proxyState by ProxyServiceBridge.state.collectAsState()
-    val isProxyRunning = proxyState.state == ProxyState.Running || proxyState.state == ProxyState.Starting
     val scrollBehavior = MiuixScrollBehavior()
     val showPopup = remember { mutableStateOf(false) }
     val density = LocalDensity.current
@@ -147,7 +141,10 @@ fun AppProxyScreen(
                     title = stringResource(Res.string.app_proxy_title),
                     scrollBehavior = scrollBehavior,
                     navigationIcon = {
-                        IconButton(onClick = onBack) {
+                        IconButton(onClick = {
+                            viewModel.applyIfChanged()
+                            onBack()
+                        }) {
                             val layoutDirection = LocalLayoutDirection.current
                             Icon(
                                 imageVector = MiuixIcons.Back,
@@ -354,24 +351,6 @@ fun AppProxyScreen(
                     bottom = bottomPadding,
                 ),
             ) {
-                // 运行中提示
-                if (isProxyRunning) {
-                    item(key = "running_hint") {
-                        Card(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 12.dp, vertical = 6.dp),
-                            insideMargin = PaddingValues(16.dp),
-                        ) {
-                            Text(
-                                text = stringResource(Res.string.app_proxy_running_hint),
-                                fontSize = 13.sp,
-                                color = Color(0xFFFFA726),
-                            )
-                        }
-                    }
-                }
-
                 // 代理模式
                 item(key = "mode_title") { SmallTitle(text = stringResource(Res.string.app_proxy_mode)) }
                 item(key = "mode_card") {

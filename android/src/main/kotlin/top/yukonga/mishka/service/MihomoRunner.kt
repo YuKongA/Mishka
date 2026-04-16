@@ -64,15 +64,16 @@ class MihomoRunner(private val context: Context) {
                 "-d", workDir.absolutePath,
                 "-f", configFile.absolutePath,
             )
+            val logFile = File(workDir, "mihomo.log")
 
             if (useRoot) {
-                val logFile = File(workDir, "mihomo.log").absolutePath
-                childPid = RootHelper.startAsRoot(binary.absolutePath, args, workDir.absolutePath, logFile)
+                childPid = RootHelper.startAsRoot(binary.absolutePath, args, workDir.absolutePath, logFile.absolutePath)
             } else {
                 childPid = ProcessHelper.nativeForkExec(
                     binary.absolutePath,
                     args,
                     workDir.absolutePath,
+                    logFile.absolutePath,
                 )
             }
 
@@ -89,7 +90,7 @@ class MihomoRunner(private val context: Context) {
             if (result != null) {
                 errorMessage = result
                 Log.e(TAG, errorMessage)
-                childPid = -1
+                stop() // kill 子进程 + waitpid 回收，防止孤儿进程占用端口
                 return@withContext false
             }
 
@@ -134,15 +135,10 @@ class MihomoRunner(private val context: Context) {
             // 进程退出则快速失败
             val alive = if (useRoot) RootHelper.isAliveAsRoot(childPid) else isProcessAlive(childPid)
             if (!alive) {
-                return if (useRoot) {
-                    val logFile = File(workDir, "mihomo.log").absolutePath
-                    val logContent = RootHelper.readLogFile(logFile)
-                    if (logContent.isNotBlank()) {
-                        Log.e(TAG, "mihomo log:\n$logContent")
-                        context.getString(R.string.error_mihomo_start_failed, logContent)
-                    } else {
-                        context.getString(R.string.error_mihomo_exited)
-                    }
+                val logContent = readStartupLog(useRoot, workDir)
+                return if (logContent.isNotBlank()) {
+                    Log.e(TAG, "mihomo log:\n$logContent")
+                    context.getString(R.string.error_mihomo_start_failed, extractErrorMessage(logContent))
                 } else {
                     context.getString(R.string.error_mihomo_exited)
                 }
@@ -150,7 +146,38 @@ class MihomoRunner(private val context: Context) {
             // API 响应则就绪
             if (isApiReady()) return null
         }
-        return context.getString(R.string.error_api_not_ready)
+        // 超时：尝试读取日志辅助诊断
+        val logContent = readStartupLog(useRoot, workDir)
+        return if (logContent.isNotBlank()) {
+            Log.w(TAG, "API timeout, mihomo log:\n$logContent")
+            context.getString(R.string.error_api_not_ready) + "\n" + extractErrorMessage(logContent)
+        } else {
+            context.getString(R.string.error_api_not_ready)
+        }
+    }
+
+    /** 统一读取 mihomo 启动日志 */
+    private fun readStartupLog(useRoot: Boolean, workDir: File): String {
+        return if (useRoot) {
+            RootHelper.readLogFile(File(workDir, "mihomo.log").absolutePath)
+        } else {
+            val logFile = File(workDir, "mihomo.log")
+            if (logFile.exists()) {
+                logFile.readText().trim().lines().takeLast(20).joinToString("\n")
+            } else ""
+        }
+    }
+
+    /** 从日志中提取 level=error/fatal 的错误消息 */
+    private fun extractErrorMessage(logContent: String): String {
+        val errorLines = logContent.lines().filter {
+            it.contains("level=error") || it.contains("level=fatal")
+        }
+        if (errorLines.isEmpty()) return logContent.lines().takeLast(5).joinToString("\n")
+
+        val msgRegex = Regex("""msg="(.+?)"""")
+        val messages = errorLines.mapNotNull { msgRegex.find(it)?.groupValues?.get(1) }
+        return if (messages.isNotEmpty()) messages.joinToString("\n") else errorLines.joinToString("\n")
     }
 
     private fun isApiReady(): Boolean {
@@ -158,10 +185,9 @@ class MihomoRunner(private val context: Context) {
             val conn = URL("http://$externalController/version").openConnection() as HttpURLConnection
             conn.connectTimeout = 500
             conn.readTimeout = 500
-            conn.setRequestProperty("Authorization", "Bearer $secret")
-            val code = conn.responseCode
+            conn.responseCode // 任何响应（200/401 等）都说明 API 已就绪
             conn.disconnect()
-            code == 200
+            true
         } catch (_: Exception) {
             false
         }
