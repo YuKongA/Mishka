@@ -80,6 +80,7 @@ fun SubscriptionScreen(
     onBack: (() -> Unit)? = null,
     onNavigateAdd: () -> Unit = {},
     onNavigateEdit: (uuid: String) -> Unit = {},
+    onActiveChanged: (() -> Unit)? = null,
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val scrollBehavior = MiuixScrollBehavior()
@@ -187,7 +188,10 @@ fun SubscriptionScreen(
                 SubscriptionItem(
                     subscription = sub,
                     isLoading = uiState.isLoading,
-                    onSelect = { viewModel.setActive(sub.id) },
+                    onSelect = {
+                        viewModel.setActive(sub.id)
+                        onActiveChanged?.invoke()
+                    },
                     onRefresh = { viewModel.fetchSubscription(sub.id) },
                     onDelete = { viewModel.removeSubscription(sub.id) },
                     onEdit = { onNavigateEdit(sub.id) },

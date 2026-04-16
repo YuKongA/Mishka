@@ -14,7 +14,7 @@ sealed interface Route : NavKey {
     data object SubscriptionAdd : Route
 
     @Serializable
-    data object SubscriptionAddUrl : Route
+    data class SubscriptionAddUrl(val initialUrl: String = "") : Route
 
     @Serializable
     data object Log : Route

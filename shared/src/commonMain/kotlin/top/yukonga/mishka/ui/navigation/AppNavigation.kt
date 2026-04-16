@@ -149,6 +149,11 @@ fun AppNavigation(
                         onBack = { navigator.pop() },
                         onNavigateAdd = { navigator.push(Route.SubscriptionAdd) },
                         onNavigateEdit = { uuid -> navigator.push(Route.SubscriptionEdit(uuid)) },
+                        onActiveChanged = {
+                            if (homeViewModel?.uiState?.value?.isRunning == true) {
+                                homeViewModel.restartProxy()
+                            }
+                        },
                     )
                 }
             }
@@ -169,28 +174,23 @@ fun AppNavigation(
                             }
                         }
                     },
-                    onNavigateUrl = { navigator.push(Route.SubscriptionAddUrl) },
+                    onNavigateUrl = { navigator.push(Route.SubscriptionAddUrl()) },
                     onScanQR = if (onScanQR != null) {
                         {
                             onScanQR { url ->
-                                if (url != null && subscriptionViewModel != null) {
-                                    subscriptionViewModel.addSubscription(
-                                        name = "",
-                                        url = url,
-                                        onComplete = {
-                                            navigator.popUntil { key -> key is Route.Subscription }
-                                        },
-                                    )
+                                if (url != null && (url.startsWith("http://") || url.startsWith("https://"))) {
+                                    navigator.push(Route.SubscriptionAddUrl(initialUrl = url))
                                 }
                             }
                         }
                     } else null,
                 )
             }
-            entry<Route.SubscriptionAddUrl> {
+            entry<Route.SubscriptionAddUrl> { route ->
                 subscriptionViewModel?.let {
                     SubscriptionAddUrlScreen(
                         viewModel = it,
+                        initialUrl = route.initialUrl,
                         onBack = { navigator.pop() },
                         onSaved = { navigator.popUntil { key -> key is Route.Subscription } },
                     )
@@ -306,10 +306,10 @@ private fun MainPage(
     subscriptionViewModel: SubscriptionViewModel?,
     navigator: Navigator,
     mainPagerState: MainPagerState,
-    bootStartManager: top.yukonga.mishka.platform.BootStartManager? = null,
+    bootStartManager: BootStartManager? = null,
     colorMode: Int = 0,
     onColorModeChange: (Int) -> Unit = {},
-    storage: top.yukonga.mishka.platform.PlatformStorage? = null,
+    storage: PlatformStorage? = null,
     onPredictiveBackChange: ((Boolean) -> Unit)? = null,
     hasRootPermission: Boolean = false,
 ) {
@@ -379,6 +379,11 @@ private fun MainPage(
                         bottomPadding = bottomPadding,
                         onNavigateAdd = { navigator.push(Route.SubscriptionAdd) },
                         onNavigateEdit = { uuid -> navigator.push(Route.SubscriptionEdit(uuid)) },
+                        onActiveChanged = {
+                            if (homeViewModel?.uiState?.value?.isRunning == true) {
+                                homeViewModel.restartProxy()
+                            }
+                        },
                     )
                 }
 

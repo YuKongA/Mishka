@@ -57,6 +57,7 @@ import top.yukonga.miuix.kmp.utils.scrollEndHaptic
 @Composable
 fun SubscriptionAddUrlScreen(
     viewModel: SubscriptionViewModel,
+    initialUrl: String = "",
     onBack: () -> Unit = {},
     onSaved: () -> Unit = {},
     bottomPadding: Dp = 0.dp,
@@ -65,7 +66,7 @@ fun SubscriptionAddUrlScreen(
     val scrollBehavior = MiuixScrollBehavior()
     val defaultName = stringResource(Res.string.common_new_config)
     var inputName by remember { mutableStateOf(defaultName) }
-    var inputUrl by remember { mutableStateOf("") }
+    var inputUrl by remember { mutableStateOf(initialUrl) }
 
     Scaffold(
         topBar = {
