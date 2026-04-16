@@ -1,3 +1,6 @@
+import java.net.URI
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 import java.util.Properties
 
 plugins {
@@ -79,6 +82,39 @@ android {
             reset()
             include("arm64-v8a")
         }
+    }
+}
+
+abstract class DownloadGeoFilesTask : DefaultTask() {
+    @get:OutputDirectory
+    abstract val outputDir: DirectoryProperty
+
+    @TaskAction
+    fun download() {
+        val geoFilesUrls = mapOf(
+            "https://github.com/MetaCubeX/meta-rules-dat/releases/download/latest/geoip.metadb" to "geoip.metadb",
+            "https://github.com/MetaCubeX/meta-rules-dat/releases/download/latest/geosite.dat" to "geosite.dat",
+            "https://github.com/MetaCubeX/meta-rules-dat/releases/download/latest/GeoLite2-ASN.mmdb" to "ASN.mmdb",
+        )
+        val dir = outputDir.get().asFile
+        dir.mkdirs()
+        geoFilesUrls.forEach { (downloadUrl, outputFileName) ->
+            val outputPath = File(dir, outputFileName)
+            URI(downloadUrl).toURL().openStream().use { input ->
+                Files.copy(input, outputPath.toPath(), StandardCopyOption.REPLACE_EXISTING)
+                println("$outputFileName downloaded to $outputPath")
+            }
+        }
+    }
+}
+
+val downloadGeoFiles = tasks.register<DownloadGeoFilesTask>("downloadGeoFiles") {
+    outputDir.set(layout.projectDirectory.dir("src/main/assets"))
+}
+
+tasks.configureEach {
+    if (name.startsWith("assemble") || name.startsWith("merge") && name.contains("Assets")) {
+        dependsOn(downloadGeoFiles)
     }
 }
 

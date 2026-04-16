@@ -40,10 +40,10 @@ Mishka/
 │   │   ├── platform/                 9 个 expect 声明 + ProfileFileManager 接口
 │   │   ├── ui/
 │   │   │   ├── navigation/           AppNavigation（主导航树 + HorizontalPager）
-│   │   │   ├── navigation3/          Route（13 路由）+ Navigator（自定义栈）
-│   │   │   ├── component/            SearchBar + SearchStatus + MenuPositionProvider
+│   │   │   ├── navigation3/          Route（14 路由）+ Navigator（自定义栈）
+│   │   │   ├── component/            SearchBar + SearchStatus + MenuPositionProvider + TriStatePreference + ListEditDialog
 │   │   │   │   └── effect/           BgEffectBackground（OS3 动态渐变着色器背景）
-│   │   │   └── screen/               16 个页面（home/ proxy/ subscription/ settings/ log/ provider/ dns/ connection/）
+│   │   │   └── screen/               17 个页面（home/ proxy/ subscription/ settings/ log/ provider/ dns/ connection/）
 │   │   ├── viewmodel/                10 个 ViewModel
 │   │   └── util/                     FormatUtils
 │   ├── commonMain/composeResources/
@@ -54,7 +54,7 @@ Mishka/
 ├── android/src/main/
 │   ├── kotlin/.../mishka/
 │   │   ├── MainActivity.kt           应用入口
-│   │   ├── MishkaApplication.kt      全局初始化（通知渠道 + 预测性返回手势）
+│   │   ├── MishkaApplication.kt      全局初始化（通知渠道 + GeoIP 提取 + 预测性返回手势）
 │   │   └── service/                  15 个服务组件（含 ROOT 模式）
 │   ├── res/
 │   │   ├── values/strings.xml        Android 层英文字符串（通知/Tile）
@@ -95,7 +95,7 @@ MainActivity → App → AppNavigation
 - **数据持久化**：Room 3.0 KMP（结构化数据）+ PlatformStorage（简单偏好设置）+ StorageKeys（key 常量）
 - **订阅管理**：Pending/Imported 两阶段编辑模型（对齐 CMFA ProfileManager）
 - **订阅格式兼容**：User-Agent `clash.meta` + V2RayConverter 自动检测 base64/V2Ray 订阅并转换为 mihomo YAML（支持 vmess/vless/trojan/ss/ssr/hysteria/hysteria2/tuic）
-- **GeoIP 共享**：geodata/ 共享目录 + 符号链接（失败则复制），避免每个订阅重复下载 MMDB
+- **GeoIP 预制 + 共享**：构建时 DownloadGeoFilesTask 下载 geoip.metadb/geosite.dat/ASN.mmdb 到 assets，启动时提取到 geodata/ 共享目录 + 符号链接（失败则复制）
 - **配置校验**：mihomo -t 进程完整校验（ProcessBuilder，不需要 TUN fd，超时 90s）
 - **国际化**：默认英文 + 中文（zh-rCN），Compose Resources `stringResource()` + Android `getString()`
   - Compose 层：`shared/src/commonMain/composeResources/values/strings.xml`（~180 key）
@@ -132,10 +132,10 @@ DELETE → 两表都删除 + 清理文件目录
 ```
 files/mihomo/
 ├── config.yaml                 最终运行配置（ConfigGenerator 生成）
-├── geodata/                    共享 GeoIP 文件（符号链接到各订阅目录）
-│   ├── Country.mmdb
-│   ├── geoip.dat
-│   └── geosite.dat
+├── geodata/                    共享 GeoIP 文件（启动时从 assets 提取 + 符号链接到各订阅目录）
+│   ├── geoip.metadb
+│   ├── geosite.dat
+│   └── ASN.mmdb
 ├── imported/{uuid}/            已验证的稳定配置
 │   ├── config.yaml
 │   ├── Country.mmdb → ../../geodata/Country.mmdb
@@ -148,19 +148,20 @@ files/mihomo/
 
 ## 路由清单
 
-`Route.kt` 中定义 13 个路由，均实现 `NavKey`：
+`Route.kt` 中定义 14 个路由，均实现 `NavKey`：
 
 | 路由               | 类型        | 页面                          | 入口            |
 | ------------------ | ----------- | ----------------------------- | --------------- |
 | Main               | data object | 主页（HorizontalPager 4 Tab） | 根路由          |
 | Subscription       | data object | SubscriptionScreen            | 主页 Tab 2 导航 |
 | SubscriptionAdd    | data object | SubscriptionAddScreen         | 订阅页          |
-| SubscriptionAddUrl | data object | SubscriptionAddUrlScreen      | 添加订阅页      |
+| SubscriptionAddUrl | data class  | SubscriptionAddUrlScreen      | 添加订阅页      |
 | SubscriptionEdit   | data class  | SubscriptionEditScreen        | 订阅项编辑按钮  |
 | Log                | data object | LogScreen                     | QuickEntries    |
 | Provider           | data object | ProviderScreen                | QuickEntries    |
 | DnsQuery           | data object | DnsQueryScreen                | QuickEntries    |
 | Connection         | data object | ConnectionScreen              | QuickEntries    |
+| VpnSettings        | data object | VpnSettingsScreen             | 设置页          |
 | NetworkSettings    | data object | NetworkSettingsScreen         | 设置页          |
 | MetaSettings       | data object | MetaSettingsScreen            | 设置页          |
 | AppProxy           | data object | AppProxyScreen                | 设置页          |
@@ -180,6 +181,7 @@ files/mihomo/
 | ProviderScreen               | ProviderViewModel     | Provider 列表 + 刷新                        |
 | DnsQueryScreen               | DnsQueryViewModel     | DNS 查询（A/AAAA/CNAME/MX/TXT/NS）          |
 | AppProxyScreen               | AppProxyViewModel     | 应用代理白/黑名单                           |
+| VpnSettingsScreen            | —                     | VPN 设置（系统代理/排除路由等）             |
 | NetworkSettingsScreen        | OverrideSettingsVM    | 端口/局域网/IPv6 设置                       |
 | MetaSettingsScreen           | OverrideSettingsVM    | 统一延迟/Geodata/TCP 并发/嗅探器            |
 | AboutScreen                  | —                     | 版本信息（OS3 动态背景 + 视差滚动）         |
@@ -236,7 +238,7 @@ GOOS=android GOARCH=arm64 CGO_ENABLED=0 go build \
   -ldflags "-s -w -X 'github.com/metacubex/mihomo/constant.Version=v1.19.23'" \
   -o /path/to/Mishka/android/src/main/jniLibs/arm64-v8a/libmihomo.so .
 
-# 构建 APK
+# 构建 APK（assemble 自动触发 downloadGeoFiles 下载 GeoIP 到 assets/）
 ./gradlew :android:assembleDebug  # 构建 Android Debug APK
 ./gradlew :android:assembleRelease # 构建 Android Release APK
 ```
@@ -247,7 +249,7 @@ GOOS=android GOARCH=arm64 CGO_ENABLED=0 go build \
 - Android 的 ProcessBuilder 会 fork 后关闭所有非标准 fd，需用 JNI fork+exec 绕过（`process_helper.c`），保留 VPN TUN fd 继承
 - 配置校验使用 `mihomo -t -d <workDir>`（ProcessBuilder，不需要 TUN fd，超时 90s），解析 level=error/fatal 提取错误信息
 - 订阅导入兼容 V2Ray 格式：User-Agent `clash.meta` 让订阅服务返回 YAML；若仍为 base64 V2Ray 链接，V2RayConverter 自动解码转换（对齐 CMFA converter.go）
-- GeoIP 文件通过 geodata/ 共享目录 + 符号链接（失败则复制）避免每个订阅重复下载 MMDB
+- GeoIP 文件构建时通过 DownloadGeoFilesTask 下载到 assets/，启动时 MishkaApplication.extractGeoFiles() 提取到 geodata/ 共享目录，各订阅通过符号链接（失败则复制）引用
 - ConfigGenerator 使用行过滤合并 YAML（移除 external-controller/secret 后追加），避免引入 YAML 解析库
 - 订阅管理采用 Pending/Imported 两阶段模型（对齐 CMFA），每个订阅有独立目录（imported/{uuid}/），mihomo -d 指向此处
 - Room 3.0 KMP 跨平台数据库，BundledSQLiteDriver 统一 Android/Desktop，DCL 单例
@@ -264,7 +266,7 @@ GOOS=android GOARCH=arm64 CGO_ENABLED=0 go build \
 - Card 间距：水平 12.dp，垂直 12.dp
 - 首页状态卡片参考 KernelSU（CheckCircleOutline 170dp，offset(38,45)）
 - 深色模式：StatusCard 背景 #1A3825，按钮使用 isDark 条件色
-- 底栏图标：Sidebar / Tune / Settings
+- 底栏图标：Sidebar / Tune / UploadCloud / Settings
 - LazyColumn 必须加 `.scrollEndHaptic().overScrollVertical().nestedScroll(scrollBehavior.nestedScrollConnection)`
 - Badge：`clip(miuixShape(3.dp))` + 9.sp Bold Monospace
 - 操作 IconButton：`minHeight/minWidth = 35.dp, backgroundColor = secondaryContainer`

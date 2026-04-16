@@ -27,6 +27,8 @@ import mishka.shared.generated.resources.common_back
 import mishka.shared.generated.resources.common_new_config
 import mishka.shared.generated.resources.common_processing
 import mishka.shared.generated.resources.common_save
+import mishka.shared.generated.resources.subscription_auto_update
+import mishka.shared.generated.resources.subscription_auto_update_placeholder
 import mishka.shared.generated.resources.subscription_config
 import mishka.shared.generated.resources.subscription_name
 import mishka.shared.generated.resources.subscription_url_hint
@@ -67,6 +69,7 @@ fun SubscriptionAddUrlScreen(
     val defaultName = stringResource(Res.string.common_new_config)
     var inputName by remember { mutableStateOf(defaultName) }
     var inputUrl by remember { mutableStateOf(initialUrl) }
+    var intervalMinutes by remember { mutableStateOf("") }
 
     Scaffold(
         topBar = {
@@ -153,13 +156,28 @@ fun SubscriptionAddUrlScreen(
                     useLabelAsPlaceholder = true,
                 )
             }
+            item(key = "interval_field") {
+                SmallTitle(text = stringResource(Res.string.subscription_auto_update))
+                TextField(
+                    value = intervalMinutes,
+                    onValueChange = { intervalMinutes = it.filter { c -> c.isDigit() } },
+                    label = stringResource(Res.string.subscription_auto_update_placeholder),
+                    useLabelAsPlaceholder = true,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp)
+                        .padding(bottom = 12.dp),
+                )
+            }
             item(key = "save") {
                 TextButton(
                     text = stringResource(Res.string.common_save),
                     onClick = {
+                        val intervalMs = (intervalMinutes.toLongOrNull() ?: 0) * 60000
                         viewModel.addSubscription(
                             name = inputName.ifBlank { defaultName },
                             url = inputUrl,
+                            interval = intervalMs,
                             onComplete = onSaved,
                         )
                     },
@@ -167,7 +185,7 @@ fun SubscriptionAddUrlScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 12.dp)
-                        .padding(vertical = 6.dp),
+                        .padding(bottom = 12.dp),
                     colors = ButtonDefaults.textButtonColorsPrimary(),
                 )
             }
@@ -177,7 +195,7 @@ fun SubscriptionAddUrlScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 12.dp)
-                            .padding(bottom = 6.dp),
+                            .padding(bottom = 16.dp + innerPadding.calculateBottomPadding()),
                         insideMargin = PaddingValues(16.dp),
                     ) {
                         Text(

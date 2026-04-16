@@ -114,7 +114,8 @@
     <string name="subscription_url_placeholder">仅接受 http(s) 和 content 类型</string>
     <string name="subscription_config_name">配置名称</string>
     <string name="subscription_sub_url">订阅 URL</string>
-    <string name="subscription_auto_update_hint">自动更新间隔（分钟，0 或留空为禁用，最小 15）</string>
+    <string name="subscription_auto_update">自动更新间隔</string>
+    <string name="subscription_auto_update_placeholder">分钟，0 或留空为禁用，最小 15</string>
     <string name="subscription_import_config">导入配置</string>
     <string name="subscription_downloading">下载配置...</string>
     <string name="subscription_validating">验证配置...</string>

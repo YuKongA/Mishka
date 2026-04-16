@@ -114,7 +114,8 @@
     <string name="subscription_url_placeholder">Only accepts http(s) and content types</string>
     <string name="subscription_config_name">Config Name</string>
     <string name="subscription_sub_url">Subscription URL</string>
-    <string name="subscription_auto_update_hint">Auto-update interval (minutes, 0 or empty to disable, min 15)</string>
+    <string name="subscription_auto_update">Auto-update interval</string>
+    <string name="subscription_auto_update_placeholder">minutes, 0 or empty to disable, min 15</string>
     <string name="subscription_import_config">Import Config</string>
     <string name="subscription_downloading">Downloading config...</string>
     <string name="subscription_validating">Validating config...</string>

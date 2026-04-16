@@ -49,10 +49,12 @@ Java_top_yukonga_mishka_service_ProcessHelper_nativeForkExec(
 
     if (pid == 0)
     {
-        // 子进程：不关闭任何 fd，直接 exec
+        // 子进程：脱离会话组，不关闭任何 fd，直接 exec
+        setsid();
+
         if (chdir(workDir) != 0)
         {
-            LOGE("chdir failed: %s", strerror(errno));
+            _exit(126);
         }
 
         // 重定向 stdout/stderr 到日志文件（或合并到 stderr）
@@ -72,8 +74,6 @@ Java_top_yukonga_mishka_service_ProcessHelper_nativeForkExec(
         }
 
         execv(binary, argv);
-        // exec 失败
-        LOGE("execv failed: %s", strerror(errno));
         _exit(127);
     }
 

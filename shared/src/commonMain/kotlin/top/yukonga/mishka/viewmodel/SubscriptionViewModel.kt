@@ -71,14 +71,14 @@ class SubscriptionViewModel(
     /**
      * URL 导入：create Pending → 下载配置 → 校验 → commit → Imported
      */
-    fun addSubscription(name: String, url: String, onComplete: () -> Unit = {}) {
+    fun addSubscription(name: String, url: String, interval: Long = 0, onComplete: () -> Unit = {}) {
         hideAddDialog()
         _uiState.value = _uiState.value.copy(isLoading = true, error = "", importProgress = null)
 
         viewModelScope.launch {
             var subId: String? = null
             try {
-                val sub = repository.create("Url", name, url)
+                val sub = repository.create("Url", name, url, interval)
                 subId = sub.id
                 yield()
 
@@ -249,7 +249,7 @@ class SubscriptionViewModel(
         fileManager.ensureGeodataAvailable(workDir)
         val error = fileManager.validate(workDir) { provider ->
             _uiState.value = _uiState.value.copy(
-                importProgress = ImportProgress("$provider")
+                importProgress = ImportProgress(provider)
             )
         }
         if (error == null) {

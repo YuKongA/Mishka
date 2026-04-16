@@ -38,5 +38,8 @@ google-services.json
 # Downloaded mihomo binaries
 android/src/main/jniLibs/
 
+# Downloaded GeoIP files
+android/src/main/assets/
+
 # Local properties
 local.properties

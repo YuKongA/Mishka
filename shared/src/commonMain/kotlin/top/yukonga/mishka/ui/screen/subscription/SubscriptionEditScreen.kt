@@ -21,12 +21,14 @@ import androidx.compose.ui.unit.sp
 import mishka.shared.generated.resources.Res
 import mishka.shared.generated.resources.common_back
 import mishka.shared.generated.resources.common_save
-import mishka.shared.generated.resources.subscription_auto_update_hint
+import mishka.shared.generated.resources.subscription_auto_update
+import mishka.shared.generated.resources.subscription_auto_update_placeholder
 import mishka.shared.generated.resources.subscription_config_name
 import mishka.shared.generated.resources.subscription_edit
 import mishka.shared.generated.resources.subscription_sub_url
 import org.jetbrains.compose.resources.stringResource
 import top.yukonga.mishka.viewmodel.SubscriptionViewModel
+import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
@@ -127,10 +129,12 @@ fun SubscriptionEditScreen(
                             .padding(horizontal = 12.dp)
                             .padding(bottom = 12.dp),
                     )
+                    SmallTitle(text = stringResource(Res.string.subscription_auto_update))
                     TextField(
                         value = intervalMinutes,
                         onValueChange = { intervalMinutes = it.filter { c -> c.isDigit() } },
-                        label = stringResource(Res.string.subscription_auto_update_hint),
+                        label = stringResource(Res.string.subscription_auto_update_placeholder),
+                        useLabelAsPlaceholder = true,
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 12.dp)
@@ -170,10 +174,11 @@ fun SubscriptionEditScreen(
                         )
                     },
                     enabled = hasChanges && !uiState.isLoading && name.isNotBlank(),
+                    colors = ButtonDefaults.textButtonColorsPrimary(),
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 12.dp)
-                        .padding(bottom = 16.dp),
+                        .padding(bottom = 16.dp + innerPadding.calculateBottomPadding()),
                 )
             }
         }

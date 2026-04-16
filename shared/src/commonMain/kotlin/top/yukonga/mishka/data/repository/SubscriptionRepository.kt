@@ -64,13 +64,14 @@ class SubscriptionRepository(
      * 创建新的 Pending 记录。
      */
     @OptIn(ExperimentalUuidApi::class)
-    suspend fun create(type: String, name: String, source: String): Subscription = profileLock.withLock {
+    suspend fun create(type: String, name: String, source: String, interval: Long = 0): Subscription = profileLock.withLock {
         val uuid = Uuid.random().toString().take(8)
         val pending = PendingEntity(
             uuid = uuid,
             name = name,
             type = type,
             source = source,
+            interval = interval,
             createdAt = System.currentTimeMillis(),
         )
         pendingDao.insert(pending)

@@ -47,6 +47,14 @@ jobs:
             -ldflags "-s -w -X 'github.com/metacubex/mihomo/constant.Version=${{ steps.mihomo.outputs.version }}'" \
             -o libmihomo.so .
 
+      - name: Compress mihomo with UPX
+        run: |
+          llvm-strip-18 --strip-all -o libmihomo_stripped.so libmihomo.so
+          mv libmihomo_stripped.so libmihomo.so
+          curl -Lo upx.tar.xz https://github.com/upx/upx/releases/download/v5.1.1/upx-5.1.1-amd64_linux.tar.xz
+          tar -xf upx.tar.xz --strip-components=1 upx-5.1.1-amd64_linux/upx
+          ./upx --best --lzma libmihomo.so
+
       - name: Upload mihomo artifact
         uses: actions/upload-artifact@v7
         with:
@@ -60,6 +68,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
 
       - name: Set up JDK
         uses: actions/setup-java@v5
