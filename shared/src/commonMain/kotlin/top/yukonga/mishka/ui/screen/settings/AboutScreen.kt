@@ -398,6 +398,16 @@ private fun AboutContent(
                             summary = "github.com/compose-miuix-ui/miuix",
                             onClick = { onOpenUrl("https://github.com/compose-miuix-ui/miuix") },
                         )
+                        ArrowPreference(
+                            title = "snakeyaml-engine",
+                            summary = "bitbucket.org/snakeyaml/snakeyaml-engine",
+                            onClick = { onOpenUrl("https://bitbucket.org/snakeyaml/snakeyaml-engine") },
+                        )
+                        ArrowPreference(
+                            title = "quickie",
+                            summary = "github.com/G00fY2/quickie",
+                            onClick = { onOpenUrl("https://github.com/G00fY2/quickie") },
+                        )
                     }
 
                     Spacer(Modifier.navigationBarsPadding())

@@ -39,10 +39,23 @@ class MishkaTunService : VpnService() {
     override fun onCreate() {
         super.onCreate()
         NotificationHelper.createChannels(this)
-        startForeground(
-            NotificationHelper.NOTIFICATION_ID_VPN,
-            NotificationHelper.buildLoadingNotification(this),
-        )
+        try {
+            startForeground(
+                NotificationHelper.NOTIFICATION_ID_VPN,
+                NotificationHelper.buildLoadingNotification(this),
+            )
+        } catch (e: Exception) {
+            Log.e(TAG, "startForeground failed", e)
+            ProxyServiceBridge.updateState(
+                ProxyServiceStatus(
+                    ProxyState.Error,
+                    errorMessage = getString(R.string.error_foreground_failed, e.message ?: e.javaClass.simpleName),
+                    tunMode = TunMode.Vpn,
+                )
+            )
+            stopSelf()
+            return
+        }
         // 监听动态通知设置变化，实时切换通知样式
         notificationRefreshJob = scope.launch {
             ProxyServiceBridge.notificationRefresh.collect {

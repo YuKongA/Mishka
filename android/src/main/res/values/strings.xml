@@ -41,4 +41,5 @@
     <string name="error_api_not_ready">mihomo process is running but API is not responding</string>
     <string name="error_mihomo_start_failed">mihomo start failed:\n%1$s</string>
     <string name="error_generic_start_failed">Start failed: %1$s</string>
+    <string name="error_foreground_failed">Failed to start foreground service: %1$s</string>
 </resources>

@@ -1,16 +1,21 @@
 package top.yukonga.mishka.service
 
 import android.content.Context
+import android.util.Log
+import org.snakeyaml.engine.v2.api.Dump
+import org.snakeyaml.engine.v2.api.DumpSettings
+import org.snakeyaml.engine.v2.api.Load
+import org.snakeyaml.engine.v2.api.LoadSettings
+import org.snakeyaml.engine.v2.common.FlowStyle
+import org.snakeyaml.engine.v2.exceptions.YamlEngineException
 import top.yukonga.mishka.data.repository.OverrideStorageHelper
 import top.yukonga.mishka.platform.PlatformStorage
 import top.yukonga.mishka.platform.StorageKeys
+import top.yukonga.mishka.viewmodel.AppProxyMode
 import java.io.File
+import java.io.FileNotFoundException
 import java.util.UUID
 
-/**
- * 运行配置生成器：生成 mihomo 最终运行配置。
- * 订阅文件操作已拆分到 ProfileFileOps。
- */
 data class RunConfigResult(
     val configFile: File,
     val externalController: String,
@@ -18,6 +23,10 @@ data class RunConfigResult(
 )
 
 object ConfigGenerator {
+
+    private const val TAG = "ConfigGenerator"
+    private const val DEFAULT_CONTROLLER = "127.0.0.1:9090"
+    private const val DEFAULT_TUN_DEVICE = "Mishka"
 
     fun generateSecret(): String = UUID.randomUUID().toString().take(16)
 
@@ -31,7 +40,7 @@ object ConfigGenerator {
 
     /**
      * 生成最终运行配置。
-     * 以订阅配置为基础，用行过滤移除冲突 key，再注入 Mishka 控制参数和覆写设置。
+     * 解析订阅 YAML 为 Map，移除 Mishka 管理的 key 后注入新值，最后序列化回 YAML。
      *
      * @param tunFd VPN 的 TUN 文件描述符，注入到 tun.file-descriptor（VPN 模式）
      * @param rootMode 是否为 ROOT 模式（mihomo 自行创建 TUN 和管理路由）
@@ -47,21 +56,27 @@ object ConfigGenerator {
         val storage = PlatformStorage(context)
         val h = OverrideStorageHelper
 
-        val baseConfig = if (subscriptionId != null) {
-            val subConfig = ProfileFileOps.getSubscriptionConfigFile(context, subscriptionId)
-            if (subConfig.exists()) subConfig.readText() else ""
-        } else {
-            ""
-        }
+        val baseConfigText = subscriptionId?.let {
+            val subConfig = ProfileFileOps.getSubscriptionConfigFile(context, it)
+            try {
+                subConfig.readText()
+            } catch (_: FileNotFoundException) {
+                ""
+            }
+        } ?: ""
 
-        // 读取覆写设置
-        val externalControllerOverride = h.readNullableString(storage, h.KEY_EXTERNAL_CONTROLLER)
-        val configExternalController = extractTopLevelValue(baseConfig, "external-controller")
-        val configController = externalControllerOverride ?: configExternalController ?: "127.0.0.1:9090"
-        // API 客户端连接地址：0.0.0.0 替换为 127.0.0.1（0.0.0.0 是监听地址，不可用于连接）
+        val root: MutableMap<String, Any?> = loadRootMap(baseConfigText)
+
+        // snakeyaml-engine 默认 JsonSchema（YAML 1.2 严格 JSON 兼容），与 mihomo 的 Go yaml.v3 对齐：
+        // `secret: 0020` 按 `^-?(0|[1-9][0-9]*)$` 不匹配 Int → 保留为 String "0020"，
+        // 不再需要对 secret/external-controller 做原文级正则提取。
+        val externalControllerOverride = h.readNullableString(storage, h.KEY_EXTERNAL_CONTROLLER)?.trim()
+        val configExternalController = root["external-controller"]?.toString()?.trim()
+        val configController = externalControllerOverride ?: configExternalController ?: DEFAULT_CONTROLLER
+        // 0.0.0.0 是监听地址，作为客户端连接地址需替换为 127.0.0.1
         val effectiveController = configController.replace("0.0.0.0", "127.0.0.1")
 
-        val configSecret = extractTopLevelValue(baseConfig, "secret")
+        val configSecret = root["secret"]?.toString()
         val effectiveSecret = configSecret ?: secret
 
         val httpPort = h.readNullableInt(storage, h.KEY_HTTP_PORT)
@@ -106,210 +121,160 @@ object ConfigGenerator {
             snifferParsePureIp != null || snifferOverrideDest != null ||
             snifferForceDomain != null || snifferSkipDomain != null
 
-        // 行过滤：移除会被 Mishka 注入或覆写的顶层 key
-        val keysToRemove = buildSet {
-            add("external-controller")
-            add("secret")
-            add("tun")
-            if (httpPort != null) add("port")
-            if (socksPort != null) add("socks-port")
-            if (redirPort != null) add("redir-port")
-            if (tproxyPort != null) add("tproxy-port")
-            if (mixedPort != null) add("mixed-port")
-            if (allowLan != null) add("allow-lan")
-            if (ipv6 != null) add("ipv6")
-            if (bindAddress != null) add("bind-address")
-            if (logLevel != null) add("log-level")
-            if (unifiedDelay != null) add("unified-delay")
-            if (geodataMode != null) add("geodata-mode")
-            if (tcpConcurrent != null) add("tcp-concurrent")
-            if (findProcessMode != null) add("find-process-mode")
-            if (hasDnsOverrides) add("dns")
-            if (hasSnifferOverrides) add("sniffer")
+        root.remove("external-controller")
+        root.remove("secret")
+        root.remove("tun")
+        if (httpPort != null) root.remove("port")
+        if (socksPort != null) root.remove("socks-port")
+        if (redirPort != null) root.remove("redir-port")
+        if (tproxyPort != null) root.remove("tproxy-port")
+        if (mixedPort != null) root.remove("mixed-port")
+        if (allowLan != null) root.remove("allow-lan")
+        if (ipv6 != null) root.remove("ipv6")
+        if (bindAddress != null) root.remove("bind-address")
+        if (logLevel != null) root.remove("log-level")
+        if (unifiedDelay != null) root.remove("unified-delay")
+        if (geodataMode != null) root.remove("geodata-mode")
+        if (tcpConcurrent != null) root.remove("tcp-concurrent")
+        if (findProcessMode != null) root.remove("find-process-mode")
+        if (hasDnsOverrides) root.remove("dns")
+        if (hasSnifferOverrides) root.remove("sniffer")
+
+        root["external-controller"] = configController
+        root["secret"] = effectiveSecret
+        root["tun"] = buildTunMap(storage, rootMode, tunFd)
+
+        root.putIfNotNull("port", httpPort)
+        root.putIfNotNull("socks-port", socksPort)
+        root.putIfNotNull("redir-port", redirPort)
+        root.putIfNotNull("tproxy-port", tproxyPort)
+        root.putIfNotNull("mixed-port", mixedPort)
+        root.putIfNotNull("allow-lan", allowLan)
+        root.putIfNotNull("ipv6", ipv6)
+        root.putIfNotNull("bind-address", bindAddress)
+        root.putIfNotNull("log-level", logLevel)
+        root.putIfNotNull("unified-delay", unifiedDelay)
+        root.putIfNotNull("geodata-mode", geodataMode)
+        root.putIfNotNull("tcp-concurrent", tcpConcurrent)
+        root.putIfNotNull("find-process-mode", findProcessMode)
+
+        if (hasDnsOverrides) {
+            root["dns"] = linkedMapOf<String, Any?>().apply {
+                putIfNotNull("enable", dnsEnable)
+                putIfNotNull("listen", dnsListen)
+                putIfNotNull("ipv6", dnsIpv6)
+                putIfNotNull("prefer-h3", dnsPreferH3)
+                putIfNotNull("use-hosts", dnsUseHosts)
+                putIfNotNull("enhanced-mode", dnsEnhancedMode)
+                putIfNotNull("nameserver", dnsNameservers)
+                putIfNotNull("fallback", dnsFallback)
+                putIfNotNull("default-nameserver", dnsDefaultNameserver)
+                putIfNotNull("fake-ip-filter", dnsFakeIpFilter)
+            }
+        } else if (!root.containsKey("dns")) {
+            root["dns"] = linkedMapOf<String, Any?>(
+                "enable" to true,
+                "listen" to "0.0.0.0:1053",
+                "default-nameserver" to listOf("223.5.5.5", "119.29.29.29"),
+                "nameserver" to listOf("https://doh.pub/dns-query", "https://dns.alidns.com/dns-query"),
+            )
         }
 
-        val filteredLines = if (baseConfig.isNotEmpty()) {
-            filterTopLevelKeys(baseConfig, keysToRemove)
-        } else {
-            ""
-        }
-
-        val config = buildString {
-            if (filteredLines.isNotEmpty()) {
-                appendLine(filteredLines)
-                appendLine()
-            }
-
-            appendLine("# === Mishka injected ===")
-            appendLine("external-controller: $configController")
-            appendLine("secret: \"$effectiveSecret\"")
-
-            appendLine()
-            appendLine("tun:")
-            appendLine("  enable: true")
-            if (rootMode) {
-                // ROOT 模式：mihomo 自行创建 TUN 设备和管理路由表
-                val tunDevice = storage.getString(StorageKeys.ROOT_TUN_DEVICE, "Mishka")
-                appendLine("  device: $tunDevice")
-                appendLine("  auto-route: true")
-                appendLine("  auto-detect-interface: true")
-                // 分应用代理：通过 mihomo 的 include/exclude-package 实现
-                val proxyMode = storage.getString(StorageKeys.APP_PROXY_MODE, "AllowAll")
-                val packages = storage.getStringSet(StorageKeys.APP_PROXY_PACKAGES, emptySet())
-                if (proxyMode == "AllowSelected") {
-                    appendLine("  include-package:")
-                    if (packages.isNotEmpty()) {
-                        packages.forEach { appendLine("    - $it") }
-                    } else {
-                        // 空列表时用无效包名占位，确保不代理任何应用
-                        appendLine("    - \"-\"")
-                    }
-                } else if (proxyMode == "DenySelected" && packages.isNotEmpty()) {
-                    appendLine("  exclude-package:")
-                    packages.forEach { appendLine("    - $it") }
-                }
-            } else {
-                // VPN 模式：使用 VpnService 提供的 TUN fd
-                if (tunFd >= 0) {
-                    appendLine("  file-descriptor: $tunFd")
-                }
-                appendLine("  auto-route: false")
-                appendLine("  auto-detect-interface: false")
-            }
-            appendLine("  stack: mixed")
-            appendLine("  inet4-address:")
-            appendLine("    - 198.18.0.1/30")
-            if (rootMode) {
-                val allowIpv6 = storage.getString(StorageKeys.VPN_ALLOW_IPV6, "false") == "true"
-                if (allowIpv6) {
-                    appendLine("  inet6-address:")
-                    appendLine("    - fdfe:dcba:9876::1/126")
-                }
-            } else {
-                appendLine("  inet6-address: []")
-            }
-            appendLine("  dns-hijack:")
-            appendLine("    - 0.0.0.0:53")
-
-            appendLine()
-            appendLine("# === Override settings ===")
-            httpPort?.let { appendLine("port: $it") }
-            socksPort?.let { appendLine("socks-port: $it") }
-            redirPort?.let { appendLine("redir-port: $it") }
-            tproxyPort?.let { appendLine("tproxy-port: $it") }
-            mixedPort?.let { appendLine("mixed-port: $it") }
-            allowLan?.let { appendLine("allow-lan: $it") }
-            ipv6?.let { appendLine("ipv6: $it") }
-            bindAddress?.let { appendLine("bind-address: \"$it\"") }
-            logLevel?.let { appendLine("log-level: $it") }
-            unifiedDelay?.let { appendLine("unified-delay: $it") }
-            geodataMode?.let { appendLine("geodata-mode: $it") }
-            tcpConcurrent?.let { appendLine("tcp-concurrent: $it") }
-            findProcessMode?.let { appendLine("find-process-mode: $it") }
-
-            if (hasDnsOverrides) {
-                appendLine()
-                appendLine("dns:")
-                dnsEnable?.let { appendLine("  enable: $it") }
-                dnsListen?.let { appendLine("  listen: $it") }
-                dnsIpv6?.let { appendLine("  ipv6: $it") }
-                dnsPreferH3?.let { appendLine("  prefer-h3: $it") }
-                dnsUseHosts?.let { appendLine("  use-hosts: $it") }
-                dnsEnhancedMode?.let { appendLine("  enhanced-mode: $it") }
-                dnsNameservers?.let { list ->
-                    appendLine("  nameserver:")
-                    list.forEach { appendLine("    - $it") }
-                }
-                dnsFallback?.let { list ->
-                    appendLine("  fallback:")
-                    list.forEach { appendLine("    - $it") }
-                }
-                dnsDefaultNameserver?.let { list ->
-                    appendLine("  default-nameserver:")
-                    list.forEach { appendLine("    - $it") }
-                }
-                dnsFakeIpFilter?.let { list ->
-                    appendLine("  fake-ip-filter:")
-                    list.forEach { appendLine("    - $it") }
-                }
-            } else if (!baseConfig.contains("dns:")) {
-                appendLine()
-                appendLine("dns:")
-                appendLine("  enable: true")
-                appendLine("  listen: 0.0.0.0:1053")
-                appendLine("  default-nameserver:")
-                appendLine("    - 223.5.5.5")
-                appendLine("    - 119.29.29.29")
-                appendLine("  nameserver:")
-                appendLine("    - https://doh.pub/dns-query")
-                appendLine("    - https://dns.alidns.com/dns-query")
-            }
-
-            if (hasSnifferOverrides) {
-                appendLine()
-                appendLine("sniffer:")
-                snifferEnable?.let { appendLine("  enable: $it") }
-                snifferForceDnsMapping?.let { appendLine("  force-dns-mapping: $it") }
-                snifferParsePureIp?.let { appendLine("  parse-pure-ip: $it") }
-                snifferOverrideDest?.let { appendLine("  override-destination: $it") }
-                snifferForceDomain?.let { list ->
-                    appendLine("  force-domain:")
-                    list.forEach { appendLine("    - $it") }
-                }
-                snifferSkipDomain?.let { list ->
-                    appendLine("  skip-domain:")
-                    list.forEach { appendLine("    - $it") }
-                }
-            }
-
-            if (mixedPort == null && !baseConfig.contains("mixed-port:")) {
-                appendLine()
-                appendLine("mixed-port: 7890")
-            }
-
-            if (!baseConfig.contains("mode:")) {
-                appendLine("mode: rule")
+        if (hasSnifferOverrides) {
+            root["sniffer"] = linkedMapOf<String, Any?>().apply {
+                putIfNotNull("enable", snifferEnable)
+                putIfNotNull("force-dns-mapping", snifferForceDnsMapping)
+                putIfNotNull("parse-pure-ip", snifferParsePureIp)
+                putIfNotNull("override-destination", snifferOverrideDest)
+                putIfNotNull("force-domain", snifferForceDomain)
+                putIfNotNull("skip-domain", snifferSkipDomain)
             }
         }
 
-        configFile.writeText(config)
+        if (mixedPort == null && !root.containsKey("mixed-port")) {
+            root["mixed-port"] = 7890
+        }
+        if (!root.containsKey("mode")) {
+            root["mode"] = "rule"
+        }
+
+        configFile.writeText(Dump(dumpSettings).dumpToString(root))
         return RunConfigResult(configFile, effectiveController, effectiveSecret)
     }
 
-    private fun filterTopLevelKeys(content: String, keysToRemove: Set<String>): String {
-        val lines = content.lines()
-        val result = mutableListOf<String>()
-        var skipping = false
-
-        for (line in lines) {
-            val trimmed = line.trimStart()
-
-            if (trimmed.isEmpty() || trimmed.startsWith("#")) {
-                if (!skipping) result.add(line)
-                continue
+    private fun buildTunMap(
+        storage: PlatformStorage,
+        rootMode: Boolean,
+        tunFd: Int,
+    ): Map<String, Any?> = linkedMapOf<String, Any?>().apply {
+        put("enable", true)
+        if (rootMode) {
+            // mihomo 自行创建 TUN + 管理路由 + 分应用代理
+            put("device", storage.getString(StorageKeys.ROOT_TUN_DEVICE, DEFAULT_TUN_DEVICE))
+            put("auto-route", true)
+            put("auto-detect-interface", true)
+            val proxyMode = parseAppProxyMode(storage.getString(StorageKeys.APP_PROXY_MODE, AppProxyMode.AllowAll.name))
+            val packages = storage.getStringSet(StorageKeys.APP_PROXY_PACKAGES, emptySet())
+            when (proxyMode) {
+                // 空列表时用无效包名占位，确保不代理任何应用
+                AppProxyMode.AllowSelected -> put("include-package", if (packages.isNotEmpty()) packages.toList() else listOf("-"))
+                AppProxyMode.DenySelected -> if (packages.isNotEmpty()) put("exclude-package", packages.toList())
+                AppProxyMode.AllowAll -> Unit
             }
-
-            val isTopLevel = !line.startsWith(" ") && !line.startsWith("\t")
-
-            if (isTopLevel) {
-                val key = trimmed.substringBefore(":").trim()
-                skipping = key in keysToRemove
-                if (!skipping) result.add(line)
-            } else {
-                if (!skipping) result.add(line)
-            }
+        } else {
+            if (tunFd >= 0) put("file-descriptor", tunFd)
+            put("auto-route", false)
+            put("auto-detect-interface", false)
         }
-
-        return result.joinToString("\n")
+        put("stack", "mixed")
+        put("inet4-address", listOf("198.18.0.1/30"))
+        if (rootMode && storage.getString(StorageKeys.VPN_ALLOW_IPV6, "false") == "true") {
+            put("inet6-address", listOf("fdfe:dcba:9876::1/126"))
+        } else if (!rootMode) {
+            put("inet6-address", emptyList<String>())
+        }
+        put("dns-hijack", listOf("0.0.0.0:53"))
     }
 
-    private fun extractTopLevelValue(content: String, key: String): String? {
-        if (content.isEmpty()) return null
-        for (line in content.lines()) {
-            if (!line.startsWith(" ") && !line.startsWith("\t") && line.startsWith("$key:")) {
-                return line.substringAfter(":").trim().removeSurrounding("\"").ifEmpty { null }
-            }
+    private fun parseAppProxyMode(name: String): AppProxyMode =
+        runCatching { AppProxyMode.valueOf(name) }.getOrDefault(AppProxyMode.AllowAll)
+
+    private fun MutableMap<String, Any?>.putIfNotNull(key: String, value: Any?) {
+        if (value != null) put(key, value)
+    }
+
+    // LoadSettings / DumpSettings 不可变，缓存复用；Load / Dump 实例带状态，按需构造
+    private val loadSettings: LoadSettings = LoadSettings.builder()
+        // 单个订阅配置上限 8MB（典型 <1MB，留 8x 余量；避免 32MB 上限带来 OOM 风险）
+        .setCodePointLimit(8 * 1024 * 1024)
+        .setAllowDuplicateKeys(true)
+        // 对齐 Go yaml.v3（mihomo 所用）默认上限，覆盖重度使用 <<: *anchor 合并键的订阅
+        .setMaxAliasesForCollections(1024)
+        .build()
+
+    private val dumpSettings: DumpSettings = DumpSettings.builder()
+        .setDefaultFlowStyle(FlowStyle.BLOCK)
+        .setIndent(2)
+        // 不自动换行，保持长 URL / 正则等原样
+        .setWidth(Int.MAX_VALUE)
+        .setSplitLines(false)
+        // 展开共享引用：避免生成的 config.yaml 出现 `*id001` 之类的匿名别名
+        .setDereferenceAliases(true)
+        .build()
+
+    @Suppress("UNCHECKED_CAST")
+    private fun loadRootMap(content: String): MutableMap<String, Any?> {
+        if (content.isBlank()) return linkedMapOf()
+        val loaded = try {
+            Load(loadSettings).loadFromString(content)
+        } catch (e: YamlEngineException) {
+            // 即使 mihomo -t 已在导入时校验通过，snakeyaml-engine 仍可能因解析差异失败——
+            // 必须写日志便于排查，否则 writeRunConfig 会生成只含 Mishka 注入段的空壳配置，
+            // 启动后 UI 表现为"无代理组"
+            Log.e(TAG, "Failed to parse subscription YAML, generating shell config only", e)
+            null
         }
-        return null
+        val map = loaded as? Map<String, Any?> ?: return linkedMapOf()
+        return LinkedHashMap(map)
     }
 }

@@ -43,7 +43,6 @@ import mishka.shared.generated.resources.log_title
 import mishka.shared.generated.resources.log_waiting
 import org.jetbrains.compose.resources.stringResource
 import top.yukonga.mishka.data.model.LogMessage
-import top.yukonga.mishka.viewmodel.IndexedLog
 import top.yukonga.mishka.viewmodel.LogViewModel
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Icon

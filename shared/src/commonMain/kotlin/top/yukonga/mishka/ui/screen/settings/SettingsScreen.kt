@@ -21,6 +21,9 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import mishka.shared.generated.resources.Res
+import mishka.shared.generated.resources.common_cancel
+import mishka.shared.generated.resources.common_confirm
+import mishka.shared.generated.resources.network_input_value
 import mishka.shared.generated.resources.settings_about
 import mishka.shared.generated.resources.settings_app_proxy
 import mishka.shared.generated.resources.settings_app_proxy_summary
@@ -41,16 +44,12 @@ import mishka.shared.generated.resources.settings_theme_light
 import mishka.shared.generated.resources.settings_theme_mode
 import mishka.shared.generated.resources.settings_theme_system
 import mishka.shared.generated.resources.settings_title
+import mishka.shared.generated.resources.settings_tun_device
 import mishka.shared.generated.resources.settings_tun_mode
 import mishka.shared.generated.resources.settings_tun_root_summary
 import mishka.shared.generated.resources.settings_tun_vpn_summary
-import mishka.shared.generated.resources.settings_tun_device
-import mishka.shared.generated.resources.settings_tun_device_summary
 import mishka.shared.generated.resources.settings_vpn_settings
 import mishka.shared.generated.resources.settings_vpn_summary
-import mishka.shared.generated.resources.common_cancel
-import mishka.shared.generated.resources.common_confirm
-import mishka.shared.generated.resources.network_input_value
 import org.jetbrains.compose.resources.stringResource
 import top.yukonga.mishka.platform.BootStartManager
 import top.yukonga.mishka.platform.PlatformStorage

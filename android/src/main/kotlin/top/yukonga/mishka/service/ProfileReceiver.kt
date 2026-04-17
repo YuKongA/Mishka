@@ -6,7 +6,6 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
-import android.os.Build
 import android.util.Log
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -16,7 +15,6 @@ import kotlinx.coroutines.sync.withLock
 import top.yukonga.mishka.data.database.ImportedEntity
 import top.yukonga.mishka.data.database.getAppDatabase
 import java.io.File
-import java.util.concurrent.TimeUnit
 
 /**
  * 配置自动更新调度器（对齐 CMFA ProfileReceiver）。

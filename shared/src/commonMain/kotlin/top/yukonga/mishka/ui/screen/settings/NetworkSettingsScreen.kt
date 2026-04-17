@@ -33,7 +33,6 @@ import mishka.shared.generated.resources.common_items_count
 import mishka.shared.generated.resources.common_not_modified
 import mishka.shared.generated.resources.network_allow_lan
 import mishka.shared.generated.resources.network_bind_address
-import mishka.shared.generated.resources.network_external_controller
 import mishka.shared.generated.resources.network_dns
 import mishka.shared.generated.resources.network_dns_default_nameserver
 import mishka.shared.generated.resources.network_dns_enable
@@ -42,6 +41,7 @@ import mishka.shared.generated.resources.network_dns_fakeip_filter
 import mishka.shared.generated.resources.network_dns_listen
 import mishka.shared.generated.resources.network_dns_listen_title
 import mishka.shared.generated.resources.network_dns_use_hosts
+import mishka.shared.generated.resources.network_external_controller
 import mishka.shared.generated.resources.network_http_port
 import mishka.shared.generated.resources.network_input_value
 import mishka.shared.generated.resources.network_log_level

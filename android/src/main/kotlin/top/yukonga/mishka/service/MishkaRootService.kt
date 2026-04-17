@@ -13,7 +13,6 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.io.File
 import top.yukonga.mishka.R
 import top.yukonga.mishka.data.repository.OverrideStorageHelper
 import top.yukonga.mishka.platform.PlatformStorage
@@ -22,6 +21,7 @@ import top.yukonga.mishka.platform.ProxyServiceStatus
 import top.yukonga.mishka.platform.ProxyState
 import top.yukonga.mishka.platform.StorageKeys
 import top.yukonga.mishka.platform.TunMode
+import java.io.File
 
 /**
  * ROOT TUN 模式前台服务。
@@ -40,10 +40,23 @@ class MishkaRootService : Service() {
     override fun onCreate() {
         super.onCreate()
         NotificationHelper.createChannels(this)
-        startForeground(
-            NotificationHelper.NOTIFICATION_ID_VPN,
-            NotificationHelper.buildLoadingNotification(this),
-        )
+        try {
+            startForeground(
+                NotificationHelper.NOTIFICATION_ID_VPN,
+                NotificationHelper.buildLoadingNotification(this),
+            )
+        } catch (e: Exception) {
+            Log.e(TAG, "startForeground failed", e)
+            ProxyServiceBridge.updateState(
+                ProxyServiceStatus(
+                    ProxyState.Error,
+                    errorMessage = getString(R.string.error_foreground_failed, e.message ?: e.javaClass.simpleName),
+                    tunMode = TunMode.Root,
+                )
+            )
+            stopSelf()
+            return
+        }
         // 监听动态通知设置变化，实时切换通知样式
         notificationRefreshJob = scope.launch {
             ProxyServiceBridge.notificationRefresh.collect {

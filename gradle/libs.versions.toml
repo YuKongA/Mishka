@@ -16,6 +16,7 @@ material-icons-extended = "1.7.3"
 miuix = "0.9.0"
 room3 = "3.0.0-alpha03"
 quickie = "1.11.0"
+snakeyaml-engine = "3.0.1"
 sqlite = "2.6.2"
 
 [libraries]
@@ -44,6 +45,7 @@ miuix-icons = { module = "top.yukonga.miuix.kmp:miuix-icons", version.ref = "miu
 miuix-navigation3-ui = { module = "top.yukonga.miuix.kmp:miuix-navigation3-ui", version.ref = "miuix" }
 miuix-preference = { module = "top.yukonga.miuix.kmp:miuix-preference", version.ref = "miuix" }
 quickie-bundled = { module = "io.github.g00fy2.quickie:quickie-bundled", version.ref = "quickie" }
+snakeyaml-engine = { module = "org.snakeyaml:snakeyaml-engine", version.ref = "snakeyaml-engine" }
 
 [plugins]
 androidApplication = { id = "com.android.application", version.ref = "agp" }

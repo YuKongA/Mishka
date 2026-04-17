@@ -13,11 +13,11 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import top.yukonga.mishka.R
 import top.yukonga.mishka.data.database.getAppDatabase
+import top.yukonga.mishka.data.model.Subscription
 import top.yukonga.mishka.data.repository.ConfigProcessor
 import top.yukonga.mishka.data.repository.SubscriptionFetcher
-import top.yukonga.mishka.data.model.Subscription
-import top.yukonga.mishka.R
 
 /**
  * 配置后台更新前台服务（对齐 CMFA ProfileWorker）。
@@ -34,11 +34,17 @@ class ProfileWorker : Service() {
 
     override fun onCreate() {
         super.onCreate()
-        startForeground(
-            NotificationHelper.NOTIFICATION_ID_PROFILE_WORKER,
-            NotificationHelper.buildProfileWorkerNotification(this),
-            ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE,
-        )
+        try {
+            startForeground(
+                NotificationHelper.NOTIFICATION_ID_PROFILE_WORKER,
+                NotificationHelper.buildProfileWorkerNotification(this),
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE,
+            )
+        } catch (e: Exception) {
+            Log.e(TAG, "startForeground failed", e)
+            stopSelf()
+            return
+        }
 
         // 所有任务完成后自动停止
         scope.launch {
