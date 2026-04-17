@@ -20,32 +20,42 @@ jobs:
     name: Build mihomo
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout Mishka for version
+        uses: actions/checkout@v6
+        with:
+          sparse-checkout: gradle.properties
+          sparse-checkout-cone-mode: false
+          path: mishka
+
+      - name: Read mihomo version
+        id: mihomo
+        working-directory: mishka
+        run: |
+          VERSION=$(grep '^mihomo.version=' gradle.properties | cut -d'=' -f2)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
       - name: Checkout mihomo
         uses: actions/checkout@v6
         with:
           repository: YuKongA/mihomo
           ref: Mishka
+          path: mihomo
 
       - name: Set up Go
         uses: actions/setup-go@v6
         with:
-          go-version-file: go.mod
-
-      - name: Get mihomo version
-        id: mihomo
-        run: |
-          VERSION="alpha-$(git rev-parse --short HEAD)"
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          go-version-file: mihomo/go.mod
 
       - name: Build mihomo for Android arm64
         env:
           GOOS: android
           GOARCH: arm64
           CGO_ENABLED: 0
+        working-directory: mihomo
         run: |
           go build -v -tags "cmfa,mishka,with_gvisor" -trimpath \
             -ldflags "-s -w -X 'github.com/metacubex/mihomo/constant.Version=${{ steps.mihomo.outputs.version }}'" \
-            -o libmihomo.so .
+            -o ../libmihomo.so .
 
       - name: Upload mihomo artifact
         uses: actions/upload-artifact@v7
@@ -77,15 +87,6 @@ jobs:
         with:
           name: libmihomo.so
           path: android/src/main/jniLibs/arm64-v8a/
-
-      - name: Compress mihomo with UPX
-        run: |
-          MIHOMO=android/src/main/jniLibs/arm64-v8a/libmihomo.so
-          $ANDROID_NDK_LATEST_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-objcopy --strip-sections $MIHOMO
-          chmod +x $MIHOMO
-          curl -Lo upx.tar.xz https://github.com/upx/upx/releases/download/v5.1.1/upx-5.1.1-amd64_linux.tar.xz
-          tar -xf upx.tar.xz --strip-components=1 upx-5.1.1-amd64_linux/upx
-          ./upx --best $MIHOMO
 
       - name: Download GeoIP files
         run: ./gradlew :android:downloadGeoFiles
