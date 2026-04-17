@@ -28,8 +28,18 @@ class AndroidProfileFileManager(private val context: Context) : ProfileFileManag
         ProfileFileOps.cloneImportedToPending(context, sourceUuid, targetUuid)
     }
 
-    override suspend fun validate(workDir: String, onProgress: ((String) -> Unit)?): String? {
-        return MihomoValidator.validate(context, workDir, onProgress)
+    override suspend fun validate(workDir: String, configFileName: String, onProgress: ((String) -> Unit)?): String? {
+        return MihomoValidator.validate(context, workDir, configFileName, onProgress)
+    }
+
+    override fun generateValidationConfig(uuid: String): String {
+        ConfigGenerator.writeValidationConfig(context, uuid)
+        return ConfigGenerator.VALIDATION_CONFIG_NAME
+    }
+
+    override fun cleanupValidationConfig(uuid: String) {
+        val file = java.io.File(ProfileFileOps.getSubscriptionDir(context, uuid), ConfigGenerator.VALIDATION_CONFIG_NAME)
+        if (file.exists()) file.delete()
     }
 
     override fun ensureGeodataAvailable(workDir: String) {

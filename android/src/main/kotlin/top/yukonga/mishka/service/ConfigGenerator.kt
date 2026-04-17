@@ -22,11 +22,21 @@ data class RunConfigResult(
     val secret: String,
 )
 
+/** 构建结果。纯数据，不包含文件写入副作用 —— 由调用方决定写入位置。 */
+private data class BuildResult(
+    val yamlString: String,
+    val externalController: String,
+    val secret: String,
+)
+
 object ConfigGenerator {
 
     private const val TAG = "ConfigGenerator"
     private const val DEFAULT_CONTROLLER = "127.0.0.1:9090"
     internal const val DEFAULT_TUN_DEVICE = "Mishka"
+
+    /** mihomo -t 校验时使用的临时配置文件名（相对订阅 workDir） */
+    const val VALIDATION_CONFIG_NAME = "config.validate.yaml"
 
     fun generateSecret(): String = UUID.randomUUID().toString().take(16)
 
@@ -39,7 +49,7 @@ object ConfigGenerator {
     fun getConfigFile(context: Context): File = File(getWorkDir(context), "config.yaml")
 
     /**
-     * 生成最终运行配置。
+     * 生成最终运行配置并写入全局 config.yaml。
      * 解析订阅 YAML 为 Map，移除 Mishka 管理的 key 后注入新值，最后序列化回 YAML。
      *
      * @param tunFd VPN 的 TUN 文件描述符，注入到 tun.file-descriptor（VPN 模式）
@@ -52,7 +62,43 @@ object ConfigGenerator {
         tunFd: Int = -1,
         rootMode: Boolean = false,
     ): RunConfigResult {
+        val result = buildRunConfig(context, secret, subscriptionId, tunFd, rootMode, stubTunForValidation = false)
         val configFile = getConfigFile(context)
+        configFile.writeText(result.yamlString)
+        return RunConfigResult(configFile, result.externalController, result.secret)
+    }
+
+    /**
+     * 生成 mihomo -t 校验专用的配置并写入订阅目录。
+     *
+     * 与 writeRunConfig 共享 override 合并逻辑，确保校验的 YAML 与将要运行的 YAML 基本一致，
+     * 避免"原始订阅通过校验但 override 合并后导致运行失败"的 silent gap。
+     *
+     * 唯一差异：tun 段注入 `{enable: false}` 占位，避免 mihomo -t 对 TUN 特定字段做强校验
+     * （校验阶段没有 TUN fd，也不需要校验 auto-route 等运行时行为）。
+     */
+    fun writeValidationConfig(context: Context, subscriptionId: String): File {
+        val result = buildRunConfig(
+            context,
+            secret = "validate",
+            subscriptionId = subscriptionId,
+            tunFd = -1,
+            rootMode = false,
+            stubTunForValidation = true,
+        )
+        val file = File(ProfileFileOps.getSubscriptionDir(context, subscriptionId), VALIDATION_CONFIG_NAME)
+        file.writeText(result.yamlString)
+        return file
+    }
+
+    private fun buildRunConfig(
+        context: Context,
+        secret: String,
+        subscriptionId: String?,
+        tunFd: Int,
+        rootMode: Boolean,
+        stubTunForValidation: Boolean,
+    ): BuildResult {
         val storage = PlatformStorage(context)
         val h = OverrideStorageHelper
 
@@ -142,7 +188,13 @@ object ConfigGenerator {
 
         root["external-controller"] = configController
         root["secret"] = effectiveSecret
-        root["tun"] = buildTunMap(storage, rootMode, tunFd)
+        root["tun"] = if (stubTunForValidation) {
+            // 校验阶段不需要 TUN fd 和 auto-route，用 enable:false 占位，
+            // 避免 mihomo -t 对 TUN 特定字段做强校验
+            linkedMapOf<String, Any?>("enable" to false)
+        } else {
+            buildTunMap(storage, rootMode, tunFd)
+        }
 
         root.putIfNotNull("port", httpPort)
         root.putIfNotNull("socks-port", socksPort)
@@ -198,8 +250,11 @@ object ConfigGenerator {
             root["mode"] = "rule"
         }
 
-        configFile.writeText(Dump(dumpSettings).dumpToString(root))
-        return RunConfigResult(configFile, effectiveController, effectiveSecret)
+        return BuildResult(
+            yamlString = Dump(dumpSettings).dumpToString(root),
+            externalController = effectiveController,
+            secret = effectiveSecret,
+        )
     }
 
     private fun buildTunMap(

@@ -247,11 +247,7 @@ class SubscriptionViewModel(
         yield()
         val workDir = fileManager.getDir(subscription.id)
         fileManager.ensureGeodataAvailable(workDir)
-        val error = fileManager.validate(workDir) { provider ->
-            _uiState.value = _uiState.value.copy(
-                importProgress = ImportProgress(provider)
-            )
-        }
+        val error = validateWithOverrides(subscription.id, workDir)
         if (error == null) {
             fileManager.collectGeodata(workDir)
         }
@@ -282,11 +278,7 @@ class SubscriptionViewModel(
         yield()
         val workDir = fileManager.getDir(subscription.id)
         fileManager.ensureGeodataAvailable(workDir)
-        val error = fileManager.validate(workDir) { provider ->
-            _uiState.value = _uiState.value.copy(
-                importProgress = ImportProgress(provider)
-            )
-        }
+        val error = validateWithOverrides(subscription.id, workDir)
         if (error == null) {
             fileManager.collectGeodata(workDir)
         }
@@ -337,5 +329,20 @@ class SubscriptionViewModel(
     private suspend fun cleanupFailedPending(uuid: String) {
         repository.release(uuid)
         fileManager.releasePending(uuid)
+    }
+
+    /**
+     * 生成 override 合并后的临时配置并 mihomo -t 校验，try/finally 确保清理临时文件。
+     * 校验将要运行的 YAML 而非原始订阅，捕捉 override（DNS/port/sniffer 等）与订阅的交互 bug。
+     */
+    private suspend fun validateWithOverrides(uuid: String, workDir: String): String? {
+        val validationFileName = fileManager.generateValidationConfig(uuid)
+        return try {
+            fileManager.validate(workDir, validationFileName) { provider ->
+                _uiState.value = _uiState.value.copy(importProgress = ImportProgress(provider))
+            }
+        } finally {
+            fileManager.cleanupValidationConfig(uuid)
+        }
     }
 }

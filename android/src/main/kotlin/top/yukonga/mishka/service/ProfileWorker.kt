@@ -120,11 +120,14 @@ class ProfileWorker : Service() {
                     )
                 }
 
-                // 4. mihomo -t 校验
-                val error = MihomoValidator.validate(
-                    this,
-                    ProfileFileOps.getSubscriptionDir(this, uuid).absolutePath,
-                )
+                // 4. mihomo -t 校验 override 合并后的配置（非原始订阅），捕捉 override 与订阅的交互 bug
+                val workDir = ProfileFileOps.getSubscriptionDir(this, uuid).absolutePath
+                ConfigGenerator.writeValidationConfig(this, uuid)
+                val error = try {
+                    MihomoValidator.validate(this, workDir, ConfigGenerator.VALIDATION_CONFIG_NAME)
+                } finally {
+                    java.io.File(workDir, ConfigGenerator.VALIDATION_CONFIG_NAME).takeIf { it.exists() }?.delete()
+                }
                 if (error != null) {
                     throw Exception(error)
                 }

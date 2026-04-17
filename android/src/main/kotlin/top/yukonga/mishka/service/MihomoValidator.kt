@@ -20,11 +20,15 @@ object MihomoValidator {
      * 对指定工作目录运行 mihomo -t 校验配置。
      *
      * @param context Android 上下文
-     * @param workDir 工作目录（包含 config.yaml 和 providers/）
+     * @param workDir 工作目录（包含配置和 providers/）
+     * @param configFileName 相对 workDir 的配置文件名，调用方可指定 override 合并后的校验专用配置
      * @return null 表示校验通过，否则返回错误信息
      */
     suspend fun validate(
-        context: Context, workDir: String, onProgress: ((String) -> Unit)? = null
+        context: Context,
+        workDir: String,
+        configFileName: String = "config.yaml",
+        onProgress: ((String) -> Unit)? = null,
     ): String? = withContext(Dispatchers.IO) {
         val binary = getMihomoBinary(context)
         if (binary == null) {
@@ -34,7 +38,7 @@ object MihomoValidator {
 
         binary.setExecutable(true)
 
-        val configFile = File(workDir, "config.yaml")
+        val configFile = File(workDir, configFileName)
         if (!configFile.exists()) {
             return@withContext "Configuration file does not exist: ${configFile.absolutePath}"
         }
