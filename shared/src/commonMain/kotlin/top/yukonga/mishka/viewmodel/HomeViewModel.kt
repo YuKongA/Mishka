@@ -11,13 +11,13 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.launch
 import top.yukonga.mishka.data.api.MihomoApiClient
 import top.yukonga.mishka.data.api.MihomoWebSocket
-import top.yukonga.mishka.data.model.ConfigPatch
 import top.yukonga.mishka.data.model.MemoryData
 import top.yukonga.mishka.data.model.MihomoConfig
 import top.yukonga.mishka.data.model.SubscriptionInfo
 import top.yukonga.mishka.data.model.TrafficData
-import top.yukonga.mishka.data.model.TunPatch
 import top.yukonga.mishka.data.repository.MihomoRepository
+import top.yukonga.mishka.data.repository.OverrideStorageHelper
+import top.yukonga.mishka.platform.PlatformStorage
 import top.yukonga.mishka.platform.PlatformSystemInfo
 import top.yukonga.mishka.platform.ProxyServiceController
 import top.yukonga.mishka.platform.ProxyState
@@ -55,6 +55,7 @@ data class HomeUiState(
 
 class HomeViewModel(
     private val serviceController: ProxyServiceController,
+    private val storage: PlatformStorage,
     private val getActiveSubscriptionId: () -> String? = { null },
 ) : ViewModel() {
 
@@ -210,19 +211,15 @@ class HomeViewModel(
     }
 
     fun switchMode(mode: String) {
-        viewModelScope.launch {
-            repository?.patchConfig(ConfigPatch(mode = mode))?.onSuccess {
-                _uiState.value = _uiState.value.copy(mode = mode)
-            }
-        }
+        OverrideStorageHelper.writeNullableString(storage, OverrideStorageHelper.KEY_MODE, mode)
+        _uiState.value = _uiState.value.copy(mode = mode)
+        serviceController.restart(getActiveSubscriptionId())
     }
 
     fun switchTunStack(stack: String) {
-        viewModelScope.launch {
-            repository?.patchConfig(ConfigPatch(tun = TunPatch(stack = stack)))?.onSuccess {
-                _uiState.value = _uiState.value.copy(tunStack = stack)
-            }
-        }
+        OverrideStorageHelper.writeNullableString(storage, OverrideStorageHelper.KEY_TUN_STACK, stack)
+        _uiState.value = _uiState.value.copy(tunStack = stack)
+        serviceController.restart(getActiveSubscriptionId())
     }
 
     private suspend fun loadProxyGroups() {
@@ -258,11 +255,7 @@ class HomeViewModel(
     }
 
     fun reloadConfig() {
-        viewModelScope.launch {
-            repository?.restart()
-            delay(1000)
-            loadConfig()
-        }
+        serviceController.restart(getActiveSubscriptionId())
     }
 
     fun testLatency() {

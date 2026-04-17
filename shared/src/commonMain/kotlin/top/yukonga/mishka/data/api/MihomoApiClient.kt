@@ -8,7 +8,6 @@ import io.ktor.client.plugins.websocket.WebSockets
 import io.ktor.client.request.delete
 import io.ktor.client.request.get
 import io.ktor.client.request.header
-import io.ktor.client.request.patch
 import io.ktor.client.request.post
 import io.ktor.client.request.put
 import io.ktor.client.request.setBody
@@ -16,7 +15,6 @@ import io.ktor.http.ContentType
 import io.ktor.http.contentType
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.serialization.json.Json
-import top.yukonga.mishka.data.model.ConfigPatch
 import top.yukonga.mishka.data.model.ConnectionsResponse
 import top.yukonga.mishka.data.model.DelayResult
 import top.yukonga.mishka.data.model.DnsQueryResponse
@@ -60,20 +58,6 @@ class MihomoApiClient(
 
     suspend fun getConfig(): MihomoConfig =
         client.get("$baseUrl/configs").body()
-
-    suspend fun patchConfig(patch: ConfigPatch) {
-        client.patch("$baseUrl/configs") {
-            contentType(ContentType.Application.Json)
-            setBody(patch)
-        }
-    }
-
-    suspend fun reloadConfig(path: String, payload: String = "") {
-        client.put("$baseUrl/configs") {
-            contentType(ContentType.Application.Json)
-            setBody(mapOf("path" to path, "payload" to payload))
-        }
-    }
 
     // === 代理 ===
 
@@ -162,12 +146,6 @@ class MihomoApiClient(
 
     suspend fun flushDnsCache() {
         client.post("$baseUrl/cache/dns/flush")
-    }
-
-    // === 控制 ===
-
-    suspend fun restart() {
-        client.post("$baseUrl/restart")
     }
 
     // === 生命周期 ===

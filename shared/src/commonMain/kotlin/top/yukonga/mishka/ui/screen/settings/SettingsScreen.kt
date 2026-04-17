@@ -171,6 +171,7 @@ fun SettingsScreen(
                                 tunDeviceTextState.edit { replace(0, length, tunDevice) }
                                 showTunDeviceDialog = true
                             },
+                            enabled = !isProxyRunning,
                         )
                     }
                     ArrowPreference(

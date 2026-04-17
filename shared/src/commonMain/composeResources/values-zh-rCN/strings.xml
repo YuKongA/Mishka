@@ -229,8 +229,10 @@
     <string name="network_dns_default_nameserver">默认 Nameserver</string>
     <string name="network_dns_fakeip_filter">FakeIP 过滤</string>
     <string name="network_port_label">端口号 (0-65535)</string>
+    <string name="network_port_zero_hint">填写 0 表示禁用该端口</string>
     <string name="network_input_value">输入值</string>
     <string name="network_one_per_line">每行一条</string>
+    <string name="settings_override_restart_hint">此页设置修改后需重启代理服务生效</string>
 
     <!-- Meta Settings -->
     <string name="meta_settings_title">Meta 设置</string>

@@ -42,6 +42,7 @@ import mishka.shared.generated.resources.meta_unified_delay
 import org.jetbrains.compose.resources.stringResource
 import top.yukonga.mishka.data.repository.OverrideStorageHelper
 import top.yukonga.mishka.ui.component.ListEditDialog
+import top.yukonga.mishka.ui.component.RestartRequiredHint
 import top.yukonga.mishka.ui.component.TriStatePreference
 import top.yukonga.mishka.viewmodel.OverrideSettingsViewModel
 import top.yukonga.miuix.kmp.basic.Card
@@ -113,6 +114,8 @@ fun MetaSettingsScreen(
                 bottom = bottomPadding,
             ),
         ) {
+            item { RestartRequiredHint() }
+
             // === 基本 ===
             item { SmallTitle(text = stringResource(Res.string.meta_basic)) }
             item {

@@ -19,6 +19,7 @@ fun TriStatePreference(
     title: String,
     value: Boolean?,
     onValueChange: (Boolean?) -> Unit,
+    enabled: Boolean = true,
 ) {
     val items = listOf(stringResource(Res.string.common_not_modified), stringResource(Res.string.common_enabled), stringResource(Res.string.common_disabled))
     val selectedIndex = when (value) {
@@ -41,5 +42,6 @@ fun TriStatePreference(
                 }
             )
         },
+        enabled = enabled,
     )
 }

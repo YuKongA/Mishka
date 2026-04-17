@@ -56,56 +56,6 @@ data class DnsConfig(
 )
 
 @Serializable
-data class ConfigPatch(
-    val port: Int? = null,
-    @SerialName("socks-port") val socksPort: Int? = null,
-    @SerialName("redir-port") val redirPort: Int? = null,
-    @SerialName("tproxy-port") val tproxyPort: Int? = null,
-    @SerialName("mixed-port") val mixedPort: Int? = null,
-    val mode: String? = null,
-    @SerialName("log-level") val logLevel: String? = null,
-    @SerialName("allow-lan") val allowLan: Boolean? = null,
-    @SerialName("bind-address") val bindAddress: String? = null,
-    val ipv6: Boolean? = null,
-    val tun: TunPatch? = null,
-    @SerialName("unified-delay") val unifiedDelay: Boolean? = null,
-    @SerialName("geodata-mode") val geodataMode: Boolean? = null,
-    @SerialName("tcp-concurrent") val tcpConcurrent: Boolean? = null,
-    @SerialName("find-process-mode") val findProcessMode: String? = null,
-    val sniffer: SnifferPatch? = null,
-    val dns: DnsPatch? = null,
-)
-
-@Serializable
-data class TunPatch(
-    val stack: String? = null,
-)
-
-@Serializable
-data class SnifferPatch(
-    val enable: Boolean? = null,
-    @SerialName("force-dns-mapping") val forceDnsMapping: Boolean? = null,
-    @SerialName("parse-pure-ip") val parsePureIp: Boolean? = null,
-    @SerialName("override-destination") val overrideDestination: Boolean? = null,
-    @SerialName("force-domain") val forceDomain: List<String>? = null,
-    @SerialName("skip-domain") val skipDomain: List<String>? = null,
-)
-
-@Serializable
-data class DnsPatch(
-    val enable: Boolean? = null,
-    val listen: String? = null,
-    val ipv6: Boolean? = null,
-    @SerialName("prefer-h3") val preferH3: Boolean? = null,
-    @SerialName("use-hosts") val useHosts: Boolean? = null,
-    @SerialName("enhanced-mode") val enhancedMode: String? = null,
-    val nameserver: List<String>? = null,
-    val fallback: List<String>? = null,
-    @SerialName("default-nameserver") val defaultNameserver: List<String>? = null,
-    @SerialName("fake-ip-filter") val fakeIpFilter: List<String>? = null,
-)
-
-@Serializable
 data class MihomoVersion(
     val version: String = "",
     val meta: Boolean = true,

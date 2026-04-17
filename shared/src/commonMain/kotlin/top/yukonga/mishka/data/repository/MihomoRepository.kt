@@ -4,7 +4,6 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 import top.yukonga.mishka.data.api.MihomoApiClient
 import top.yukonga.mishka.data.api.MihomoWebSocket
-import top.yukonga.mishka.data.model.ConfigPatch
 import top.yukonga.mishka.data.model.ConnectionsResponse
 import top.yukonga.mishka.data.model.DelayResult
 import top.yukonga.mishka.data.model.DnsQueryResponse
@@ -35,8 +34,6 @@ class MihomoRepository(
 
     suspend fun getVersion(): Result<MihomoVersion> = runCatching { apiClient.getVersion() }
     suspend fun getConfig(): Result<MihomoConfig> = runCatching { apiClient.getConfig() }
-    suspend fun patchConfig(patch: ConfigPatch): Result<Unit> = runCatching { apiClient.patchConfig(patch) }
-    suspend fun reloadConfig(path: String): Result<Unit> = runCatching { apiClient.reloadConfig(path) }
     suspend fun getProxies(): Result<ProxiesResponse> = runCatching { apiClient.getProxies() }
     suspend fun getGroups(): Result<top.yukonga.mishka.data.model.GroupsResponse> = runCatching { apiClient.getGroups() }
     suspend fun selectProxy(group: String, name: String): Result<Unit> = runCatching { apiClient.selectProxy(group, name) }
@@ -55,7 +52,6 @@ class MihomoRepository(
     suspend fun queryDns(name: String, type: String = "A"): Result<DnsQueryResponse> = runCatching { apiClient.queryDns(name, type) }
     suspend fun flushFakeIp(): Result<Unit> = runCatching { apiClient.flushFakeIp() }
     suspend fun flushDnsCache(): Result<Unit> = runCatching { apiClient.flushDnsCache() }
-    suspend fun restart(): Result<Unit> = runCatching { apiClient.restart() }
 
     fun close() {
         apiClient.close()

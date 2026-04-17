@@ -10,6 +10,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -21,6 +23,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
@@ -48,6 +51,7 @@ import mishka.shared.generated.resources.network_log_level
 import mishka.shared.generated.resources.network_mixed_port
 import mishka.shared.generated.resources.network_options
 import mishka.shared.generated.resources.network_port_label
+import mishka.shared.generated.resources.network_port_zero_hint
 import mishka.shared.generated.resources.network_proxy_ports
 import mishka.shared.generated.resources.network_redir_port
 import mishka.shared.generated.resources.network_settings_title
@@ -56,6 +60,7 @@ import mishka.shared.generated.resources.network_tproxy_port
 import org.jetbrains.compose.resources.stringResource
 import top.yukonga.mishka.data.repository.OverrideStorageHelper
 import top.yukonga.mishka.ui.component.ListEditDialog
+import top.yukonga.mishka.ui.component.RestartRequiredHint
 import top.yukonga.mishka.ui.component.TriStatePreference
 import top.yukonga.mishka.viewmodel.OverrideSettingsViewModel
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
@@ -160,6 +165,8 @@ fun NetworkSettingsScreen(
                 bottom = bottomPadding,
             ),
         ) {
+            item { RestartRequiredHint() }
+
             // === 代理端口 ===
             item { SmallTitle(text = stringResource(Res.string.network_proxy_ports)) }
             item {
@@ -254,52 +261,63 @@ fun NetworkSettingsScreen(
                         value = uiState.dnsEnable,
                         onValueChange = { viewModel.updateBoolean(OverrideStorageHelper.KEY_DNS_ENABLE, it) },
                     )
+                    // DNS 显式关闭时禁用子项；null（不修改）仍保留可编辑，允许用户预配置子覆写
+                    val dnsSubEnabled = uiState.dnsEnable != false
                     val dnsListenTitle = stringResource(Res.string.network_dns_listen_title)
                     ArrowPreference(
                         title = stringResource(Res.string.network_dns_listen),
                         summary = uiState.dnsListen ?: stringResource(Res.string.common_not_modified),
                         onClick = { openStringDialog(dnsListenTitle, OverrideStorageHelper.KEY_DNS_LISTEN, uiState.dnsListen) },
+                        enabled = dnsSubEnabled,
                     )
                     TriStatePreference(
                         title = "DNS IPv6",
                         value = uiState.dnsIpv6,
                         onValueChange = { viewModel.updateBoolean(OverrideStorageHelper.KEY_DNS_IPV6, it) },
+                        enabled = dnsSubEnabled,
                     )
                     TriStatePreference(
                         title = "Prefer H3",
                         value = uiState.dnsPreferH3,
                         onValueChange = { viewModel.updateBoolean(OverrideStorageHelper.KEY_DNS_PREFER_H3, it) },
+                        enabled = dnsSubEnabled,
                     )
                     TriStatePreference(
                         title = stringResource(Res.string.network_dns_use_hosts),
                         value = uiState.dnsUseHosts,
                         onValueChange = { viewModel.updateBoolean(OverrideStorageHelper.KEY_DNS_USE_HOSTS, it) },
+                        enabled = dnsSubEnabled,
                     )
                     DnsEnhancedModePreference(
                         value = uiState.dnsEnhancedMode,
                         onValueChange = { viewModel.updateString(OverrideStorageHelper.KEY_DNS_ENHANCED_MODE, it) },
+                        enabled = dnsSubEnabled,
                     )
                     ArrowPreference(
                         title = "Nameserver",
                         summary = listSummary(uiState.dnsNameservers),
                         onClick = { openListDialog("Nameserver", OverrideStorageHelper.KEY_DNS_NAMESERVERS, uiState.dnsNameservers) },
+                        enabled = dnsSubEnabled,
                     )
                     ArrowPreference(
                         title = "Fallback",
                         summary = listSummary(uiState.dnsFallback),
                         onClick = { openListDialog("Fallback", OverrideStorageHelper.KEY_DNS_FALLBACK, uiState.dnsFallback) },
+                        enabled = dnsSubEnabled,
                     )
                     val defaultNsTitle = stringResource(Res.string.network_dns_default_nameserver)
                     ArrowPreference(
                         title = defaultNsTitle,
                         summary = listSummary(uiState.dnsDefaultNameserver),
                         onClick = { openListDialog(defaultNsTitle, OverrideStorageHelper.KEY_DNS_DEFAULT_NAMESERVER, uiState.dnsDefaultNameserver) },
+                        enabled = dnsSubEnabled,
                     )
                     val fakeipFilterTitle = stringResource(Res.string.network_dns_fakeip_filter)
                     ArrowPreference(
                         title = fakeipFilterTitle,
                         summary = listSummary(uiState.dnsFakeIpFilter),
                         onClick = { openListDialog(fakeipFilterTitle, OverrideStorageHelper.KEY_DNS_FAKEIP_FILTER, uiState.dnsFakeIpFilter) },
+                        enabled = dnsSubEnabled,
                     )
                 }
             }
@@ -364,6 +382,7 @@ private fun LogLevelPreference(
 private fun DnsEnhancedModePreference(
     value: String?,
     onValueChange: (String?) -> Unit,
+    enabled: Boolean = true,
 ) {
     val notModifiedStr2 = stringResource(Res.string.common_not_modified)
     val items = listOf(notModifiedStr2, "Normal", "FakeIP", "Redir-Host")
@@ -376,6 +395,7 @@ private fun DnsEnhancedModePreference(
         items = items,
         selectedIndex = selectedIndex,
         onSelectedIndexChange = { index -> onValueChange(values[index]) },
+        enabled = enabled,
     )
 }
 
@@ -383,7 +403,7 @@ private fun DnsEnhancedModePreference(
 private fun PortEditDialog(
     show: Boolean,
     title: String,
-    textState: androidx.compose.foundation.text.input.TextFieldState,
+    textState: TextFieldState,
     onDismiss: () -> Unit,
     onConfirm: (Int?) -> Unit,
     onReset: () -> Unit,
@@ -391,14 +411,15 @@ private fun PortEditDialog(
     WindowDialog(
         show = show,
         title = title,
+        summary = stringResource(Res.string.network_port_zero_hint),
         onDismissRequest = onDismiss,
     ) {
         TextField(
             state = textState,
             modifier = Modifier.fillMaxWidth(),
             label = stringResource(Res.string.network_port_label),
-            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
-                keyboardType = androidx.compose.ui.text.input.KeyboardType.Number,
+            keyboardOptions = KeyboardOptions(
+                keyboardType = KeyboardType.Number,
             ),
         )
         Spacer(Modifier.height(12.dp))
@@ -439,7 +460,7 @@ private fun PortEditDialog(
 private fun StringEditDialog(
     show: Boolean,
     title: String,
-    textState: androidx.compose.foundation.text.input.TextFieldState,
+    textState: TextFieldState,
     onDismiss: () -> Unit,
     onConfirm: (String?) -> Unit,
     onReset: () -> Unit,

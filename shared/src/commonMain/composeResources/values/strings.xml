@@ -229,8 +229,10 @@
     <string name="network_dns_default_nameserver">Default Nameserver</string>
     <string name="network_dns_fakeip_filter">FakeIP Filter</string>
     <string name="network_port_label">Port (0-65535)</string>
+    <string name="network_port_zero_hint">0 disables this listener</string>
     <string name="network_input_value">Input value</string>
     <string name="network_one_per_line">One per line</string>
+    <string name="settings_override_restart_hint">Changes to these settings take effect after restarting the proxy service.</string>
 
     <!-- Meta Settings -->
     <string name="meta_settings_title">Meta Settings</string>

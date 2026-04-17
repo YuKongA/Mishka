@@ -37,18 +37,18 @@ Mishka/
 │   │   │   ├── api/                  MihomoApiClient（REST）+ MihomoWebSocket（流）
 │   │   │   ├── database/             Room 3.0 KMP（AppDatabase + 3 Entity + 3 DAO + DataMigration）
 │   │   │   ├── model/                12 个 @Serializable 数据模型
-│   │   │   └── repository/           MihomoRepository + SubscriptionRepository + SubscriptionFetcher + ConfigProcessor + V2RayConverter
-│   │   ├── platform/                 9 个 expect 声明 + ProfileFileManager 接口
+│   │   │   └── repository/           MihomoRepository + SubscriptionRepository + SubscriptionFetcher + ConfigProcessor + V2RayConverter + OverrideStorageHelper
+│   │   ├── platform/                 9 个 expect 声明 + ProfileFileManager 接口 + ProxyServiceBridge
 │   │   ├── ui/
 │   │   │   ├── navigation/           AppNavigation（主导航树 + HorizontalPager）
 │   │   │   ├── navigation3/          Route（14 路由）+ Navigator（自定义栈）
-│   │   │   ├── component/            SearchBar + SearchStatus + MenuPositionProvider + TriStatePreference + ListEditDialog
+│   │   │   ├── component/            SearchBar + SearchStatus + MenuPositionProvider + TriStatePreference + NullablePortPreference + ListEditDialog + RestartRequiredHint
 │   │   │   │   └── effect/           BgEffectBackground（OS3 动态渐变着色器背景）
 │   │   │   └── screen/               17 个页面（home/ proxy/ subscription/ settings/ log/ provider/ dns/ connection/）
-│   │   ├── viewmodel/                10 个 ViewModel
+│   │   ├── viewmodel/                9 个 ViewModel
 │   │   └── util/                     FormatUtils
 │   ├── commonMain/composeResources/
-│   │   ├── values/strings.xml        英文默认字符串（~180 key）
+│   │   ├── values/strings.xml        英文默认字符串（244 key）
 │   │   └── values-zh-rCN/strings.xml 中文字符串
 │   ├── androidMain/                  actual 实现 + AppDatabaseBuilder
 │   └── desktopMain/                  actual 桩实现 + AppDatabaseBuilder
@@ -93,13 +93,13 @@ MainActivity → App → AppNavigation
   - ROOT 不可用时（卸载 Magisk 等）自动回退 VPN 模式
 - **状态桥接**：ProxyServiceBridge（全局 StateFlow + TunMode），Service 写入、ViewModel 读取
 - **进程模型**：单进程（VpnService 和 UI 同进程），ROOT 模式 mihomo 为独立 root 进程
-- **数据持久化**：Room 3.0 KMP（结构化数据）+ PlatformStorage（简单偏好设置）+ StorageKeys（key 常量）
+- **数据持久化**：Room 3.0 KMP（结构化数据）+ PlatformStorage（简单偏好设置）+ StorageKeys（通用 key 常量）+ OverrideStorageHelper（override key + 可空三态读写）
 - **订阅管理**：Pending/Imported 两阶段编辑模型（对齐 CMFA ProfileManager）
 - **订阅格式兼容**：User-Agent `clash.meta` + V2RayConverter 自动检测 base64/V2Ray 订阅并转换为 mihomo YAML（支持 vmess/vless/trojan/ss/ssr/hysteria/hysteria2/tuic）
 - **GeoIP 预制 + 共享**：构建时 DownloadGeoFilesTask 下载 geoip.metadb/geosite.dat/ASN.mmdb 到 assets，启动时提取到 geodata/ 共享目录 + 符号链接（失败则复制）
 - **配置校验**：mihomo -t 进程完整校验（ProcessBuilder，不需要 TUN fd，超时 90s）
 - **国际化**：默认英文 + 中文（zh-rCN），Compose Resources `stringResource()` + Android `getString()`
-  - Compose 层：`shared/src/commonMain/composeResources/values/strings.xml`（~180 key）
+  - Compose 层：`shared/src/commonMain/composeResources/values/strings.xml`（244 key）
   - Android 层：`android/src/main/res/values/strings.xml`（通知/Tile/错误）
   - 日志消息英文，代码注释中文
 
@@ -170,24 +170,24 @@ files/mihomo/
 
 ## 页面与 ViewModel
 
-| Screen                       | ViewModel             | 说明                                        |
-| ---------------------------- | --------------------- | ------------------------------------------- |
-| HomeScreen（7 个子 Section） | HomeViewModel         | 主页：状态/流量/网速/延迟/快速入口          |
-| ProxyScreen                  | ProxyViewModel        | 代理组 Tab + 节点选择 + 延迟测试 + 选择记忆 |
-| SubscriptionScreen           | SubscriptionViewModel | 订阅列表 + 增删改 + 全部更新 + 编辑 + 复制  |
-| SubscriptionEditScreen       | SubscriptionViewModel | 编辑名称/URL/更新间隔                       |
-| SettingsScreen               | —                     | 设置入口页                                  |
-| LogScreen                    | LogViewModel          | 实时日志流 + 级别过滤                       |
-| ConnectionScreen             | ConnectionViewModel   | 活跃连接列表 + 关闭                         |
-| ProviderScreen               | ProviderViewModel     | Provider 列表 + 刷新                        |
-| DnsQueryScreen               | DnsQueryViewModel     | DNS 查询（A/AAAA/CNAME/MX/TXT/NS）          |
-| AppProxyScreen               | AppProxyViewModel     | 应用代理白/黑名单                           |
-| VpnSettingsScreen            | —                     | VPN 设置（系统代理/排除路由等）             |
-| NetworkSettingsScreen        | OverrideSettingsVM    | 端口/局域网/IPv6 设置                       |
-| MetaSettingsScreen           | OverrideSettingsVM    | 统一延迟/Geodata/TCP 并发/嗅探器            |
-| AboutScreen                  | —                     | 版本信息（OS3 动态背景 + 视差滚动）         |
-| SubscriptionAddScreen        | —                     | 添加方式选择（文件/URL/QR Code）            |
-| SubscriptionAddUrlScreen     | SubscriptionViewModel | URL 导入订阅                                |
+| Screen                       | ViewModel             | 说明                                          |
+| ---------------------------- | --------------------- | --------------------------------------------- |
+| HomeScreen（6 个子 Section） | HomeViewModel         | 状态/ActionButtons/NetworkInfo/QuickEntries/Latency/BottomCards |
+| ProxyScreen                  | ProxyViewModel        | 代理组 Tab + 节点选择 + 延迟测试 + 选择记忆   |
+| SubscriptionScreen           | SubscriptionViewModel | 订阅列表 + 增删改 + 全部更新 + 编辑 + 复制    |
+| SubscriptionEditScreen       | SubscriptionViewModel | 编辑名称/URL/更新间隔                         |
+| SettingsScreen               | —                     | 设置入口页（TUN 模式/主题/开机自启）          |
+| LogScreen                    | LogViewModel          | 实时日志流 + 级别过滤                         |
+| ConnectionScreen             | ConnectionViewModel   | 活跃连接列表 + 关闭                           |
+| ProviderScreen               | ProviderViewModel     | Provider 列表 + 刷新                          |
+| DnsQueryScreen               | DnsQueryViewModel     | DNS 查询（A/AAAA/CNAME/MX/TXT/NS）            |
+| AppProxyScreen               | AppProxyViewModel     | 应用代理白/黑名单                             |
+| VpnSettingsScreen            | —                     | VPN 设置（系统代理/排除路由等）               |
+| NetworkSettingsScreen        | OverrideSettingsVM    | 端口/局域网/IPv6/external-controller/DNS      |
+| MetaSettingsScreen           | OverrideSettingsVM    | 统一延迟/Geodata/TCP 并发/嗅探器              |
+| AboutScreen                  | —                     | 版本信息（OS3 动态背景 + 视差滚动）           |
+| SubscriptionAddScreen        | —                     | 添加方式选择（文件/URL/QR Code）              |
+| SubscriptionAddUrlScreen     | SubscriptionViewModel | URL 导入订阅                                  |
 
 ## 平台抽象（expect/actual）
 
@@ -213,7 +213,7 @@ files/mihomo/
 | DynamicNotificationManager | 动态通知（WebSocket 流量），两个 Service 共用                     |
 | MishkaTileService          | Quick Settings Tile 一键启停代理（双模式路由）                    |
 | BootReceiver               | 开机自启（默认 disabled，动态启用）                               |
-| ConfigGenerator            | 运行配置生成（writeRunConfig + YAML 行过滤）                      |
+| ConfigGenerator            | 运行配置生成（buildRunConfig/writeRunConfig/writeValidationConfig，snakeyaml AST 合并 override） |
 | ProfileFileOps             | 订阅文件操作（imported/pending/processing 目录管理 + GeoIP 共享） |
 | AndroidProfileFileManager  | ProfileFileManager 接口的 Android 实现                            |
 | MihomoRunner               | mihomo 进程管理（VPN: JNI fork+exec / ROOT: su）                  |
@@ -244,7 +244,7 @@ GOOS=android GOARCH=arm64 CGO_ENABLED=0 go build \
 ./gradlew :android:assembleRelease # 构建 Android Release APK
 ```
 
-## 关键设计决策
+## 设计决策
 
 - mihomo 二进制放在 jniLibs 中（命名为 libmihomo.so），通过 `jniLibs.useLegacyPackaging = true` 确保解压到 nativeLibraryDir
 - Android 的 ProcessBuilder 会 fork 后关闭所有非标准 fd，需用 JNI fork+exec 绕过（`process_helper.c`），保留 VPN TUN fd 继承
@@ -260,10 +260,13 @@ GOOS=android GOARCH=arm64 CGO_ENABLED=0 go build \
 - Activity 声明 `configChanges="uiMode"` 避免系统深浅色切换时重建，防止导航栈丢失
 - 预测性返回手势通过 HiddenApiBypass 反射调用 `ApplicationInfo.setEnableOnBackInvokedCallback`，Android 14+ 可选启用
 - ROOT 模式重连校验：`attachToExisting` 做三重验证（`kill -0` 存活 + `/proc/$pid/cmdline` 含 libmihomo.so + stored secret 通过 `/configs` 带 Bearer 鉴权 2xx），防 PID 复用与 secret 漂移；订阅一致性由 `startProxy` 在 attach 之前比对 persisted vs 请求的 subscriptionId，不一致直接走 cleanup + 全新启动
-- 孤儿 mihomo 清理：`RootHelper.cleanupOrphanedMihomo` 用**单次 su shell** 完成"pgrep 探测 → pkill -TERM → 轮询等退 3s → pkill -KILL → 轮询等退 2s"，外层 `waitFor(8s)` 阻塞等整体完成，Kotlin 侧无 Thread.sleep；孤儿进程不是当前 App 子进程，waitpid 不适用，pidfd_open 需自写 JNI 故采用 shell 内轮询。无残留时首行 `pgrep || exit 0` 秒退
-- VPN 启动清理触发：`MishkaTunService.startProxy` 在 `hadRootPid || HAS_ROOT` 时调用 cleanupOrphanedMihomo + 清 ROOT 持久化 key（PID/SECRET/ACTIVE_SUBSCRIPTION_ID）。`hasRoot` 这一分支覆盖两个漏清场景：ROOT 崩溃后 `clearPersistedState` 清了 storage 但进程仍活的冷启动；VPN mihomo 因 `setsid()` 脱离 App 进程组、App 崩溃后被 init 收养继续占端口
-- WebSocket 重连：`MihomoWebSocket.webSocketFlow` 在传输层加无限重连循环 + 指数退避（1s→30s 封顶）+ `pingIntervalMillis = 20_000` 心跳（Ktor graceful close 时 `for (frame in incoming)` 会静默退出不抛异常，消费者 `.catch` 无法感知；无内置重连只能手搓）。`CancellationException` 必须显式 rethrow 否则 cancel 被吞导致死循环。连接状态通过类级别 `connectionState: StateFlow<Boolean>` 暴露（4 个 flow 共享；粗粒度因 mihomo API server 是单点，要么都通要么都不通）
-- startForeground 防御：`MishkaTunService` / `MishkaRootService` / `ProfileWorker` 三个 Service 的 onCreate 内 `startForeground()` 必须 `try { ... } catch (e: Exception) { ... }`。真实风险是 API 31+ `ForegroundServiceStartNotAllowedException`（BootReceiver/ProfileReceiver 后台触发）与 API 34+ FGS type 异常（如 `specialUse` 缺 property subtype），**不是** POST_NOTIFICATIONS 拒绝（该权限拒绝仅隐藏通知，FGS 仍运行）。catch 用通用 `Exception` 兜底（具体类 API 31+ 才有，会触发编译期警告，且各 OEM ROM 抛出类不同）。失败路径：Tun/Root 走 `Log.e` + `ProxyServiceBridge.updateState(Error, errorMessage, tunMode)` + `stopSelf()`（让 UI 退出 Starting loading）；ProfileWorker 无 UI 状态仅 `Log.e` + `stopSelf()`。**不可降级为普通 Service**（Android 12+ 迅速回收，VPN/mihomo 不可用）
+- 孤儿 mihomo 清理：`RootHelper.cleanupOrphanedMihomo(tunDevice)` 用**单次 su shell** 完成 pkill + 兜底 `ip link delete <tunDevice>`，Kotlin 侧零 `Thread.sleep`（孤儿非当前 App 子进程，waitpid 不适用，只能 shell 内轮询）。TUN 清理必须同步：sing-tun `tun.New()` 遇已存在设备返回 EEXIST，叠加 TUN init silent failure 会级联。device name 来自用户 storage，`escapeShellSingleQuoted` 单引号 + `'\''` POSIX 转义防命令注入
+- VPN 启动清理触发：`MishkaTunService.startProxy` 在 `hadRootPid || HAS_ROOT` 时调用 cleanupOrphanedMihomo + 清 ROOT 持久化 key（PID/SECRET/ACTIVE_SUBSCRIPTION_ID）。`HAS_ROOT` 分支覆盖两个漏清场景：ROOT 崩溃后 storage 清了但进程仍活；VPN mihomo `setsid()` 脱离 App 进程组、App 崩溃后被 init 收养继续占端口
+- WebSocket 重连：`MihomoWebSocket.webSocketFlow` 传输层加无限重连循环 + 指数退避（1s→30s 封顶）+ `pingIntervalMillis = 20_000` 心跳。Ktor graceful close 时 `for (frame in incoming)` 静默退出不抛异常，消费者 `.catch` 无法感知，无内置重连只能手搓。`CancellationException` 必须显式 rethrow 否则 cancel 被吞导致死循环。连接状态通过 `connectionState: StateFlow<Boolean>` 粗粒度暴露（mihomo API server 单点，4 flow 共享）
+- startForeground 防御：`MishkaTunService` / `MishkaRootService` / `ProfileWorker` 的 onCreate 内 `startForeground()` 必须 `try { ... } catch (e: Exception) { ... }`。真实风险是 API 31+ `ForegroundServiceStartNotAllowedException`（BootReceiver/ProfileReceiver 后台触发）与 API 34+ FGS type 异常，**不是** POST_NOTIFICATIONS 拒绝（仅隐藏通知，FGS 照常运行）。catch 用通用 `Exception` 兜底（各 OEM ROM 抛出类不同）。失败路径：Tun/Root 上报 `ProxyServiceBridge.Error` + `stopSelf()`（让 UI 退出 Starting）；ProfileWorker 仅 `stopSelf()`。**不可降级为普通 Service**（Android 12+ 迅速回收）
+- TUN init silent failure 兜底：mihomo `listener.ReCreateTun` TUN inbound 初始化失败走 `log.Errorln + tunConf.Enable=false` 正常返回，**进程不退出**（其他 inbound 如 mixed-port 继续响应 `/version`）。仅靠进程存活 + API 可达无法检测。检测规则：① `MishkaTunService` 清 O_CLOEXEC (`fcntlInt(F_SETFD)`) 失败必须视为致命（`closeTunFd` + `ProxyState.Error` + `stopSelf`）——fd 未清则 exec 后必然被关；② `MihomoRunner.waitForReady` API ready 后 delay 500ms 再 `scanLogForTunError`，匹配 pattern：`Start TUN listening error` / `configure tun interface` / `create NetworkUpdateMonitor`
+- 配置校验走 override 合并后的产物，不是原始订阅：`imported/{uuid}/config.yaml` 是订阅原文，`files/mihomo/config.yaml` 是 override 合并后的运行配置。若直接 `mihomo -t` 原始订阅，用户的 override 字段（external-controller/secret/tun/各 port/allow-lan/ipv6/bind-address/log-level/dns/sniffer）**零测试**，用户设错冲突端口或非法 DNS URL 时会"导入成功但运行时失败"。`ConfigGenerator.writeValidationConfig` 写入订阅目录的 `config.validate.yaml`，`stubTunForValidation=true` 使 tun 段 `{enable:false}` 占位（校验无 fd / root）；`ProfileFileManager.validate(configFileName=...)` + `generateValidationConfig` + `cleanupValidationConfig` try/finally 清理
+- CMFA embed mode 禁用全部 HTTP 配置 API：mihomo 上游 `patch_android.go`（`//go:build android && cmfa`）init `SetEmbedMode(true)`，`PATCH/PUT /configs` / `POST /restart` / `POST /configs/geo` / `PUT/PATCH /rules` / `POST /upgrade` 全部 404（configs.go:28 / server.go:135 / rules.go:17 / upgrade.go:18）。Mishka fork 未改该文件。Ktor `HttpClient` 默认不对 404 抛异常，`runCatching` 包装会返回"幻觉成功"（UI 以为切换，mihomo 未动）。约束：**不要**添加 `apiClient.patchConfig` / `reloadConfig` / `restart` 方法。所有 mihomo 配置修改（mode/tun.stack/DNS/port/...）走 `OverrideStorageHelper` 写 key + `serviceController.restart(subscriptionId)`（Service Intent 重启，非 HTTP）+ `ConfigGenerator.buildRunConfig` 合并生成新 config.yaml；UI 用 `RestartRequiredHint` Card 统一告知"需重启生效"
 
 ## UI 规范
 

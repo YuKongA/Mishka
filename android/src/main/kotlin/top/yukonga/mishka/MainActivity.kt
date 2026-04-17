@@ -110,6 +110,7 @@ class MainActivity : ComponentActivity() {
 
         homeViewModel = HomeViewModel(
             serviceController = serviceController,
+            storage = storage,
             getActiveSubscriptionId = { subscriptionViewModel.getActiveSubscription()?.id },
         )
 
@@ -126,7 +127,6 @@ class MainActivity : ComponentActivity() {
                         providerViewModel.setRepository(repo)
                         connectionViewModel.setRepository(repo)
                         dnsQueryViewModel.setRepository(repo)
-                        overrideSettingsViewModel.setRepository(repo)
                     }
                     else -> {
                         proxyViewModel.setRepository(null)
@@ -134,7 +134,6 @@ class MainActivity : ComponentActivity() {
                         providerViewModel.setRepository(null)
                         connectionViewModel.setRepository(null)
                         dnsQueryViewModel.setRepository(null)
-                        overrideSettingsViewModel.setRepository(null)
                     }
                 }
             }

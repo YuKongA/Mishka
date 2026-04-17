@@ -134,6 +134,8 @@ object ConfigGenerator {
         val ipv6 = h.readNullableBoolean(storage, h.KEY_IPV6)
         val bindAddress = h.readNullableString(storage, h.KEY_BIND_ADDRESS)
         val logLevel = h.readNullableString(storage, h.KEY_LOG_LEVEL)
+        val mode = h.readNullableString(storage, h.KEY_MODE)
+        val tunStack = h.readNullableString(storage, h.KEY_TUN_STACK)
 
         val dnsEnable = h.readNullableBoolean(storage, h.KEY_DNS_ENABLE)
         val dnsListen = h.readNullableString(storage, h.KEY_DNS_LISTEN)
@@ -179,6 +181,7 @@ object ConfigGenerator {
         if (ipv6 != null) root.remove("ipv6")
         if (bindAddress != null) root.remove("bind-address")
         if (logLevel != null) root.remove("log-level")
+        if (mode != null) root.remove("mode")
         if (unifiedDelay != null) root.remove("unified-delay")
         if (geodataMode != null) root.remove("geodata-mode")
         if (tcpConcurrent != null) root.remove("tcp-concurrent")
@@ -193,7 +196,7 @@ object ConfigGenerator {
             // 避免 mihomo -t 对 TUN 特定字段做强校验
             linkedMapOf<String, Any?>("enable" to false)
         } else {
-            buildTunMap(storage, rootMode, tunFd)
+            buildTunMap(storage, rootMode, tunFd, tunStack)
         }
 
         root.putIfNotNull("port", httpPort)
@@ -205,6 +208,7 @@ object ConfigGenerator {
         root.putIfNotNull("ipv6", ipv6)
         root.putIfNotNull("bind-address", bindAddress)
         root.putIfNotNull("log-level", logLevel)
+        root.putIfNotNull("mode", mode)
         root.putIfNotNull("unified-delay", unifiedDelay)
         root.putIfNotNull("geodata-mode", geodataMode)
         root.putIfNotNull("tcp-concurrent", tcpConcurrent)
@@ -261,6 +265,7 @@ object ConfigGenerator {
         storage: PlatformStorage,
         rootMode: Boolean,
         tunFd: Int,
+        stackOverride: String?,
     ): Map<String, Any?> = linkedMapOf<String, Any?>().apply {
         put("enable", true)
         if (rootMode) {
@@ -281,7 +286,7 @@ object ConfigGenerator {
             put("auto-route", false)
             put("auto-detect-interface", false)
         }
-        put("stack", "mixed")
+        put("stack", stackOverride ?: "mixed")
         put("inet4-address", listOf("198.18.0.1/30"))
         if (rootMode && storage.getString(StorageKeys.VPN_ALLOW_IPV6, "false") == "true") {
             put("inet6-address", listOf("fdfe:dcba:9876::1/126"))

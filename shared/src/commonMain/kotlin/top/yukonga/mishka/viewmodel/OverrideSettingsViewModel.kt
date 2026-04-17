@@ -1,15 +1,9 @@
 package top.yukonga.mishka.viewmodel
 
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.launch
-import top.yukonga.mishka.data.model.ConfigPatch
-import top.yukonga.mishka.data.model.DnsPatch
-import top.yukonga.mishka.data.model.SnifferPatch
-import top.yukonga.mishka.data.repository.MihomoRepository
 import top.yukonga.mishka.data.repository.OverrideStorageHelper
 import top.yukonga.mishka.platform.PlatformStorage
 
@@ -61,14 +55,8 @@ class OverrideSettingsViewModel(
     private val _uiState = MutableStateFlow(OverrideUiState())
     val uiState: StateFlow<OverrideUiState> = _uiState.asStateFlow()
 
-    private var repository: MihomoRepository? = null
-
     init {
         loadFromStorage()
-    }
-
-    fun setRepository(repo: MihomoRepository?) {
-        repository = repo
     }
 
     // === 从 PlatformStorage 加载所有覆写设置 ===
@@ -109,7 +97,7 @@ class OverrideSettingsViewModel(
         )
     }
 
-    // === 更新方法：保存到 PlatformStorage 并可选 patch 运行中的 mihomo ===
+    // === 更新方法：保存到 PlatformStorage；修改后需重启代理服务生效 ===
 
     fun updatePort(key: String, value: Int?) {
         OverrideStorageHelper.writeNullableInt(storage, key, value)
@@ -122,7 +110,6 @@ class OverrideSettingsViewModel(
             OverrideStorageHelper.KEY_MIXED_PORT -> state.copy(mixedPort = value)
             else -> state
         }
-        patchIfRunning()
     }
 
     fun updateBoolean(key: String, value: Boolean?) {
@@ -144,7 +131,6 @@ class OverrideSettingsViewModel(
             OverrideStorageHelper.KEY_SNIFFER_OVERRIDE_DEST -> state.copy(snifferOverrideDestination = value)
             else -> state
         }
-        patchIfRunning()
     }
 
     fun updateString(key: String, value: String?) {
@@ -159,7 +145,6 @@ class OverrideSettingsViewModel(
             OverrideStorageHelper.KEY_FIND_PROCESS_MODE -> state.copy(findProcessMode = value)
             else -> state
         }
-        patchIfRunning()
     }
 
     fun updateStringList(key: String, value: List<String>?) {
@@ -173,70 +158,6 @@ class OverrideSettingsViewModel(
             OverrideStorageHelper.KEY_SNIFFER_FORCE_DOMAIN -> state.copy(snifferForceDomain = value)
             OverrideStorageHelper.KEY_SNIFFER_SKIP_DOMAIN -> state.copy(snifferSkipDomain = value)
             else -> state
-        }
-        patchIfRunning()
-    }
-
-    // === 将当前覆写设置 patch 到运行中的 mihomo ===
-
-    private fun patchIfRunning() {
-        val repo = repository ?: return
-        val state = _uiState.value
-
-        // 构建仅包含非 null 字段的 ConfigPatch
-        val snifferPatch = if (state.snifferEnable != null || state.snifferForceDnsMapping != null ||
-            state.snifferParsePureIp != null || state.snifferOverrideDestination != null ||
-            state.snifferForceDomain != null || state.snifferSkipDomain != null
-        ) {
-            SnifferPatch(
-                enable = state.snifferEnable,
-                forceDnsMapping = state.snifferForceDnsMapping,
-                parsePureIp = state.snifferParsePureIp,
-                overrideDestination = state.snifferOverrideDestination,
-                forceDomain = state.snifferForceDomain,
-                skipDomain = state.snifferSkipDomain,
-            )
-        } else null
-
-        val dnsPatch = if (state.dnsEnable != null || state.dnsListen != null ||
-            state.dnsIpv6 != null || state.dnsPreferH3 != null || state.dnsUseHosts != null ||
-            state.dnsEnhancedMode != null || state.dnsNameservers != null || state.dnsFallback != null ||
-            state.dnsDefaultNameserver != null || state.dnsFakeIpFilter != null
-        ) {
-            DnsPatch(
-                enable = state.dnsEnable,
-                listen = state.dnsListen,
-                ipv6 = state.dnsIpv6,
-                preferH3 = state.dnsPreferH3,
-                useHosts = state.dnsUseHosts,
-                enhancedMode = state.dnsEnhancedMode,
-                nameserver = state.dnsNameservers,
-                fallback = state.dnsFallback,
-                defaultNameserver = state.dnsDefaultNameserver,
-                fakeIpFilter = state.dnsFakeIpFilter,
-            )
-        } else null
-
-        val patch = ConfigPatch(
-            port = state.httpPort,
-            socksPort = state.socksPort,
-            redirPort = state.redirPort,
-            tproxyPort = state.tproxyPort,
-            mixedPort = state.mixedPort,
-            allowLan = state.allowLan,
-            ipv6 = state.ipv6,
-            bindAddress = state.bindAddress,
-            logLevel = state.logLevel,
-            unifiedDelay = state.unifiedDelay,
-            geodataMode = state.geodataMode,
-            tcpConcurrent = state.tcpConcurrent,
-            findProcessMode = state.findProcessMode,
-            sniffer = snifferPatch,
-            dns = dnsPatch,
-        )
-
-        viewModelScope.launch {
-            repo.patchConfig(patch)
         }
     }
 }

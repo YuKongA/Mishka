@@ -25,6 +25,8 @@ object OverrideStorageHelper {
     const val KEY_EXTERNAL_CONTROLLER = "override_external_controller"
     const val KEY_BIND_ADDRESS = "override_bind_address"
     const val KEY_LOG_LEVEL = "override_log_level"
+    const val KEY_MODE = "override_mode"
+    const val KEY_TUN_STACK = "override_tun_stack"
 
     // DNS
     const val KEY_DNS_ENABLE = "override_dns_enable"
