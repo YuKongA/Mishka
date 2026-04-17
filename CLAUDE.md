@@ -261,6 +261,7 @@ GOOS=android GOARCH=arm64 CGO_ENABLED=0 go build \
 - ROOT 模式重连校验：`attachToExisting` 做三重验证（`kill -0` 存活 + `/proc/$pid/cmdline` 含 libmihomo.so + stored secret 通过 `/configs` 带 Bearer 鉴权 2xx），防 PID 复用与 secret 漂移；订阅一致性由 `startProxy` 在 attach 之前比对 persisted vs 请求的 subscriptionId，不一致直接走 cleanup + 全新启动
 - 孤儿 mihomo 清理：`RootHelper.cleanupOrphanedMihomo` 用**单次 su shell** 完成"pgrep 探测 → pkill -TERM → 轮询等退 3s → pkill -KILL → 轮询等退 2s"，外层 `waitFor(8s)` 阻塞等整体完成，Kotlin 侧无 Thread.sleep；孤儿进程不是当前 App 子进程，waitpid 不适用，pidfd_open 需自写 JNI 故采用 shell 内轮询。无残留时首行 `pgrep || exit 0` 秒退
 - VPN 启动清理触发：`MishkaTunService.startProxy` 在 `hadRootPid || HAS_ROOT` 时调用 cleanupOrphanedMihomo + 清 ROOT 持久化 key（PID/SECRET/ACTIVE_SUBSCRIPTION_ID）。`hasRoot` 这一分支覆盖两个漏清场景：ROOT 崩溃后 `clearPersistedState` 清了 storage 但进程仍活的冷启动；VPN mihomo 因 `setsid()` 脱离 App 进程组、App 崩溃后被 init 收养继续占端口
+- WebSocket 重连：`MihomoWebSocket.webSocketFlow` 在传输层加无限重连循环 + 指数退避（1s→30s 封顶）+ `pingIntervalMillis = 20_000` 心跳（Ktor graceful close 时 `for (frame in incoming)` 会静默退出不抛异常，消费者 `.catch` 无法感知；无内置重连只能手搓）。`CancellationException` 必须显式 rethrow 否则 cancel 被吞导致死循环。连接状态通过类级别 `connectionState: StateFlow<Boolean>` 暴露（4 个 flow 共享；粗粒度因 mihomo API server 是单点，要么都通要么都不通）
 
 ## UI 规范
 

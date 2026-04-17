@@ -6,7 +6,6 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import top.yukonga.mishka.data.model.LogMessage
@@ -30,6 +29,7 @@ class LogViewModel : ViewModel() {
 
     private var repository: MihomoRepository? = null
     private var logJob: Job? = null
+    private var connectionStateJob: Job? = null
 
     fun setRepository(repo: MihomoRepository?) {
         if (repo == null) {
@@ -38,6 +38,14 @@ class LogViewModel : ViewModel() {
             nextLogId = 0L
         }
         repository = repo
+        connectionStateJob?.cancel()
+        connectionStateJob = repo?.let {
+            viewModelScope.launch {
+                it.connectionState.collect { connected ->
+                    _uiState.value = _uiState.value.copy(isConnected = connected)
+                }
+            }
+        }
     }
 
     fun connect() {
@@ -48,7 +56,6 @@ class LogViewModel : ViewModel() {
     fun disconnect() {
         logJob?.cancel()
         logJob = null
-        _uiState.value = _uiState.value.copy(isConnected = false)
     }
 
     private fun startLogCollection() {
@@ -56,14 +63,9 @@ class LogViewModel : ViewModel() {
         val repo = repository ?: return
 
         logJob = viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isConnected = true)
-            repo.logsFlow(_uiState.value.level)
-                .catch {
-                    _uiState.value = _uiState.value.copy(isConnected = false)
-                }
-                .collect { log ->
-                    _logs.update { (it + IndexedLog(nextLogId++, log)).takeLast(500) }
-                }
+            repo.logsFlow(_uiState.value.level).collect { log ->
+                _logs.update { (it + IndexedLog(nextLogId++, log)).takeLast(500) }
+            }
         }
     }
 
@@ -82,5 +84,6 @@ class LogViewModel : ViewModel() {
     override fun onCleared() {
         super.onCleared()
         logJob?.cancel()
+        connectionStateJob?.cancel()
     }
 }

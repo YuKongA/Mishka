@@ -6,7 +6,6 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.launch
 import top.yukonga.mishka.data.model.ConnectionInfo
 import top.yukonga.mishka.data.repository.MihomoRepository
@@ -27,14 +26,22 @@ class ConnectionViewModel : ViewModel() {
 
     private var repository: MihomoRepository? = null
     private var connectionJob: Job? = null
+    private var connectionStateJob: Job? = null
 
     fun setRepository(repo: MihomoRepository?) {
         repository = repo
+        connectionStateJob?.cancel()
         if (repo != null) {
+            connectionStateJob = viewModelScope.launch {
+                repo.connectionState.collect { connected ->
+                    _uiState.value = _uiState.value.copy(isConnected = connected)
+                }
+            }
             startConnectionCollection()
         } else {
             connectionJob?.cancel()
             connectionJob = null
+            connectionStateJob = null
             _uiState.value = ConnectionUiState()
         }
     }
@@ -44,18 +51,13 @@ class ConnectionViewModel : ViewModel() {
         val repo = repository ?: return
 
         connectionJob = viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isConnected = true)
-            repo.connectionsFlow()
-                .catch {
-                    _uiState.value = _uiState.value.copy(isConnected = false)
-                }
-                .collect { response ->
-                    _uiState.value = _uiState.value.copy(
-                        connections = response.connections,
-                        downloadTotal = response.downloadTotal,
-                        uploadTotal = response.uploadTotal,
-                    )
-                }
+            repo.connectionsFlow().collect { response ->
+                _uiState.value = _uiState.value.copy(
+                    connections = response.connections,
+                    downloadTotal = response.downloadTotal,
+                    uploadTotal = response.uploadTotal,
+                )
+            }
         }
     }
 
@@ -92,5 +94,6 @@ class ConnectionViewModel : ViewModel() {
     override fun onCleared() {
         super.onCleared()
         connectionJob?.cancel()
+        connectionStateJob?.cancel()
     }
 }

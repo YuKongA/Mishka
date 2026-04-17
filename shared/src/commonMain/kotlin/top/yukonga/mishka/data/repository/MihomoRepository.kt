@@ -1,6 +1,7 @@
 package top.yukonga.mishka.data.repository
 
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.StateFlow
 import top.yukonga.mishka.data.api.MihomoApiClient
 import top.yukonga.mishka.data.api.MihomoWebSocket
 import top.yukonga.mishka.data.model.ConfigPatch
@@ -20,6 +21,10 @@ class MihomoRepository(
     private val apiClient: MihomoApiClient,
     private val webSocket: MihomoWebSocket,
 ) {
+    // === 连接状态 ===
+
+    val connectionState: StateFlow<Boolean> get() = webSocket.connectionState
+
     // === 实时流 ===
 
     fun trafficFlow(): Flow<TrafficData> = webSocket.trafficFlow()
