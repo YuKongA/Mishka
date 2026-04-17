@@ -80,19 +80,22 @@ class MishkaTunService : VpnService() {
             Log.i(TAG, "Starting proxy, subscription: $subscriptionId")
             ProxyServiceBridge.updateState(ProxyServiceStatus(ProxyState.Starting, tunMode = TunMode.Vpn))
 
-            // 清理可能残留的 VPN 模式 mihomo 进程（防止端口冲突）
+            // 清理当前实例 runner 的残留
             if (runner.isRunning) {
                 runner.stop()
             }
 
-            // 清理可能残留的 root mihomo 进程（防止端口冲突）
-            // 仅在曾使用过 ROOT 模式时才调用 su，避免无 root 设备触发授权弹窗
+            // 清理孤儿 mihomo（setsid 脱离进程组后 App 崩溃也不会带走 mihomo，需 pkill）
+            // 条件 hadRootPid || hasRoot：后者覆盖"ROOT 崩溃后 storage 被清但进程仍活"的冷启动；
+            // 无 root 设备两者均为 false，不触发 su。
             val storage = PlatformStorage(this@MishkaTunService)
             val hadRootPid = storage.getString(StorageKeys.ROOT_MIHOMO_PID, "").isNotEmpty()
-            if (hadRootPid) {
+            val hasRoot = storage.getString(StorageKeys.HAS_ROOT, "false") == "true"
+            if (hadRootPid || hasRoot) {
                 RootHelper.cleanupOrphanedMihomo()
                 storage.putString(StorageKeys.ROOT_MIHOMO_PID, "")
                 storage.putString(StorageKeys.ROOT_MIHOMO_SECRET, "")
+                storage.putString(StorageKeys.ROOT_ACTIVE_SUBSCRIPTION_ID, "")
             }
 
             // 1. 建立 VPN 接口，获取 fd

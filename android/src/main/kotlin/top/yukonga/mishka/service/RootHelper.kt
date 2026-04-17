@@ -155,13 +155,45 @@ object RootHelper {
         }
     }
 
+    /**
+     * 清理残留的 mihomo 进程（孤儿进程，非当前 App 子进程）。
+     * 将探测 → SIGTERM → 等退 → SIGKILL → 等退整个流程下沉到单次 su shell 执行，
+     * 避免 Kotlin 侧 Thread.sleep 轮询 + 多次 su 调用的开销。
+     * exit code: 0=无残留或已清理；1=SIGKILL 后仍存活；其他=shell 或 su 错误。
+     */
     fun cleanupOrphanedMihomo() {
+        val script = """
+            pgrep -f libmihomo.so >/dev/null 2>&1 || exit 0
+            pkill -TERM -f libmihomo.so 2>/dev/null
+            i=0; while [ ${'$'}i -lt 6 ]; do
+                sleep 0.5
+                pgrep -f libmihomo.so >/dev/null 2>&1 || exit 0
+                i=${'$'}((i+1))
+            done
+            pkill -KILL -f libmihomo.so 2>/dev/null
+            i=0; while [ ${'$'}i -lt 4 ]; do
+                sleep 0.5
+                pgrep -f libmihomo.so >/dev/null 2>&1 || exit 0
+                i=${'$'}((i+1))
+            done
+            exit 1
+        """.trimIndent()
+
         try {
-            val process = ProcessBuilder("su", "-c", "pkill -f libmihomo.so 2>/dev/null; true")
+            val process = ProcessBuilder("su", "-c", script)
                 .redirectErrorStream(true)
                 .start()
-            process.waitFor(3, TimeUnit.SECONDS)
+            val exited = process.waitFor(8, TimeUnit.SECONDS)
+            if (!exited) {
+                process.destroyForcibly()
+                Log.e(TAG, "cleanupOrphanedMihomo timed out")
+                return
+            }
+            if (process.exitValue() == 1) {
+                Log.e(TAG, "Orphaned mihomo still alive after SIGKILL")
+            }
         } catch (_: Exception) {
+            // 无 su 设备 ProcessBuilder 抛 IOException，静默降级
         }
     }
 }

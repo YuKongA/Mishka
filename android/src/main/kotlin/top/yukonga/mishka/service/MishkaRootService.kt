@@ -109,6 +109,10 @@ class MishkaRootService : Service() {
             }
 
             // 2. 清理残留进程（上次的进程已失效，确保干净启动）
+            // 先停自身 runner（Service 实例被复用时可能仍持有旧状态），再 pkill 孤儿进程
+            if (runner.isRunning) {
+                runner.stop()
+            }
             RootHelper.cleanupOrphanedMihomo()
 
             // 3. 检查 ROOT 权限
