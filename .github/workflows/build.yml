@@ -85,7 +85,7 @@ jobs:
           chmod +x $MIHOMO
           curl -Lo upx.tar.xz https://github.com/upx/upx/releases/download/v5.1.1/upx-5.1.1-amd64_linux.tar.xz
           tar -xf upx.tar.xz --strip-components=1 upx-5.1.1-amd64_linux/upx
-          ./upx --best --lzma $MIHOMO
+          ./upx --best $MIHOMO
 
       - name: Download GeoIP files
         run: ./gradlew :android:downloadGeoFiles

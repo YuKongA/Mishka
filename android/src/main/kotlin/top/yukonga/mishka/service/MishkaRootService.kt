@@ -87,9 +87,9 @@ class MishkaRootService : Service() {
             val existingPid = storage.getString(StorageKeys.ROOT_MIHOMO_PID, "").toIntOrNull() ?: -1
             val existingSecret = storage.getString(StorageKeys.ROOT_MIHOMO_SECRET, "")
             if (existingPid > 0 && existingSecret.isNotEmpty()) {
-                if (runner.attachToExisting(existingPid, existingSecret, subscriptionId)) {
+                val ec = OverrideStorageHelper.readNullableString(storage, OverrideStorageHelper.KEY_EXTERNAL_CONTROLLER) ?: "127.0.0.1:9090"
+                if (runner.attachToExisting(existingPid, existingSecret, ec, subscriptionId)) {
                     val existingStartTime = storage.getString(StorageKeys.ROOT_START_TIME, "").toLongOrNull() ?: System.currentTimeMillis()
-                    val ec = OverrideStorageHelper.readNullableString(storage, OverrideStorageHelper.KEY_EXTERNAL_CONTROLLER) ?: "127.0.0.1:9090"
                     Log.i(TAG, "Reconnected to existing mihomo: pid=$existingPid")
                     ProxyServiceBridge.updateState(ProxyServiceStatus(ProxyState.Running, secret = existingSecret, externalController = ec, tunMode = TunMode.Root, startTime = existingStartTime, mihomoPid = runner.pid))
                     dynamicNotification.startOrFallbackStatic(storage, existingSecret, ec, TunMode.Root)
@@ -98,7 +98,7 @@ class MishkaRootService : Service() {
                     startProcessMonitor(workDir)
                     return@launch
                 }
-                Log.i(TAG, "Existing process pid=$existingPid no longer alive, restarting")
+                Log.i(TAG, "Existing process pid=$existingPid failed attach verification, cleaning up")
                 clearPersistedState(storage)
             }
 

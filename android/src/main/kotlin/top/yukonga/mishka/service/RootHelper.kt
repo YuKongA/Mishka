@@ -60,6 +60,23 @@ object RootHelper {
         }
     }
 
+    /**
+     * 以 root 权限读取 `/proc/$pid/cmdline`。非 root 进程无权读 root 进程的 cmdline。
+     * 超时/异常返回空串，仅做 IO，不做语义判断。
+     */
+    fun readRootCmdline(pid: Int): String {
+        return try {
+            val process = ProcessBuilder("su", "-c", "cat /proc/$pid/cmdline 2>/dev/null")
+                .redirectErrorStream(true)
+                .start()
+            val output = process.inputStream.bufferedReader().readText()
+            process.waitFor(3, TimeUnit.SECONDS)
+            output
+        } catch (_: Exception) {
+            ""
+        }
+    }
+
     fun isAliveAsRoot(pid: Int): Boolean {
         return try {
             val process = ProcessBuilder("su", "-c", "kill -0 $pid")

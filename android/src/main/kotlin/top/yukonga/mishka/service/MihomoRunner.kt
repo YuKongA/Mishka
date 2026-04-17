@@ -27,11 +27,40 @@ class MihomoRunner(private val context: Context) {
     val isRunning: Boolean
         get() = childPid > 0 && if (isRootMode) RootHelper.isAliveAsRoot(childPid) else isProcessAlive(childPid)
 
-    fun attachToExisting(pid: Int, secret: String, subscriptionId: String?): Boolean {
-        if (pid <= 0 || !RootHelper.isAliveAsRoot(pid)) return false
+    /**
+     * 尝试重连已持久化的 mihomo 进程。三重校验任一失败均返回 false：
+     *   1. PID 存活（kill -0）
+     *   2. cmdline 含 libmihomo.so（防 PID 复用撞其他 root 进程）
+     *   3. stored secret 能通过 /configs 鉴权（防 secret 漂移导致 UI 假 Running）
+     * 校验阶段**不**修改任何 field，全部通过后再原子赋值。
+     *
+     * TODO: 后续还应校验 persisted subscriptionId 与请求的 subscriptionId 是否一致，
+     *       不一致时应 kill + 全新启动。本次修复暂不覆盖该场景。
+     */
+    fun attachToExisting(
+        pid: Int,
+        secret: String,
+        externalController: String,
+        subscriptionId: String?,
+    ): Boolean {
+        if (pid <= 0 || !RootHelper.isAliveAsRoot(pid)) {
+            Log.w(TAG, "Attach failed: pid dead (pid=$pid)")
+            return false
+        }
+        val cmdline = RootHelper.readRootCmdline(pid)
+        if (!cmdline.contains("libmihomo.so")) {
+            Log.w(TAG, "Attach failed: wrong cmdline (pid=$pid, cmdline=${cmdline.take(64)})")
+            return false
+        }
+        if (!isApiAuthorized(secret, externalController)) {
+            Log.w(TAG, "Attach failed: auth failed (pid=$pid)")
+            return false
+        }
+        // 全部通过，原子赋值
         childPid = pid
         isRootMode = true
         this.secret = secret
+        this.externalController = externalController
         activeSubscriptionId = subscriptionId
         Log.i(TAG, "Attached to existing mihomo process: pid=$pid")
         return true
@@ -191,6 +220,24 @@ class MihomoRunner(private val context: Context) {
             conn.responseCode // 任何响应（200/401 等）都说明 API 已就绪
             conn.disconnect()
             true
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    /**
+     * 带 Bearer secret 鉴权地探测 /configs（/configs 在 mihomo 各版本均强制鉴权，
+     * /version 在部分版本免鉴权不可靠）。仅 2xx 视为鉴权通过。
+     */
+    private fun isApiAuthorized(secret: String, externalController: String, timeoutMs: Int = 1500): Boolean {
+        return try {
+            val conn = URL("http://$externalController/configs").openConnection() as HttpURLConnection
+            conn.connectTimeout = timeoutMs
+            conn.readTimeout = timeoutMs
+            conn.setRequestProperty("Authorization", "Bearer $secret")
+            val code = conn.responseCode
+            conn.disconnect()
+            code in 200..299
         } catch (_: Exception) {
             false
         }
