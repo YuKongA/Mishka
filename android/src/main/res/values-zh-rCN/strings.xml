@@ -1,6 +1,4 @@
 <resources>
-    <string name="app_name">Mishka</string>
-
     <!-- Notification Channels -->
     <string name="channel_vpn_name">VPN 服务状态</string>
     <string name="channel_vpn_desc">Mishka 代理服务运行状态</string>
@@ -10,13 +8,13 @@
     <string name="channel_profile_result_desc">配置更新成功或失败的通知</string>
 
     <!-- VPN Notifications -->
-    <string name="notification_loading">正在启动...</string>
+    <string name="notification_loading">正在启动…</string>
     <string name="notification_running_title">Mishka 运行中</string>
     <string name="notification_running_content">模式: %1$s</string>
 
     <!-- Profile Update Notifications -->
     <string name="notification_profile_update">配置更新</string>
-    <string name="notification_profile_running">正在运行...</string>
+    <string name="notification_profile_running">正在运行…</string>
     <string name="notification_profile_updating">正在更新配置</string>
     <string name="notification_update_success">更新成功</string>
     <string name="notification_update_success_content">%1$s 已更新</string>
@@ -25,9 +23,16 @@
 
     <!-- Tile -->
     <string name="tile_connected">已连接</string>
-    <string name="tile_connecting">连接中...</string>
+    <string name="tile_connecting">连接中…</string>
     <string name="tile_error">错误</string>
     <string name="tile_disconnected">未连接</string>
+
+    <!-- QR Scanner -->
+    <string name="qr_scanner_overlay">将二维码对准扫描框</string>
+    <string name="qr_permission_denied">未授予相机权限</string>
+    <string name="qr_scan_failed">扫码失败</string>
+    <string name="qr_invalid_subscription">不是有效的订阅链接</string>
+    <string name="qr_unsupported">不支持的二维码</string>
 
     <!-- Service Errors -->
     <string name="error_vpn_failed">VPN 建立失败: %1$s</string>

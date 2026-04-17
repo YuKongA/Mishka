@@ -5,17 +5,21 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.ActivityResultLauncher
+import androidx.annotation.StringRes
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.lifecycleScope
 import io.github.g00fy2.quickie.QRResult
-import io.github.g00fy2.quickie.ScanQRCode
+import io.github.g00fy2.quickie.ScanCustomCode
+import io.github.g00fy2.quickie.config.BarcodeFormat
+import io.github.g00fy2.quickie.config.ScannerConfig
 import kotlinx.coroutines.launch
 import top.yukonga.mishka.data.api.MihomoApiClient
 import top.yukonga.mishka.data.api.MihomoWebSocket
@@ -56,8 +60,17 @@ class MainActivity : ComponentActivity() {
     private lateinit var overrideSettingsViewModel: OverrideSettingsViewModel
     private lateinit var appProxyViewModel: AppProxyViewModel
     private lateinit var filePicker: FilePicker
-    private lateinit var scanQrLauncher: ActivityResultLauncher<Nothing?>
+    private lateinit var scanQrLauncher: ActivityResultLauncher<ScannerConfig>
     private var qrResultCallback: ((String?) -> Unit)? = null
+    private val scannerConfig: ScannerConfig by lazy {
+        ScannerConfig.build {
+            setBarcodeFormats(listOf(BarcodeFormat.FORMAT_QR_CODE))
+            setOverlayStringRes(R.string.qr_scanner_overlay)
+            setShowTorchToggle(true)
+            setShowCloseButton(true)
+            setKeepScreenOn(true)
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -69,10 +82,31 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        scanQrLauncher = registerForActivityResult(ScanQRCode()) { result ->
-            val url = when (result) {
-                is QRResult.QRSuccess -> result.content.rawValue
-                else -> null
+        scanQrLauncher = registerForActivityResult(ScanCustomCode()) { result ->
+            val url: String? = when (result) {
+                is QRResult.QRSuccess -> {
+                    val raw = result.content.rawValue
+                    when {
+                        raw == null -> {
+                            showQrToast(R.string.qr_unsupported)
+                            null
+                        }
+                        raw.startsWith("http://") || raw.startsWith("https://") -> raw
+                        else -> {
+                            showQrToast(R.string.qr_invalid_subscription)
+                            null
+                        }
+                    }
+                }
+                is QRResult.QRMissingPermission -> {
+                    showQrToast(R.string.qr_permission_denied)
+                    null
+                }
+                is QRResult.QRError -> {
+                    showQrToast(R.string.qr_scan_failed)
+                    null
+                }
+                is QRResult.QRUserCanceled -> null
             }
             qrResultCallback?.invoke(url)
             qrResultCallback = null
@@ -177,7 +211,7 @@ class MainActivity : ComponentActivity() {
                 bootStartManager = BootStartManager(this@MainActivity),
                 onScanQR = { callback ->
                     qrResultCallback = callback
-                    scanQrLauncher.launch(null)
+                    scanQrLauncher.launch(scannerConfig)
                 },
                 hasRootPermission = hasRootState.value,
                 onPredictiveBackChange = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
@@ -193,6 +227,10 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         serviceController.verifyAndSyncState()
+    }
+
+    private fun showQrToast(@StringRes resId: Int) {
+        Toast.makeText(this, resId, Toast.LENGTH_SHORT).show()
     }
 
     @Deprecated("Use ActivityResult API")

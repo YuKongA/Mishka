@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">Mishka</string>
+    <string name="app_name" translatable="false">Mishka</string>
 
     <!-- Notification Channels -->
     <string name="channel_vpn_name">VPN Service Status</string>
@@ -10,13 +10,13 @@
     <string name="channel_profile_result_desc">Config update success or failure notifications</string>
 
     <!-- VPN Notifications -->
-    <string name="notification_loading">Starting...</string>
+    <string name="notification_loading">Starting…</string>
     <string name="notification_running_title">Mishka Running</string>
     <string name="notification_running_content">Mode: %1$s</string>
 
     <!-- Profile Update Notifications -->
     <string name="notification_profile_update">Config Update</string>
-    <string name="notification_profile_running">Running...</string>
+    <string name="notification_profile_running">Running…</string>
     <string name="notification_profile_updating">Updating config</string>
     <string name="notification_update_success">Update Successful</string>
     <string name="notification_update_success_content">%1$s updated</string>
@@ -25,9 +25,16 @@
 
     <!-- Tile -->
     <string name="tile_connected">Connected</string>
-    <string name="tile_connecting">Connecting...</string>
+    <string name="tile_connecting">Connecting…</string>
     <string name="tile_error">Error</string>
     <string name="tile_disconnected">Disconnected</string>
+
+    <!-- QR Scanner -->
+    <string name="qr_scanner_overlay">Align the QR code within the frame</string>
+    <string name="qr_permission_denied">Camera permission not granted</string>
+    <string name="qr_scan_failed">QR code scan failed</string>
+    <string name="qr_invalid_subscription">Not a valid subscription link</string>
+    <string name="qr_unsupported">Unsupported QR code</string>
 
     <!-- Service Errors -->
     <string name="error_vpn_failed">VPN establishment failed: %1$s</string>

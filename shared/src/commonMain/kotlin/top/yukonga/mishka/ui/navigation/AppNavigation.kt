@@ -181,7 +181,7 @@ fun AppNavigation(
                     onScanQR = if (onScanQR != null) {
                         {
                             onScanQR { url ->
-                                if (url != null && (url.startsWith("http://") || url.startsWith("https://"))) {
+                                if (url != null) {
                                     navigator.push(Route.SubscriptionAddUrl(initialUrl = url))
                                 }
                             }
