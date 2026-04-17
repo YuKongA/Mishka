@@ -32,7 +32,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.graphicsLayer
@@ -175,7 +174,7 @@ fun ConnectionScreen(
                     bottomContent = {
                         Box(
                             modifier = Modifier
-                                .alpha(if (searchStatus.isCollapsed()) 1f else 0f)
+                                .graphicsLayer { alpha = if (searchStatus.isCollapsed()) 1f else 0f }
                                 .onGloballyPositioned { coordinates ->
                                     with(density) {
                                         val newOffsetY = coordinates.positionInWindow().y.toDp()

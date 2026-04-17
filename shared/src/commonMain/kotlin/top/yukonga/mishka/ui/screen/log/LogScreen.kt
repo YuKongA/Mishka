@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -20,6 +21,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -75,8 +77,22 @@ fun LogScreen(
         onDispose { viewModel.disconnect() }
     }
 
+    // 仅当用户已滚到底部时自动跟随新日志，否则不抢夺滚动位置
+    val autoScrollEnabled by remember {
+        derivedStateOf {
+            val info = listState.layoutInfo
+            val visible = info.visibleItemsInfo
+            if (visible.isEmpty()) true
+            else {
+                val lastVisible = visible.last().index
+                // bottom_spacer 或最后一条 log 在可视范围内即视为"在底部"
+                lastVisible >= info.totalItemsCount - 2
+            }
+        }
+    }
+
     LaunchedEffect(logs.size) {
-        if (logs.isNotEmpty()) {
+        if (logs.isNotEmpty() && autoScrollEnabled) {
             listState.animateScrollToItem(logs.lastIndex)
         }
     }
@@ -122,7 +138,7 @@ fun LogScreen(
                 top = innerPadding.calculateTopPadding(),
                 bottom = bottomPadding,
             ),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             if (logs.isEmpty()) {
                 item(key = "empty", contentType = "empty") {
@@ -132,11 +148,19 @@ fun LogScreen(
                         verticalArrangement = Arrangement.Center,
                     ) {
                         Text(
-                            text = if (uiState.isConnected) stringResource(Res.string.log_waiting) else stringResource(Res.string.log_not_connected),
+                            text = if (uiState.isConnected) {
+                                stringResource(Res.string.log_waiting)
+                            } else {
+                                stringResource(Res.string.log_not_connected)
+                            },
                             fontSize = 16.sp,
                             color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                         )
                     }
+                }
+            } else {
+                item(key = "top_spacer", contentType = "spacer") {
+                    Spacer(Modifier)
                 }
             }
 

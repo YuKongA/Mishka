@@ -13,8 +13,10 @@ import top.yukonga.mishka.data.database.ImportedEntity
 import top.yukonga.mishka.data.database.PendingDao
 import top.yukonga.mishka.data.database.PendingEntity
 import top.yukonga.mishka.data.database.SelectionDao
+import top.yukonga.mishka.data.model.ProfileType
 import top.yukonga.mishka.data.model.Subscription
 import top.yukonga.mishka.platform.PlatformStorage
+import top.yukonga.mishka.platform.ProfileFileManager
 import top.yukonga.mishka.platform.ProxyServiceBridge
 import top.yukonga.mishka.platform.StorageKeys
 import kotlin.uuid.ExperimentalUuidApi
@@ -40,6 +42,7 @@ class SubscriptionRepository(
     private val pendingDao: PendingDao,
     private val selectionDao: SelectionDao,
     private val storage: PlatformStorage,
+    private val fileManager: ProfileFileManager? = null,
     scope: CoroutineScope,
 ) {
 
@@ -64,8 +67,8 @@ class SubscriptionRepository(
      * 创建新的 Pending 记录。
      */
     @OptIn(ExperimentalUuidApi::class)
-    suspend fun create(type: String, name: String, source: String, interval: Long = 0): Subscription = profileLock.withLock {
-        val uuid = Uuid.random().toString().take(8)
+    suspend fun create(type: ProfileType, name: String, source: String, interval: Long = 0): Subscription = profileLock.withLock {
+        val uuid = Uuid.random().toString()
         val pending = PendingEntity(
             uuid = uuid,
             name = name,
@@ -217,12 +220,12 @@ class SubscriptionRepository(
     suspend fun clone(uuid: String): String = profileLock.withLock {
         val imported = importedDao.queryByUUID(uuid)
             ?: throw IllegalArgumentException("Profile $uuid not found")
-        val newUuid = Uuid.random().toString().take(8)
+        val newUuid = Uuid.random().toString()
         pendingDao.insert(
             PendingEntity(
                 uuid = newUuid,
                 name = imported.name,
-                type = "File",
+                type = ProfileType.File,
                 source = imported.source,
                 interval = imported.interval,
                 createdAt = System.currentTimeMillis(),
@@ -264,7 +267,9 @@ class SubscriptionRepository(
             download = pending?.download ?: imported.download,
             total = pending?.total ?: imported.total,
             expire = pending?.expire ?: imported.expire,
-            updatedAt = imported.createdAt,
+            updatedAt = fileManager?.getDirectoryLastModified(imported.uuid, pending = true)
+                ?: fileManager?.getDirectoryLastModified(imported.uuid, pending = false)
+                ?: imported.createdAt,
             isActive = imported.uuid == activeId,
             imported = true,
             pending = pending != null,

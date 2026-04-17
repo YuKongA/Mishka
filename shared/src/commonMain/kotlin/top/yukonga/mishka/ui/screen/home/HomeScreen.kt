@@ -4,11 +4,19 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import top.yukonga.mishka.viewmodel.HomeUiState
+import top.yukonga.mishka.viewmodel.HomeViewModel
+import top.yukonga.mishka.viewmodel.MemorySnapshot
+import top.yukonga.mishka.viewmodel.SpeedSnapshot
+import top.yukonga.mishka.viewmodel.SystemInfoSnapshot
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.TopAppBar
@@ -20,6 +28,7 @@ fun HomeScreen(
     modifier: Modifier = Modifier,
     bottomPadding: Dp = 0.dp,
     uiState: HomeUiState = HomeUiState(),
+    viewModel: HomeViewModel? = null,
     onRestart: () -> Unit = {},
     onStop: () -> Unit = {},
     onReload: () -> Unit = {},
@@ -34,6 +43,12 @@ fun HomeScreen(
     onSwitchProxyGroup: (String) -> Unit = {},
 ) {
     val scrollBehavior = MiuixScrollBehavior()
+
+    // 高频字段独立订阅，重组仅限到相应 Section
+    val speed by (viewModel?.speedState?.collectAsState() ?: remember { mutableStateOf(SpeedSnapshot()) })
+    val memory by (viewModel?.memoryState?.collectAsState() ?: remember { mutableStateOf(MemorySnapshot()) })
+    val systemInfo by (viewModel?.systemInfoState?.collectAsState() ?: remember { mutableStateOf(SystemInfoSnapshot()) })
+    val uptime by (viewModel?.uptimeState?.collectAsState() ?: remember { mutableStateOf("") })
 
     Scaffold(
         modifier = modifier,
@@ -57,6 +72,7 @@ fun HomeScreen(
         ) {
             statusSection(
                 state = uiState,
+                uptime = uptime,
                 onSwitchMode = onSwitchMode,
                 onSwitchTunStack = onSwitchTunStack,
             )
@@ -76,8 +92,8 @@ fun HomeScreen(
                 onNavigateDnsQuery = onNavigateDnsQuery,
             )
             latencySection(uiState, onTestLatency, onSwitchProxyGroup)
-            networkInfoSection(uiState)
-            bottomCardsSection(uiState)
+            networkInfoSection(speed = speed, systemInfo = systemInfo)
+            bottomCardsSection(state = uiState, memory = memory, systemInfo = systemInfo)
         }
     }
 }

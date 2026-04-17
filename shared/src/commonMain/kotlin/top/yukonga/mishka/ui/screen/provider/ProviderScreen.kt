@@ -7,8 +7,10 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -31,7 +33,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import mishka.shared.generated.resources.Res
 import mishka.shared.generated.resources.common_back
-import mishka.shared.generated.resources.provider_list
 import mishka.shared.generated.resources.provider_no_providers
 import mishka.shared.generated.resources.provider_start_first
 import mishka.shared.generated.resources.provider_title
@@ -46,7 +47,6 @@ import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.Scaffold
-import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TopAppBar
 import top.yukonga.miuix.kmp.icon.MiuixIcons
@@ -146,10 +146,9 @@ fun ProviderScreen(
             }
 
             if (uiState.providers.isNotEmpty()) {
-                item(key = "provider_title") {
-                    SmallTitle(text = stringResource(Res.string.provider_list))
+                item(key = "top_spacer", contentType = "spacer") {
+                    Spacer(Modifier.height(12.dp))
                 }
-
                 items(
                     items = uiState.providers,
                     key = { it.name },

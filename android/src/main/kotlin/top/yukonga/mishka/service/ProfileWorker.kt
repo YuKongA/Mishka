@@ -18,6 +18,7 @@ import top.yukonga.mishka.data.database.getAppDatabase
 import top.yukonga.mishka.data.model.Subscription
 import top.yukonga.mishka.data.repository.ConfigProcessor
 import top.yukonga.mishka.data.repository.SubscriptionFetcher
+import java.util.concurrent.ConcurrentLinkedQueue
 
 /**
  * 配置后台更新前台服务（对齐 CMFA ProfileWorker）。
@@ -28,7 +29,7 @@ import top.yukonga.mishka.data.repository.SubscriptionFetcher
 class ProfileWorker : Service() {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    private val jobs = mutableListOf<Job>()
+    private val jobs = ConcurrentLinkedQueue<Job>()
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -49,8 +50,8 @@ class ProfileWorker : Service() {
         // 所有任务完成后自动停止
         scope.launch {
             delay(10_000) // 等待任务提交
-            while (jobs.any { it.isActive }) {
-                delay(1_000)
+            while (true) {
+                jobs.poll()?.join() ?: break
             }
             stopSelf()
         }
@@ -65,7 +66,7 @@ class ProfileWorker : Service() {
                 val uuid = intent.data?.host
                 if (uuid != null) {
                     val job = scope.launch { runUpdate(uuid) }
-                    jobs.add(job)
+                    jobs.offer(job)
                 }
             }
         }

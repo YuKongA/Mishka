@@ -22,7 +22,7 @@ fun RestartRequiredHint() {
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 12.dp)
-            .padding(vertical = 12.dp),
+            .padding(top = 12.dp, bottom = 6.dp),
     ) {
         Text(
             text = stringResource(Res.string.settings_override_restart_hint),

@@ -54,17 +54,19 @@ import top.yukonga.miuix.kmp.window.WindowDialog
 
 fun LazyListScope.statusSection(
     state: HomeUiState = HomeUiState(),
+    uptime: String = "",
     onSwitchMode: (String) -> Unit = {},
     onSwitchTunStack: (String) -> Unit = {},
 ) {
     item(key = "status") {
-        StatusContent(state, onSwitchMode, onSwitchTunStack)
+        StatusContent(state, uptime, onSwitchMode, onSwitchTunStack)
     }
 }
 
 @Composable
 private fun StatusContent(
     state: HomeUiState,
+    uptime: String,
     onSwitchMode: (String) -> Unit,
     onSwitchTunStack: (String) -> Unit,
 ) {
@@ -154,7 +156,7 @@ private fun StatusContent(
                         color = if (isDark) Color(0xFFAAAAAA) else Color(0xFF666666),
                     )
                     Text(
-                        text = state.uptime,
+                        text = uptime,
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Medium,
                         color = if (isDark) Color(0xFFAAAAAA) else Color(0xFF666666),

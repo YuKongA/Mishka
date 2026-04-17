@@ -138,7 +138,7 @@ fun SubscriptionAddUrlScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 12.dp)
-                        .padding(bottom = 12.dp),
+                        .padding(bottom = 6.dp),
                 )
             }
             item(key = "url_title") {
@@ -151,7 +151,7 @@ fun SubscriptionAddUrlScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 12.dp)
-                        .padding(bottom = 12.dp),
+                        .padding(bottom = 6.dp),
                     label = stringResource(Res.string.subscription_url_placeholder),
                     useLabelAsPlaceholder = true,
                 )

@@ -13,6 +13,22 @@ interface ProfileFileManager {
     fun cloneFiles(sourceUuid: String, targetUuid: String)
 
     /**
+     * 返回订阅目录的最后修改时间（毫秒）。
+     * @param pending true 取 pending/{uuid}，false 取 imported/{uuid}
+     * @return 目录存在且 mtime > 0 返回时间戳，否则 null
+     */
+    fun getDirectoryLastModified(uuid: String, pending: Boolean): Long?
+
+    /** 列出 imported/{uuid} 下的文件（相对路径）。目录不存在返回空列表。 */
+    fun listImportedFiles(uuid: String): List<String>
+
+    /** 读取 imported/{uuid}/{relativePath} 文本内容，不存在或读失败返回 null。 */
+    fun readImportedFile(uuid: String, relativePath: String): String?
+
+    /** 写入 imported/{uuid}/{relativePath} 文本内容。调用方负责先校验 YAML 合法性。 */
+    fun writeImportedFile(uuid: String, relativePath: String, content: String)
+
+    /**
      * 使用 mihomo -t 校验指定工作目录下的配置文件。
      * @param configFileName 相对 workDir 的配置文件名，默认校验订阅原始 config.yaml；
      *                       调用方传 config.validate.yaml 可校验 override 合并后的 YAML

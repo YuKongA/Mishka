@@ -269,6 +269,28 @@
     <string name="app_proxy_deny_selected_summary">选中的应用不经过代理</string>
     <string name="app_proxy_app_list">应用列表 (%1$d/%2$d)</string>
     <string name="app_proxy_running_hint">修改将在重启代理后生效</string>
+    <string name="app_proxy_applied">已应用分应用代理</string>
+    <string name="app_proxy_no_change">无变更</string>
+    <string name="dialog_reset_done">已恢复默认值</string>
+
+    <!-- External Control -->
+    <string name="external_control_title">外部控制器</string>
+    <string name="external_control_controller_hint">mihomo HTTP API 的监听地址（例如 127.0.0.1:9090）。重启代理后生效。</string>
+    <string name="settings_external_control">外部控制器</string>
+    <string name="settings_external_control_summary">覆写 mihomo HTTP API 绑定地址</string>
+
+    <!-- File Manager -->
+    <string name="file_manager_title">文件管理</string>
+    <string name="file_manager_empty">暂无已导入的订阅</string>
+    <string name="file_manager_files_title">%1$s 的文件</string>
+    <string name="file_manager_no_files">暂无文件</string>
+    <string name="file_manager_save">保存</string>
+    <string name="file_manager_save_failed">保存失败：%1$s</string>
+    <string name="file_manager_saved">已保存</string>
+    <string name="file_manager_validating">正在校验...</string>
+    <string name="file_manager_edit_warning">手动编辑将绕过订阅管道。非法 YAML 会阻止保存。</string>
+    <string name="settings_file_manager">文件管理</string>
+    <string name="settings_file_manager_summary">浏览并编辑已导入订阅的文件</string>
 
     <!-- About -->
     <string name="about_title">关于</string>

@@ -4,11 +4,13 @@ import androidx.room3.ConstructedBy
 import androidx.room3.Database
 import androidx.room3.RoomDatabase
 import androidx.room3.RoomDatabaseConstructor
+import androidx.room3.TypeConverters
 
 @Database(
     entities = [ImportedEntity::class, PendingEntity::class, SelectionEntity::class],
     version = 1,
 )
+@TypeConverters(ProfileTypeConverter::class)
 @ConstructedBy(AppDatabaseConstructor::class)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun importedDao(): ImportedDao

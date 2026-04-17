@@ -24,7 +24,6 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import mishka.shared.generated.resources.Res
@@ -34,6 +33,7 @@ import mishka.shared.generated.resources.common_cleared
 import mishka.shared.generated.resources.common_confirm
 import mishka.shared.generated.resources.common_items_count
 import mishka.shared.generated.resources.common_not_modified
+import mishka.shared.generated.resources.dialog_reset_done
 import mishka.shared.generated.resources.network_allow_lan
 import mishka.shared.generated.resources.network_bind_address
 import mishka.shared.generated.resources.network_dns
@@ -44,7 +44,6 @@ import mishka.shared.generated.resources.network_dns_fakeip_filter
 import mishka.shared.generated.resources.network_dns_listen
 import mishka.shared.generated.resources.network_dns_listen_title
 import mishka.shared.generated.resources.network_dns_use_hosts
-import mishka.shared.generated.resources.network_external_controller
 import mishka.shared.generated.resources.network_http_port
 import mishka.shared.generated.resources.network_input_value
 import mishka.shared.generated.resources.network_log_level
@@ -59,6 +58,7 @@ import mishka.shared.generated.resources.network_socks_port
 import mishka.shared.generated.resources.network_tproxy_port
 import org.jetbrains.compose.resources.stringResource
 import top.yukonga.mishka.data.repository.OverrideStorageHelper
+import top.yukonga.mishka.platform.showToast
 import top.yukonga.mishka.ui.component.ListEditDialog
 import top.yukonga.mishka.ui.component.RestartRequiredHint
 import top.yukonga.mishka.ui.component.TriStatePreference
@@ -86,10 +86,10 @@ import top.yukonga.miuix.kmp.window.WindowDialog
 fun NetworkSettingsScreen(
     viewModel: OverrideSettingsViewModel,
     onBack: () -> Unit = {},
-    bottomPadding: Dp = 0.dp,
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val scrollBehavior = MiuixScrollBehavior()
+    val resetDoneMsg = stringResource(Res.string.dialog_reset_done)
 
     // 端口编辑 Dialog 状态
     var showPortDialog by remember { mutableStateOf(false) }
@@ -162,7 +162,6 @@ fun NetworkSettingsScreen(
                 .nestedScroll(scrollBehavior.nestedScrollConnection),
             contentPadding = PaddingValues(
                 top = innerPadding.calculateTopPadding(),
-                bottom = bottomPadding,
             ),
         ) {
             item { RestartRequiredHint() }
@@ -227,12 +226,6 @@ fun NetworkSettingsScreen(
                         title = "IPv6",
                         value = uiState.ipv6,
                         onValueChange = { viewModel.updateBoolean(OverrideStorageHelper.KEY_IPV6, it) },
-                    )
-                    val extControllerTitle = stringResource(Res.string.network_external_controller)
-                    ArrowPreference(
-                        title = extControllerTitle,
-                        summary = uiState.externalController ?: stringResource(Res.string.common_not_modified),
-                        onClick = { openStringDialog(extControllerTitle, OverrideStorageHelper.KEY_EXTERNAL_CONTROLLER, uiState.externalController) },
                     )
                     val bindAddrTitle = stringResource(Res.string.network_bind_address)
                     ArrowPreference(
@@ -322,7 +315,7 @@ fun NetworkSettingsScreen(
                 }
             }
 
-            item { Spacer(Modifier.navigationBarsPadding()) }
+            item { Spacer(Modifier.height(24.dp).navigationBarsPadding()) }
         }
     }
 
@@ -333,7 +326,10 @@ fun NetworkSettingsScreen(
         textState = portTextState,
         onDismiss = { showPortDialog = false },
         onConfirm = { port -> viewModel.updatePort(editingPortKey, port) },
-        onReset = { viewModel.updatePort(editingPortKey, null) },
+        onReset = {
+            viewModel.updatePort(editingPortKey, null)
+            showToast(resetDoneMsg)
+        },
     )
 
     // === 字符串编辑 Dialog ===
@@ -343,7 +339,10 @@ fun NetworkSettingsScreen(
         textState = stringTextState,
         onDismiss = { showStringDialog = false },
         onConfirm = { value -> viewModel.updateString(editingStringKey, value) },
-        onReset = { viewModel.updateString(editingStringKey, null) },
+        onReset = {
+            viewModel.updateString(editingStringKey, null)
+            showToast(resetDoneMsg)
+        },
     )
 
     // === 列表编辑 Dialog ===
@@ -353,7 +352,10 @@ fun NetworkSettingsScreen(
         textState = listTextState,
         onDismiss = { showListDialog = false },
         onConfirm = { list -> viewModel.updateStringList(editingListKey, list) },
-        onReset = { viewModel.updateStringList(editingListKey, null) },
+        onReset = {
+            viewModel.updateStringList(editingListKey, null)
+            showToast(resetDoneMsg)
+        },
     )
 }
 

@@ -35,16 +35,16 @@ Mishka/
 │   │   ├── App.kt                    根组件 + 主题配置
 │   │   ├── data/
 │   │   │   ├── api/                  MihomoApiClient（REST）+ MihomoWebSocket（流）
-│   │   │   ├── database/             Room 3.0 KMP（AppDatabase + 3 Entity + 3 DAO + DataMigration）
-│   │   │   ├── model/                12 个 @Serializable 数据模型
+│   │   │   ├── database/             Room 3.0 KMP（AppDatabase + 3 Entity + 3 DAO + DataMigration + ProfileTypeConverter）
+│   │   │   ├── model/                @Serializable 数据模型 + ProfileType enum
 │   │   │   └── repository/           MihomoRepository + SubscriptionRepository + SubscriptionFetcher + ConfigProcessor + V2RayConverter + OverrideStorageHelper
-│   │   ├── platform/                 9 个 expect 声明 + ProfileFileManager 接口 + ProxyServiceBridge
+│   │   ├── platform/                 expect 声明（含 Toast）+ ProfileFileManager 接口 + ProxyServiceBridge
 │   │   ├── ui/
 │   │   │   ├── navigation/           AppNavigation（主导航树 + HorizontalPager）
-│   │   │   ├── navigation3/          Route（14 路由）+ Navigator（自定义栈）
+│   │   │   ├── navigation3/          Route（17 路由）+ Navigator（自定义栈）
 │   │   │   ├── component/            SearchBar + SearchStatus + MenuPositionProvider + TriStatePreference + NullablePortPreference + ListEditDialog + RestartRequiredHint
 │   │   │   │   └── effect/           BgEffectBackground（OS3 动态渐变着色器背景）
-│   │   │   └── screen/               17 个页面（home/ proxy/ subscription/ settings/ log/ provider/ dns/ connection/）
+│   │   │   └── screen/               19 个页面（home/ proxy/ subscription/ settings/ log/ provider/ dns/ connection/）
 │   │   ├── viewmodel/                9 个 ViewModel
 │   │   └── util/                     FormatUtils
 │   ├── commonMain/composeResources/
@@ -113,6 +113,12 @@ MainActivity → App → AppNavigation
 | pending    | PendingEntity   | 编辑中的草稿（提交后移入 imported） |
 | selections | SelectionEntity | 代理组选择记录（per 订阅）          |
 
+### 类型安全与时间语义
+
+- **ProfileType enum**（`File`/`Url`/`External`，对齐 CFMA `Profile.Type`）通过 `ProfileTypeConverter` 透明映射为 TEXT 列，历史字符串数据 100% 兼容，无需 DB migration
+- **订阅 UUID 完整 36 字符**（`Uuid.random().toString()`，去掉旧的 `.take(8)`）——UUID v4 碰撞概率 ~2^-122，不做循环冲突检测；新旧 UUID 可共存
+- **updatedAt 动态计算**：`ImportedEntity` 无 updatedAt 字段，`SubscriptionRepository.resolveProfile` 走 `ProfileFileManager.getDirectoryLastModified(uuid, pending)` 读 pending→imported 目录 mtime，fallback `imported.createdAt`（对齐 CFMA `ProfileManager.resolveUpdatedAt`）；订阅 commit/update 自然更新文件系统 mtime，无需主动写 DB
+
 ### 两阶段编辑模型（SubscriptionRepository）
 
 ```
@@ -149,79 +155,86 @@ files/mihomo/
 
 ## 路由清单
 
-`Route.kt` 中定义 14 个路由，均实现 `NavKey`：
+`Route.kt` 中定义 17 个路由，均实现 `NavKey`：
 
-| 路由               | 类型        | 页面                          | 入口            |
-| ------------------ | ----------- | ----------------------------- | --------------- |
-| Main               | data object | 主页（HorizontalPager 4 Tab） | 根路由          |
-| Subscription       | data object | SubscriptionScreen            | 主页 Tab 2 导航 |
-| SubscriptionAdd    | data object | SubscriptionAddScreen         | 订阅页          |
-| SubscriptionAddUrl | data class  | SubscriptionAddUrlScreen      | 添加订阅页      |
-| SubscriptionEdit   | data class  | SubscriptionEditScreen        | 订阅项编辑按钮  |
-| Log                | data object | LogScreen                     | QuickEntries    |
-| Provider           | data object | ProviderScreen                | QuickEntries    |
-| DnsQuery           | data object | DnsQueryScreen                | QuickEntries    |
-| Connection         | data object | ConnectionScreen              | QuickEntries    |
-| VpnSettings        | data object | VpnSettingsScreen             | 设置页          |
-| NetworkSettings    | data object | NetworkSettingsScreen         | 设置页          |
-| MetaSettings       | data object | MetaSettingsScreen            | 设置页          |
-| AppProxy           | data object | AppProxyScreen                | 设置页          |
-| About              | data object | AboutScreen                   | 设置页          |
+| 路由               | 类型        | 页面                          | 入口               |
+| ------------------ | ----------- | ----------------------------- | ------------------ |
+| Main               | data object | 主页（HorizontalPager 4 Tab） | 根路由             |
+| Subscription       | data object | SubscriptionScreen            | 主页 Tab 2 导航    |
+| SubscriptionAdd    | data object | SubscriptionAddScreen         | 订阅页             |
+| SubscriptionAddUrl | data class  | SubscriptionAddUrlScreen      | 添加订阅页         |
+| SubscriptionEdit   | data class  | SubscriptionEditScreen        | 订阅项编辑按钮     |
+| Log                | data object | LogScreen                     | QuickEntries       |
+| Provider           | data object | ProviderScreen                | QuickEntries       |
+| DnsQuery           | data object | DnsQueryScreen                | QuickEntries       |
+| Connection         | data object | ConnectionScreen              | QuickEntries       |
+| VpnSettings        | data object | VpnSettingsScreen             | 设置页             |
+| NetworkSettings    | data object | NetworkSettingsScreen         | 设置页             |
+| MetaSettings       | data object | MetaSettingsScreen            | 设置页             |
+| ExternalControl    | data object | ExternalControlScreen         | 设置页             |
+| AppProxy           | data object | AppProxyScreen                | 设置页             |
+| FileManager        | data object | FileManagerScreen             | 设置页             |
+| FileManagerEditor  | data class  | FileManagerEditorScreen       | FileManager 点击项 |
+| About              | data object | AboutScreen                   | 设置页             |
 
 ## 页面与 ViewModel
 
-| Screen                       | ViewModel             | 说明                                          |
-| ---------------------------- | --------------------- | --------------------------------------------- |
+| Screen                       | ViewModel             | 说明                                                            |
+| ---------------------------- | --------------------- | --------------------------------------------------------------- |
 | HomeScreen（6 个子 Section） | HomeViewModel         | 状态/ActionButtons/NetworkInfo/QuickEntries/Latency/BottomCards |
-| ProxyScreen                  | ProxyViewModel        | 代理组 Tab + 节点选择 + 延迟测试 + 选择记忆   |
-| SubscriptionScreen           | SubscriptionViewModel | 订阅列表 + 增删改 + 全部更新 + 编辑 + 复制    |
-| SubscriptionEditScreen       | SubscriptionViewModel | 编辑名称/URL/更新间隔                         |
-| SettingsScreen               | —                     | 设置入口页（TUN 模式/主题/开机自启）          |
-| LogScreen                    | LogViewModel          | 实时日志流 + 级别过滤                         |
-| ConnectionScreen             | ConnectionViewModel   | 活跃连接列表 + 关闭                           |
-| ProviderScreen               | ProviderViewModel     | Provider 列表 + 刷新                          |
-| DnsQueryScreen               | DnsQueryViewModel     | DNS 查询（A/AAAA/CNAME/MX/TXT/NS）            |
-| AppProxyScreen               | AppProxyViewModel     | 应用代理白/黑名单                             |
-| VpnSettingsScreen            | —                     | VPN 设置（系统代理/排除路由等）               |
-| NetworkSettingsScreen        | OverrideSettingsVM    | 端口/局域网/IPv6/external-controller/DNS      |
-| MetaSettingsScreen           | OverrideSettingsVM    | 统一延迟/Geodata/TCP 并发/嗅探器              |
-| AboutScreen                  | —                     | 版本信息（OS3 动态背景 + 视差滚动）           |
-| SubscriptionAddScreen        | —                     | 添加方式选择（文件/URL/QR Code）              |
-| SubscriptionAddUrlScreen     | SubscriptionViewModel | URL 导入订阅                                  |
+| ProxyScreen                  | ProxyViewModel        | 代理组 Tab + 节点选择 + 延迟测试 + 选择记忆                     |
+| SubscriptionScreen           | SubscriptionViewModel | 订阅列表 + 增删改 + 全部更新 + 编辑 + 复制                      |
+| SubscriptionEditScreen       | SubscriptionViewModel | 编辑名称/URL/更新间隔                                           |
+| SettingsScreen               | —                     | 设置入口页（TUN 模式/主题/开机自启）                            |
+| LogScreen                    | LogViewModel          | 实时日志流 + 级别过滤                                           |
+| ConnectionScreen             | ConnectionViewModel   | 活跃连接列表 + 关闭                                             |
+| ProviderScreen               | ProviderViewModel     | Provider 列表 + 刷新                                            |
+| DnsQueryScreen               | DnsQueryViewModel     | DNS 查询（A/AAAA/CNAME/MX/TXT/NS）                              |
+| AppProxyScreen               | AppProxyViewModel     | 应用代理白/黑名单（返回时 applyIfChanged 有变更则 Toast）       |
+| VpnSettingsScreen            | —                     | VPN 设置（系统代理/排除路由等）                                 |
+| NetworkSettingsScreen        | OverrideSettingsVM    | 端口/局域网/IPv6/DNS（external-controller 已移到独立页）        |
+| MetaSettingsScreen           | OverrideSettingsVM    | 统一延迟/Geodata/TCP 并发/嗅探器                                |
+| ExternalControlScreen        | OverrideSettingsVM    | mihomo HTTP API external-controller 独立配置页                  |
+| FileManagerScreen            | SubscriptionViewModel | imported 订阅目录浏览（复用 SubscriptionViewModel.fileManager） |
+| FileManagerEditorScreen      | SubscriptionViewModel | 多行 TextField 编辑 YAML，保存前 mihomo -t 校验，失败回滚       |
+| AboutScreen                  | —                     | 版本信息（OS3 动态背景 + 视差滚动）                             |
+| SubscriptionAddScreen        | —                     | 添加方式选择（文件/URL/QR Code）                                |
+| SubscriptionAddUrlScreen     | SubscriptionViewModel | URL 导入订阅                                                    |
 
 ## 平台抽象（expect/actual）
 
-| expect 声明            | 类型           | Android 实现                | Desktop     |
-| ---------------------- | -------------- | --------------------------- | ----------- |
-| PlatformContext        | abstract class | typealias Context           | 空对象      |
-| PlatformStorage        | class          | SharedPreferences           | Preferences |
-| PlatformSystemInfo     | class          | ConnectivityManager + /proc | 空实现      |
-| ProxyServiceController | class          | Intent 启停 VPN             | 空实现      |
-| AppListProvider        | class          | PackageManager              | 空列表      |
-| BootStartManager       | class          | BroadcastReceiver           | 空实现      |
-| FilePicker             | class          | SAF                         | 文件对话框  |
-| AppIcon                | fun            | BitmapFactory               | 资源加载    |
-| IconDiskCache          | object         | 磁盘缓存                    | 空实现      |
+| expect 声明                   | 类型           | Android 实现                       | Desktop     |
+| ----------------------------- | -------------- | ---------------------------------- | ----------- |
+| PlatformContext               | abstract class | typealias Context                  | 空对象      |
+| PlatformStorage               | class          | SharedPreferences                  | Preferences |
+| PlatformSystemInfo            | class          | ConnectivityManager + /proc        | 空实现      |
+| ProxyServiceController        | class          | Intent 启停 VPN                    | 空实现      |
+| AppListProvider               | class          | PackageManager                     | 空列表      |
+| BootStartManager              | class          | BroadcastReceiver                  | 空实现      |
+| FilePicker                    | class          | SAF                                | 文件对话框  |
+| AppIcon                       | fun            | BitmapFactory                      | 资源加载    |
+| IconDiskCache                 | object         | 磁盘缓存                           | 空实现      |
+| showToast / initToastPlatform | fun            | android.widget.Toast（主线程派发） | 空实现      |
 
 ## Android 服务层
 
-| 组件                       | 用途                                                              |
-| -------------------------- | ----------------------------------------------------------------- |
-| MishkaTunService           | VpnService + JNI fork+exec 启动 mihomo                            |
-| MishkaRootService          | ROOT TUN 模式前台服务（su 启动 mihomo，进程重连）                 |
-| RootHelper                 | root 检测/启动/终止/存活检查/残留清理                             |
-| DynamicNotificationManager | 动态通知（WebSocket 流量），两个 Service 共用                     |
-| MishkaTileService          | Quick Settings Tile 一键启停代理（双模式路由）                    |
-| BootReceiver               | 开机自启（默认 disabled，动态启用）                               |
+| 组件                       | 用途                                                                                             |
+| -------------------------- | ------------------------------------------------------------------------------------------------ |
+| MishkaTunService           | VpnService + JNI fork+exec 启动 mihomo                                                           |
+| MishkaRootService          | ROOT TUN 模式前台服务（su 启动 mihomo，进程重连）                                                |
+| RootHelper                 | root 检测/启动/终止/存活检查/残留清理                                                            |
+| DynamicNotificationManager | 动态通知（WebSocket 流量），两个 Service 共用                                                    |
+| MishkaTileService          | Quick Settings Tile 一键启停代理（双模式路由）                                                   |
+| BootReceiver               | 开机自启（默认 disabled，动态启用）                                                              |
 | ConfigGenerator            | 运行配置生成（buildRunConfig/writeRunConfig/writeValidationConfig，snakeyaml AST 合并 override） |
-| ProfileFileOps             | 订阅文件操作（imported/pending/processing 目录管理 + GeoIP 共享） |
-| AndroidProfileFileManager  | ProfileFileManager 接口的 Android 实现                            |
-| MihomoRunner               | mihomo 进程管理（VPN: JNI fork+exec / ROOT: su）                  |
-| MihomoValidator            | mihomo -t 配置校验（ProcessBuilder，超时 90s）                    |
-| ProcessHelper              | JNI 包装（nativeForkExec/nativeKill/nativeWaitpid）               |
-| NotificationHelper         | 三层通知渠道（VPN/更新进度/更新结果）                             |
-| ProfileReceiver            | AlarmManager 调度自动更新                                         |
-| ProfileWorker              | 前台服务执行后台配置更新                                          |
+| ProfileFileOps             | 订阅文件操作（imported/pending/processing 目录管理 + GeoIP 共享）                                |
+| AndroidProfileFileManager  | ProfileFileManager 接口的 Android 实现                                                           |
+| MihomoRunner               | mihomo 进程管理（VPN: JNI fork+exec / ROOT: su）                                                 |
+| MihomoValidator            | mihomo -t 配置校验（ProcessBuilder，超时 90s）                                                   |
+| ProcessHelper              | JNI 包装（nativeForkExec/nativeKill/nativeWaitpid）                                              |
+| NotificationHelper         | 三层通知渠道（VPN/更新进度/更新结果）                                                            |
+| ProfileReceiver            | AlarmManager 调度自动更新                                                                        |
+| ProfileWorker              | 前台服务执行后台配置更新                                                                         |
 
 ## 数据模型
 
@@ -255,7 +268,7 @@ GOOS=android GOARCH=arm64 CGO_ENABLED=0 go build \
 - 订阅管理采用 Pending/Imported 两阶段模型（对齐 CMFA），每个订阅有独立目录（imported/{uuid}/），mihomo -d 指向此处
 - Room 3.0 KMP 跨平台数据库，BundledSQLiteDriver 统一 Android/Desktop，DCL 单例
 - 代理组选择通过 SelectionEntity 持久化，切换订阅时自动恢复 Selector 类型组的选择
-- 后台自动更新通过 AlarmManager + ProfileReceiver + ProfileWorker 前台服务实现，最小间隔 15 分钟
+- 后台自动更新通过 AlarmManager + ProfileReceiver + ProfileWorker 前台服务实现，最小间隔 15 分钟。`ProfileWorker.jobs` 使用 `java.util.concurrent.ConcurrentLinkedQueue<Job>`（非 `mutableListOf`），`onStartCommand` 用 `offer` 提交、消费协程用 `while (true) { jobs.poll()?.join() ?: break }`——对齐 CFMA 挂起消费模式（非 `while(isActive) delay(1s)` 轮询），同时 `onStartCommand`（主线程）与 scope 协程（Dispatchers.IO）跨线程访问需要线程安全容器（ArrayList 会竞态）
 - network_security_config.xml 允许 localhost 明文通信（mihomo API 用 HTTP）
 - Activity 声明 `configChanges="uiMode"` 避免系统深浅色切换时重建，防止导航栈丢失
 - 预测性返回手势通过 HiddenApiBypass 反射调用 `ApplicationInfo.setEnableOnBackInvokedCallback`，Android 14+ 可选启用
@@ -272,13 +285,21 @@ GOOS=android GOARCH=arm64 CGO_ENABLED=0 go build \
 
 - 所有 UI 组件使用 miuix（Card、TopAppBar、NavigationBar、SmallTitle、TextButton 等）
 - 返回按钮使用 MiuixIcons.Back
-- Card 间距：水平 12.dp，垂直 12.dp
 - 首页状态卡片参考 KernelSU（CheckCircleOutline 170dp，offset(38,45)）
 - 深色模式：StatusCard 背景 #1A3825，按钮使用 isDark 条件色
 - 底栏图标：Sidebar / Tune / UploadCloud / Settings
-- LazyColumn 必须加 `.scrollEndHaptic().overScrollVertical().nestedScroll(scrollBehavior.nestedScrollConnection)`
 - Badge：`clip(miuixShape(3.dp))` + 9.sp Bold Monospace
 - 操作 IconButton：`minHeight/minWidth = 35.dp, backgroundColor = secondaryContainer`
+- **页面骨架**：Scaffold + TopAppBar(scrollBehavior) + LazyColumn
+  - LazyColumn 必须加 `.scrollEndHaptic().overScrollVertical().nestedScroll(scrollBehavior.nestedScrollConnection)`
+  - `contentPadding = PaddingValues(top = innerPadding.calculateTopPadding())` —— 仅设 top，不设 bottom
+  - 首个 item（非 RestartRequiredHint 场景）用 `item { Spacer(Modifier.height(12.dp)) }` 顶部呼吸
+  - 末尾 item 统一 `item { Spacer(Modifier.height(24.dp).navigationBarsPadding()) }` 吸收导航栏 + 24dp 留白
+  - Screen 签名**不要 `bottomPadding: Dp` 参数**（旧惯例已弃用，参 AppProxy/FileManager/ExternalControl）
+- **Card 间距**：水平 12.dp，每项统一 `padding(horizontal = 12.dp).padding(bottom = 12.dp)`；不使用 `Arrangement.spacedBy`（间距由每项 padding 承担）
+- **TextField 表单**：不包 Card，直接 `padding(horizontal = 12.dp).padding(bottom = 12.dp)`（参 SubscriptionEditScreen / FileManagerEditorScreen）
+- **Edit Dialog 按钮顺序**：`not_modified | cancel | confirm`（三按钮等宽 weight(1f) + `spacedBy(8.dp)`）；confirm 用 `ButtonDefaults.textButtonColorsPrimary()`，reset（`not_modified`）回调中调用 `showToast(dialog_reset_done)`
+- **用户反馈**：`platform.showToast(message, long = false)` —— 轻量操作结果提示（重置/应用成功等），Android 走系统 Toast 主线程派发，Desktop 空实现
 - **i18n**：所有面向用户的字符串必须使用 `stringResource(Res.string.xxx)`（Compose）或 `getString(R.string.xxx)`（Android Service），禁止硬编码
   - 新增字符串需同时添加到 `values/strings.xml`（英文）和 `values-zh-rCN/strings.xml`（中文）
   - key 命名：`{页面}_{描述}`，通用按钮用 `common_` 前缀

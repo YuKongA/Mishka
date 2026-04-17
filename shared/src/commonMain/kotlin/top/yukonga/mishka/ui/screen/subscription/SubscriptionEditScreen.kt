@@ -27,6 +27,7 @@ import mishka.shared.generated.resources.subscription_config_name
 import mishka.shared.generated.resources.subscription_edit
 import mishka.shared.generated.resources.subscription_sub_url
 import org.jetbrains.compose.resources.stringResource
+import top.yukonga.mishka.data.model.ProfileType
 import top.yukonga.mishka.viewmodel.SubscriptionViewModel
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Card
@@ -72,7 +73,7 @@ fun SubscriptionEditScreen(
         return
     }
 
-    val isFile = subscription.type == "File"
+    val isFile = subscription.type == ProfileType.File
     val hasChanges = name != subscription.name ||
             url != subscription.url ||
             intervalMinutes != (if (subscription.interval > 0) (subscription.interval / 60000).toString() else "")
@@ -117,7 +118,7 @@ fun SubscriptionEditScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 12.dp)
-                        .padding(bottom = 12.dp),
+                        .padding(bottom = 6.dp),
                 )
                 if (!isFile) {
                     SmallTitle(text = stringResource(Res.string.subscription_sub_url))
@@ -127,7 +128,7 @@ fun SubscriptionEditScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 12.dp)
-                            .padding(bottom = 12.dp),
+                            .padding(bottom = 6.dp),
                     )
                     SmallTitle(text = stringResource(Res.string.subscription_auto_update))
                     TextField(
@@ -138,7 +139,7 @@ fun SubscriptionEditScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 12.dp)
-                            .padding(bottom = 12.dp),
+                            .padding(bottom = 6.dp),
                     )
                 }
             }
@@ -148,7 +149,8 @@ fun SubscriptionEditScreen(
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 12.dp),
+                            .padding(horizontal = 12.dp)
+                            .padding(bottom = 6.dp),
                         insideMargin = PaddingValues(16.dp),
                     ) {
                         Text(
@@ -178,7 +180,7 @@ fun SubscriptionEditScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 12.dp)
-                        .padding(bottom = 16.dp + innerPadding.calculateBottomPadding()),
+                        .padding(top = 6.dp, bottom = 16.dp + innerPadding.calculateBottomPadding()),
                 )
             }
         }

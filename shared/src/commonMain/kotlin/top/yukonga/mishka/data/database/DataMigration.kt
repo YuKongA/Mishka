@@ -2,6 +2,7 @@ package top.yukonga.mishka.data.database
 
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
+import top.yukonga.mishka.data.model.ProfileType
 import top.yukonga.mishka.data.model.Subscription
 import top.yukonga.mishka.platform.PlatformStorage
 import top.yukonga.mishka.platform.StorageKeys
@@ -24,7 +25,7 @@ object DataMigration {
                     val entity = ImportedEntity(
                         uuid = sub.id,
                         name = sub.name,
-                        type = if (sub.url.isNotEmpty()) "Url" else "File",
+                        type = if (sub.url.isNotEmpty()) ProfileType.Url else ProfileType.File,
                         source = sub.url,
                         upload = sub.upload,
                         download = sub.download,

@@ -31,6 +31,10 @@ import mishka.shared.generated.resources.settings_auto_restart
 import mishka.shared.generated.resources.settings_auto_restart_summary
 import mishka.shared.generated.resources.settings_dynamic_notification
 import mishka.shared.generated.resources.settings_dynamic_notification_summary
+import mishka.shared.generated.resources.settings_external_control
+import mishka.shared.generated.resources.settings_external_control_summary
+import mishka.shared.generated.resources.settings_file_manager
+import mishka.shared.generated.resources.settings_file_manager_summary
 import mishka.shared.generated.resources.settings_general
 import mishka.shared.generated.resources.settings_meta_settings
 import mishka.shared.generated.resources.settings_meta_summary
@@ -77,7 +81,9 @@ fun SettingsScreen(
     onNavigateVpnSettings: () -> Unit = {},
     onNavigateNetworkSettings: () -> Unit = {},
     onNavigateMetaSettings: () -> Unit = {},
+    onNavigateExternalControl: () -> Unit = {},
     onNavigateAppProxy: () -> Unit = {},
+    onNavigateFileManager: () -> Unit = {},
     onNavigateAbout: () -> Unit = {},
     bootStartManager: BootStartManager? = null,
     colorMode: Int = 0,
@@ -185,9 +191,19 @@ fun SettingsScreen(
                         onClick = onNavigateMetaSettings,
                     )
                     ArrowPreference(
+                        title = stringResource(Res.string.settings_external_control),
+                        summary = stringResource(Res.string.settings_external_control_summary),
+                        onClick = onNavigateExternalControl,
+                    )
+                    ArrowPreference(
                         title = stringResource(Res.string.settings_app_proxy),
                         summary = stringResource(Res.string.settings_app_proxy_summary),
                         onClick = onNavigateAppProxy,
+                    )
+                    ArrowPreference(
+                        title = stringResource(Res.string.settings_file_manager),
+                        summary = stringResource(Res.string.settings_file_manager_summary),
+                        onClick = onNavigateFileManager,
                     )
                 }
             }

@@ -4,6 +4,7 @@ import android.app.Application
 import android.content.pm.ApplicationInfo
 import android.os.Build
 import org.lsposed.hiddenapibypass.HiddenApiBypass
+import top.yukonga.mishka.platform.initToastPlatform
 import top.yukonga.mishka.service.NotificationHelper
 import top.yukonga.mishka.service.ProfileFileOps
 import java.io.File
@@ -13,6 +14,7 @@ class MishkaApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         instance = this
+        initToastPlatform(this)
         NotificationHelper.createChannels(this)
         extractGeoFiles()
 

@@ -1,5 +1,6 @@
 package top.yukonga.mishka.viewmodel
 
+import androidx.compose.runtime.Immutable
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Job
@@ -11,10 +12,8 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.launch
 import top.yukonga.mishka.data.api.MihomoApiClient
 import top.yukonga.mishka.data.api.MihomoWebSocket
-import top.yukonga.mishka.data.model.MemoryData
 import top.yukonga.mishka.data.model.MihomoConfig
 import top.yukonga.mishka.data.model.SubscriptionInfo
-import top.yukonga.mishka.data.model.TrafficData
 import top.yukonga.mishka.data.repository.MihomoRepository
 import top.yukonga.mishka.data.repository.OverrideStorageHelper
 import top.yukonga.mishka.platform.PlatformStorage
@@ -23,25 +22,17 @@ import top.yukonga.mishka.platform.ProxyServiceController
 import top.yukonga.mishka.platform.ProxyState
 import top.yukonga.mishka.util.FormatUtils
 
+/** 低频状态：mihomo 运行状态、配置、代理组、延迟、错误等；改变频率与生命周期事件相当 */
+@Immutable
 data class HomeUiState(
     val isRunning: Boolean = false,
     val isStarting: Boolean = false,
     val isStopping: Boolean = false,
-    val uptime: String = "",
     val mode: String = "--",
     val tunStack: String = "",
     val ipv6: Boolean = false,
-    val traffic: TrafficData = TrafficData(),
-    val memory: MemoryData = MemoryData(),
     val config: MihomoConfig? = null,
-    val localIp: String = "0.0.0.0",
-    val interfaceName: String = "--",
-    val uploadSpeed: String = "-- B/s",
-    val downloadSpeed: String = "-- B/s",
     val subscription: SubscriptionInfo? = null,
-    val cpuUsage: String = "--%",
-    val ramUsage: String = "-- MB",
-    val ramTotal: String = "-- MB",
     val latencyBaidu: Int = -1,
     val latencyCloudflare: Int = -1,
     val latencyGoogle: Int = -1,
@@ -53,6 +44,28 @@ data class HomeUiState(
     val needsVpnPermission: Boolean = false,
 )
 
+/** 高频流量快照：每 100–500ms 更新，独立 Flow 隔离重组 */
+@Immutable
+data class SpeedSnapshot(
+    val uploadSpeed: String = "-- B/s",
+    val downloadSpeed: String = "-- B/s",
+)
+
+/** 高频内存快照 */
+@Immutable
+data class MemorySnapshot(
+    val ramUsage: String = "-- MB",
+    val ramTotal: String = "-- MB",
+)
+
+/** 系统信息快照：网卡 + CPU，2s 一次 */
+@Immutable
+data class SystemInfoSnapshot(
+    val localIp: String = "0.0.0.0",
+    val interfaceName: String = "--",
+    val cpuUsage: String = "--%",
+)
+
 class HomeViewModel(
     private val serviceController: ProxyServiceController,
     private val storage: PlatformStorage,
@@ -61,6 +74,18 @@ class HomeViewModel(
 
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
+
+    private val _speedState = MutableStateFlow(SpeedSnapshot())
+    val speedState: StateFlow<SpeedSnapshot> = _speedState.asStateFlow()
+
+    private val _memoryState = MutableStateFlow(MemorySnapshot())
+    val memoryState: StateFlow<MemorySnapshot> = _memoryState.asStateFlow()
+
+    private val _systemInfoState = MutableStateFlow(SystemInfoSnapshot())
+    val systemInfoState: StateFlow<SystemInfoSnapshot> = _systemInfoState.asStateFlow()
+
+    private val _uptimeState = MutableStateFlow("")
+    val uptimeState: StateFlow<String> = _uptimeState.asStateFlow()
 
     private var repository: MihomoRepository? = null
     private var trafficJob: Job? = null
@@ -94,10 +119,12 @@ class HomeViewModel(
                     ProxyState.Stopped -> {
                         disconnect()
                         _uiState.value = HomeUiState()
+                        resetHotStates()
                     }
                     ProxyState.Error -> {
                         disconnect()
                         _uiState.value = HomeUiState(errorMessage = status.errorMessage)
+                        resetHotStates()
                     }
                 }
             }
@@ -141,12 +168,13 @@ class HomeViewModel(
             repository?.trafficFlow()
                 ?.catch { /* 连接断开 */ }
                 ?.collect { traffic ->
-                    _uiState.value = _uiState.value.copy(
-                        traffic = traffic,
+                    _speedState.value = SpeedSnapshot(
                         uploadSpeed = FormatUtils.formatSpeed(traffic.up),
                         downloadSpeed = FormatUtils.formatSpeed(traffic.down),
-                        isRunning = true,
                     )
+                    if (!_uiState.value.isRunning) {
+                        _uiState.value = _uiState.value.copy(isRunning = true)
+                    }
                 }
         }
     }
@@ -157,8 +185,7 @@ class HomeViewModel(
             repository?.memoryFlow()
                 ?.catch { /* 连接断开 */ }
                 ?.collect { memory ->
-                    _uiState.value = _uiState.value.copy(
-                        memory = memory,
+                    _memoryState.value = MemorySnapshot(
                         ramUsage = FormatUtils.formatBytes(memory.inuse),
                         ramTotal = if (memory.oslimit > 0) FormatUtils.formatBytes(memory.oslimit) else "-- MB",
                     )
@@ -171,7 +198,7 @@ class HomeViewModel(
         uptimeJob = viewModelScope.launch {
             while (true) {
                 val elapsed = (System.currentTimeMillis() - startTime) / 1000
-                _uiState.value = _uiState.value.copy(uptime = FormatUtils.formatUptime(elapsed))
+                _uptimeState.value = FormatUtils.formatUptime(elapsed)
                 delay(1000)
             }
         }
@@ -183,7 +210,7 @@ class HomeViewModel(
             while (true) {
                 val networkInfo = systemInfo.getNetworkInfo()
                 val cpu = systemInfo.getCpuUsage(mihomoPid)
-                _uiState.value = _uiState.value.copy(
+                _systemInfoState.value = SystemInfoSnapshot(
                     localIp = networkInfo.localIp,
                     interfaceName = networkInfo.interfaceName,
                     cpuUsage = if (cpu >= 0) "${cpu.toInt()}%" else "--%",
@@ -191,6 +218,13 @@ class HomeViewModel(
                 delay(2000)
             }
         }
+    }
+
+    private fun resetHotStates() {
+        _speedState.value = SpeedSnapshot()
+        _memoryState.value = MemorySnapshot()
+        _systemInfoState.value = SystemInfoSnapshot()
+        _uptimeState.value = ""
     }
 
     fun startProxy() {

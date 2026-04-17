@@ -58,6 +58,9 @@ import top.yukonga.mishka.ui.screen.provider.ProviderScreen
 import top.yukonga.mishka.ui.screen.proxy.ProxyScreen
 import top.yukonga.mishka.ui.screen.settings.AboutScreen
 import top.yukonga.mishka.ui.screen.settings.AppProxyScreen
+import top.yukonga.mishka.ui.screen.settings.ExternalControlScreen
+import top.yukonga.mishka.ui.screen.settings.FileManagerEditorScreen
+import top.yukonga.mishka.ui.screen.settings.FileManagerScreen
 import top.yukonga.mishka.ui.screen.settings.MetaSettingsScreen
 import top.yukonga.mishka.ui.screen.settings.NetworkSettingsScreen
 import top.yukonga.mishka.ui.screen.settings.SettingsScreen
@@ -271,6 +274,31 @@ fun AppNavigation(
                     )
                 }
             }
+            entry<Route.ExternalControl> {
+                overrideSettingsViewModel?.let {
+                    ExternalControlScreen(
+                        viewModel = it,
+                        onBack = { navigator.pop() },
+                    )
+                }
+            }
+            entry<Route.FileManager> {
+                FileManagerScreen(
+                    subscriptionViewModel = subscriptionViewModel,
+                    onBack = { navigator.pop() },
+                    onOpenFile = { uuid, relPath ->
+                        navigator.push(Route.FileManagerEditor(uuid, relPath))
+                    },
+                )
+            }
+            entry<Route.FileManagerEditor> { route ->
+                FileManagerEditorScreen(
+                    uuid = route.uuid,
+                    relativePath = route.relativePath,
+                    subscriptionViewModel = subscriptionViewModel,
+                    onBack = { navigator.pop() },
+                )
+            }
             entry<Route.About> {
                 val uriHandler = LocalUriHandler.current
                 AboutScreen(
@@ -358,6 +386,7 @@ private fun MainPage(
                 0 -> HomeScreen(
                     bottomPadding = bottomPadding,
                     uiState = homeUiState,
+                    viewModel = homeViewModel,
                     onRestart = { homeViewModel?.restartProxy() },
                     onStop = { homeViewModel?.stopProxy() },
                     onReload = { homeViewModel?.reloadConfig() },
@@ -392,7 +421,9 @@ private fun MainPage(
                     onNavigateVpnSettings = { navigator.push(Route.VpnSettings) },
                     onNavigateNetworkSettings = { navigator.push(Route.NetworkSettings) },
                     onNavigateMetaSettings = { navigator.push(Route.MetaSettings) },
+                    onNavigateExternalControl = { navigator.push(Route.ExternalControl) },
                     onNavigateAppProxy = { navigator.push(Route.AppProxy) },
+                    onNavigateFileManager = { navigator.push(Route.FileManager) },
                     onNavigateAbout = { navigator.push(Route.About) },
                     bootStartManager = bootStartManager,
                     colorMode = colorMode,

@@ -25,6 +25,8 @@ import mishka.shared.generated.resources.home_used
 import org.jetbrains.compose.resources.stringResource
 import top.yukonga.mishka.util.FormatUtils
 import top.yukonga.mishka.viewmodel.HomeUiState
+import top.yukonga.mishka.viewmodel.MemorySnapshot
+import top.yukonga.mishka.viewmodel.SystemInfoSnapshot
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
@@ -32,6 +34,8 @@ import top.yukonga.miuix.kmp.theme.miuixShape
 
 fun LazyListScope.bottomCardsSection(
     state: HomeUiState = HomeUiState(),
+    memory: MemorySnapshot = MemorySnapshot(),
+    systemInfo: SystemInfoSnapshot = SystemInfoSnapshot(),
 ) {
     item(key = "bottom_cards") {
         Row(
@@ -93,12 +97,12 @@ fun LazyListScope.bottomCardsSection(
                 }
                 InfoRow(
                     "CPU",
-                    state.cpuUsage,
+                    systemInfo.cpuUsage,
                     Modifier.padding(top = 8.dp),
                 )
                 InfoRow(
                     "RAM",
-                    state.ramUsage,
+                    memory.ramUsage,
                     Modifier.padding(top = 4.dp),
                 )
             }

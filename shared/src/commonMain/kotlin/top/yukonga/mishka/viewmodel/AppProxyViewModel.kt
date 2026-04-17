@@ -1,10 +1,16 @@
 package top.yukonga.mishka.viewmodel
 
+import androidx.compose.runtime.Immutable
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import top.yukonga.mishka.platform.AppInfo
 import top.yukonga.mishka.platform.AppListProvider
@@ -16,6 +22,7 @@ import top.yukonga.mishka.platform.StorageKeys
 
 enum class AppProxyMode { AllowAll, AllowSelected, DenySelected }
 
+@Immutable
 data class AppProxyUiState(
     val apps: List<AppInfo> = emptyList(),
     val selectedPackages: Set<String> = emptySet(),
@@ -38,6 +45,32 @@ class AppProxyViewModel(
     private var initialMode: AppProxyMode = AppProxyMode.AllowAll
     private var initialPackages: Set<String> = emptySet()
 
+    /** 排序锚点：进入页面时的初始勾选集合。整个会话保持不变，勾选不触发重排 */
+    private val _sortAnchor = MutableStateFlow<Set<String>>(emptySet())
+
+    /**
+     * 过滤 + 排序后的应用列表。
+     * 依赖 apps / searchQuery / showSystemApps / sortAnchor，**不依赖 selectedPackages**——
+     * 勾选只改变 checkbox 外观，不引起列表顺序变化（避免可见抖动）。
+     */
+    val filteredAppsFlow: StateFlow<List<AppInfo>> = combine(
+        _uiState.map { Triple(it.apps, it.searchQuery, it.showSystemApps) }.distinctUntilChanged(),
+        _sortAnchor,
+    ) { (apps, query, showSystem), anchor ->
+        val q = query.lowercase()
+        apps
+            .filter { app ->
+                (showSystem || !app.isSystemApp) &&
+                    (q.isBlank() ||
+                        app.appName.lowercase().contains(q) ||
+                        app.packageName.lowercase().contains(q))
+            }
+            .sortedWith(
+                compareByDescending<AppInfo> { it.packageName in anchor }
+                    .thenBy { it.appName.lowercase() }
+            )
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
     init {
         loadSavedState()
         loadApps()
@@ -51,6 +84,7 @@ class AppProxyViewModel(
 
         initialMode = mode
         initialPackages = packages
+        _sortAnchor.value = packages
 
         _uiState.value = _uiState.value.copy(mode = mode, selectedPackages = packages)
     }
@@ -63,24 +97,23 @@ class AppProxyViewModel(
         }
     }
 
+    /**
+     * 对外兼容：selectAll / invertSelection 等需要当前可见列表的 package 集合。
+     * 直接读取 Flow 当前值，避免二次排序。
+     */
     fun filteredApps(searchQuery: String = _uiState.value.searchQuery): List<AppInfo> {
+        if (searchQuery == _uiState.value.searchQuery) {
+            return filteredAppsFlow.value
+        }
+        // 查询词尚未同步到 uiState：做一次即时过滤，不排序（调用点仅用 packageName）
         val state = _uiState.value
         val query = searchQuery.lowercase()
-
-        return state.apps
-            .filter { app ->
-                // 系统应用过滤
-                (state.showSystemApps || !app.isSystemApp) &&
-                    // 搜索过滤
-                    (query.isBlank() ||
-                        app.appName.lowercase().contains(query) ||
-                        app.packageName.lowercase().contains(query))
-            }
-            .sortedWith(
-                // 已选应用排在前面
-                compareByDescending<AppInfo> { it.packageName in state.selectedPackages }
-                    .thenBy { it.appName.lowercase() }
-            )
+        return state.apps.filter { app ->
+            (state.showSystemApps || !app.isSystemApp) &&
+                (query.isBlank() ||
+                    app.appName.lowercase().contains(query) ||
+                    app.packageName.lowercase().contains(query))
+        }
     }
 
     fun toggleApp(packageName: String) {
@@ -138,11 +171,11 @@ class AppProxyViewModel(
         storage.putStringSet(StorageKeys.APP_PROXY_PACKAGES, packages)
     }
 
-    /** 配置变更时，若代理运行中则自动重启服务 */
-    fun applyIfChanged() {
+    /** 配置变更时，若代理运行中则自动重启服务。返回是否发生了变更。 */
+    fun applyIfChanged(): Boolean {
         val state = _uiState.value
         val changed = state.mode != initialMode || state.selectedPackages != initialPackages
-        if (!changed) return
+        if (!changed) return false
 
         val proxyState = ProxyServiceBridge.state.value.state
         if (proxyState == ProxyState.Running || proxyState == ProxyState.Starting) {
@@ -152,5 +185,6 @@ class AppProxyViewModel(
         // 更新快照
         initialMode = state.mode
         initialPackages = state.selectedPackages
+        return true
     }
 }

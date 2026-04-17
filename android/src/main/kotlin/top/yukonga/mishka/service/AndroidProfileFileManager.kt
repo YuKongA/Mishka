@@ -28,6 +28,22 @@ class AndroidProfileFileManager(private val context: Context) : ProfileFileManag
         ProfileFileOps.cloneImportedToPending(context, sourceUuid, targetUuid)
     }
 
+    override fun getDirectoryLastModified(uuid: String, pending: Boolean): Long? {
+        return ProfileFileOps.getProfileDirLastModified(context, uuid, pending)
+    }
+
+    override fun listImportedFiles(uuid: String): List<String> {
+        return ProfileFileOps.listImportedFiles(context, uuid)
+    }
+
+    override fun readImportedFile(uuid: String, relativePath: String): String? {
+        return ProfileFileOps.readImportedFile(context, uuid, relativePath)
+    }
+
+    override fun writeImportedFile(uuid: String, relativePath: String, content: String) {
+        ProfileFileOps.writeImportedFile(context, uuid, relativePath, content)
+    }
+
     override suspend fun validate(workDir: String, configFileName: String, onProgress: ((String) -> Unit)?): String? {
         return MihomoValidator.validate(context, workDir, configFileName, onProgress)
     }

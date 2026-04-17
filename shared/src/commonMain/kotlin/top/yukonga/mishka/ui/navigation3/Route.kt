@@ -35,6 +35,15 @@ sealed interface Route : NavKey {
     data object NetworkSettings : Route
 
     @Serializable
+    data object ExternalControl : Route
+
+    @Serializable
+    data object FileManager : Route
+
+    @Serializable
+    data class FileManagerEditor(val uuid: String, val relativePath: String) : Route
+
+    @Serializable
     data object AppProxy : Route
 
     @Serializable

@@ -1,7 +1,9 @@
 package top.yukonga.mishka.data.model
 
+import androidx.compose.runtime.Immutable
 import kotlinx.serialization.Serializable
 
+@Immutable
 @Serializable
 data class ConnectionsResponse(
     val downloadTotal: Long = 0,
@@ -10,6 +12,7 @@ data class ConnectionsResponse(
     val memory: Long = 0,
 )
 
+@Immutable
 @Serializable
 data class ConnectionInfo(
     val id: String = "",
@@ -22,6 +25,7 @@ data class ConnectionInfo(
     val metadata: ConnectionMetadata = ConnectionMetadata(),
 )
 
+@Immutable
 @Serializable
 data class ConnectionMetadata(
     val network: String = "",

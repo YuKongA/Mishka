@@ -1,12 +1,14 @@
 package top.yukonga.mishka.data.model
 
+import androidx.compose.runtime.Immutable
 import kotlinx.serialization.Serializable
 
+@Immutable
 @Serializable
 data class Subscription(
     val id: String = "",
     val name: String = "",
-    val type: String = "Url",
+    val type: ProfileType = ProfileType.Url,
     val url: String = "",
     val interval: Long = 0,
     val upload: Long = 0,

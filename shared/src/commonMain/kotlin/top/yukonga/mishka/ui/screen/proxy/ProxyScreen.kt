@@ -30,6 +30,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -48,9 +50,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import io.ktor.client.HttpClient
-import io.ktor.client.request.get
-import io.ktor.client.statement.readRawBytes
+import kotlinx.coroutines.launch
 import mishka.shared.generated.resources.Res
 import mishka.shared.generated.resources.common_more
 import mishka.shared.generated.resources.common_refresh
@@ -59,9 +59,8 @@ import mishka.shared.generated.resources.proxy_refresh_icon
 import mishka.shared.generated.resources.proxy_start_first
 import mishka.shared.generated.resources.proxy_timeout
 import mishka.shared.generated.resources.proxy_title
-import org.jetbrains.compose.resources.decodeToImageBitmap
 import org.jetbrains.compose.resources.stringResource
-import top.yukonga.mishka.platform.IconDiskCache
+import top.yukonga.mishka.platform.IconLoader
 import top.yukonga.mishka.ui.component.ListPopupDefaults.MenuPositionProvider
 import top.yukonga.mishka.viewmodel.ProxyGroupUi
 import top.yukonga.mishka.viewmodel.ProxyUiState
@@ -86,9 +85,6 @@ import top.yukonga.miuix.kmp.utils.overScrollVertical
 import top.yukonga.miuix.kmp.utils.scrollEndHaptic
 import top.yukonga.miuix.kmp.window.WindowListPopup
 
-// 内存缓存（加速同次会话内的重复访问）
-private val iconMemCache = mutableMapOf<String, ImageBitmap>()
-
 @Composable
 fun ProxyScreen(
     modifier: Modifier = Modifier,
@@ -99,9 +95,9 @@ fun ProxyScreen(
     val scrollBehavior = MiuixScrollBehavior()
     val groups = uiState.groups
 
-    var expandedGroups by remember { mutableStateOf(setOf<String>()) }
     val showPopup = remember { mutableStateOf(false) }
     var iconCacheVersion by remember { mutableIntStateOf(0) }
+    val coroutineScope = rememberCoroutineScope()
 
     Scaffold(
         modifier = modifier,
@@ -145,8 +141,7 @@ fun ProxyScreen(
                                     isSelected = false,
                                     index = 0,
                                     onSelectedIndexChange = {
-                                        iconMemCache.clear()
-                                        IconDiskCache.clear()
+                                        coroutineScope.launch { IconLoader.clear() }
                                         iconCacheVersion++
                                         showPopup.value = false
                                     },
@@ -195,7 +190,7 @@ fun ProxyScreen(
                     key = { it.name },
                     contentType = { "group" },
                 ) { group ->
-                    val isExpanded = group.name in expandedGroups
+                    var isExpanded by rememberSaveable(group.name) { mutableStateOf(false) }
 
                     Card(
                         modifier = Modifier
@@ -207,13 +202,7 @@ fun ProxyScreen(
                             group = group,
                             isExpanded = isExpanded,
                             iconCacheVersion = iconCacheVersion,
-                            onToggle = {
-                                expandedGroups = if (isExpanded) {
-                                    expandedGroups - group.name
-                                } else {
-                                    expandedGroups + group.name
-                                }
-                            },
+                            onToggle = { isExpanded = !isExpanded },
                         )
 
                         AnimatedVisibility(
@@ -336,37 +325,16 @@ private fun GroupIcon(
     cacheVersion: Int,
 ) {
     if (icon.isNotEmpty()) {
-        // 内存缓存 → 磁盘缓存 → 网络
-        var bitmap by remember(icon, cacheVersion) { mutableStateOf(iconMemCache[icon]) }
+        var bitmap by remember(icon, cacheVersion) { mutableStateOf<ImageBitmap?>(null) }
 
-        if (bitmap == null) {
-            LaunchedEffect(icon, cacheVersion) {
-                try {
-                    // 尝试磁盘缓存
-                    val diskBytes = IconDiskCache.get(icon)
-                    if (diskBytes != null) {
-                        val decoded = diskBytes.decodeToImageBitmap()
-                        iconMemCache[icon] = decoded
-                        bitmap = decoded
-                        return@LaunchedEffect
-                    }
-                    // 网络下载
-                    val client = HttpClient()
-                    val bytes = client.get(icon).readRawBytes()
-                    client.close()
-                    val decoded = bytes.decodeToImageBitmap()
-                    iconMemCache[icon] = decoded
-                    IconDiskCache.put(icon, bytes)
-                    bitmap = decoded
-                } catch (_: Exception) {
-                    // 加载失败，保持 null，显示默认图标
-                }
-            }
+        LaunchedEffect(icon, cacheVersion) {
+            bitmap = IconLoader.loadIcon(icon)
         }
 
-        if (bitmap != null) {
+        val current = bitmap
+        if (current != null) {
             Image(
-                bitmap = bitmap!!,
+                bitmap = current,
                 contentDescription = name,
                 modifier = Modifier
                     .size(36.dp)

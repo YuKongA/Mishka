@@ -14,6 +14,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import top.yukonga.mishka.data.database.ImportedEntity
 import top.yukonga.mishka.data.database.getAppDatabase
+import top.yukonga.mishka.data.model.ProfileType
 import java.io.File
 
 /**
@@ -69,7 +70,7 @@ class ProfileReceiver : BroadcastReceiver() {
 
                 importedDao.queryAllUUIDs()
                     .mapNotNull { importedDao.queryByUUID(it) }
-                    .filter { it.type != "File" && it.interval >= MIN_INTERVAL_MS }
+                    .filter { it.type != ProfileType.File && it.interval >= MIN_INTERVAL_MS }
                     .forEach { scheduleNext(context, it) }
 
                 initialized = true

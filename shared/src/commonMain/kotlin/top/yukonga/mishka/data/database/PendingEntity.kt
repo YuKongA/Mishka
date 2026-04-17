@@ -2,12 +2,13 @@ package top.yukonga.mishka.data.database
 
 import androidx.room3.Entity
 import androidx.room3.PrimaryKey
+import top.yukonga.mishka.data.model.ProfileType
 
 @Entity(tableName = "pending")
 data class PendingEntity(
     @PrimaryKey val uuid: String,
     val name: String,
-    val type: String,
+    val type: ProfileType,
     val source: String,
     val interval: Long = 0,
     val upload: Long = 0,

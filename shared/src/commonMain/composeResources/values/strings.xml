@@ -269,6 +269,28 @@
     <string name="app_proxy_deny_selected_summary">Selected apps bypass proxy</string>
     <string name="app_proxy_app_list">App List (%1$d/%2$d)</string>
     <string name="app_proxy_running_hint">Changes will take effect after restarting proxy</string>
+    <string name="app_proxy_applied">Per-app proxy applied</string>
+    <string name="app_proxy_no_change">No changes</string>
+    <string name="dialog_reset_done">Reset to default</string>
+
+    <!-- External Control -->
+    <string name="external_control_title">External Controller</string>
+    <string name="external_control_controller_hint">Bind address for the mihomo HTTP API (e.g. 127.0.0.1:9090). Takes effect after restarting the proxy.</string>
+    <string name="settings_external_control">External Controller</string>
+    <string name="settings_external_control_summary">Override the mihomo HTTP API bind address</string>
+
+    <!-- File Manager -->
+    <string name="file_manager_title">File Manager</string>
+    <string name="file_manager_empty">No subscriptions imported yet</string>
+    <string name="file_manager_files_title">Files in %1$s</string>
+    <string name="file_manager_no_files">No files</string>
+    <string name="file_manager_save">Save</string>
+    <string name="file_manager_save_failed">Save failed: %1$s</string>
+    <string name="file_manager_saved">Saved</string>
+    <string name="file_manager_validating">Validating...</string>
+    <string name="file_manager_edit_warning">Manual edits bypass the subscription pipeline. Invalid YAML will block the save.</string>
+    <string name="settings_file_manager">File Manager</string>
+    <string name="settings_file_manager_summary">Browse and edit imported subscription files</string>
 
     <!-- About -->
     <string name="about_title">About</string>

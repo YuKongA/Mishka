@@ -89,6 +89,50 @@ object ProfileFileOps {
         }
     }
 
+    /** 读取订阅目录的最后修改时间（不创建目录）。目录不存在或 mtime <= 0 返回 null。 */
+    fun getProfileDirLastModified(context: Context, uuid: String, pending: Boolean): Long? {
+        val sub = if (pending) "pending/$uuid" else "imported/$uuid"
+        val dir = File(getWorkDir(context), sub)
+        if (!dir.exists()) return null
+        return dir.lastModified().takeIf { it > 0 }
+    }
+
+    /** 列出 imported/{uuid} 下所有普通文件的相对路径（递归）。目录不存在返回空列表。 */
+    fun listImportedFiles(context: Context, uuid: String): List<String> {
+        val root = File(getWorkDir(context), "imported/$uuid")
+        if (!root.exists() || !root.isDirectory) return emptyList()
+        val result = mutableListOf<String>()
+        root.walkTopDown().forEach { file ->
+            if (file.isFile) {
+                val rel = file.relativeTo(root).invariantSeparatorsPath
+                result.add(rel)
+            }
+        }
+        return result.sorted()
+    }
+
+    fun readImportedFile(context: Context, uuid: String, relativePath: String): String? {
+        val root = File(getWorkDir(context), "imported/$uuid")
+        val target = File(root, relativePath)
+        val canonicalRoot = root.canonicalFile
+        val canonicalTarget = runCatching { target.canonicalFile }.getOrNull() ?: return null
+        if (!canonicalTarget.startsWith(canonicalRoot)) return null
+        if (!canonicalTarget.isFile) return null
+        return runCatching { canonicalTarget.readText() }.getOrNull()
+    }
+
+    fun writeImportedFile(context: Context, uuid: String, relativePath: String, content: String) {
+        val root = File(getWorkDir(context), "imported/$uuid")
+        val target = File(root, relativePath)
+        val canonicalRoot = root.canonicalFile
+        val canonicalTarget = target.canonicalFile
+        require(canonicalTarget.startsWith(canonicalRoot)) {
+            "Path traversal blocked: $relativePath"
+        }
+        canonicalTarget.parentFile?.mkdirs()
+        canonicalTarget.writeText(content)
+    }
+
     // === GeoIP 共享管理 ===
 
     private val GEODATA_FILES = listOf(

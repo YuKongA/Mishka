@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -26,6 +27,7 @@ import mishka.shared.generated.resources.common_back
 import mishka.shared.generated.resources.common_cleared
 import mishka.shared.generated.resources.common_items_count
 import mishka.shared.generated.resources.common_not_modified
+import mishka.shared.generated.resources.dialog_reset_done
 import mishka.shared.generated.resources.meta_basic
 import mishka.shared.generated.resources.meta_find_process_mode
 import mishka.shared.generated.resources.meta_geodata_mode
@@ -41,6 +43,7 @@ import mishka.shared.generated.resources.meta_tcp_concurrent
 import mishka.shared.generated.resources.meta_unified_delay
 import org.jetbrains.compose.resources.stringResource
 import top.yukonga.mishka.data.repository.OverrideStorageHelper
+import top.yukonga.mishka.platform.showToast
 import top.yukonga.mishka.ui.component.ListEditDialog
 import top.yukonga.mishka.ui.component.RestartRequiredHint
 import top.yukonga.mishka.ui.component.TriStatePreference
@@ -64,10 +67,10 @@ import top.yukonga.miuix.kmp.utils.scrollEndHaptic
 fun MetaSettingsScreen(
     viewModel: OverrideSettingsViewModel,
     onBack: () -> Unit = {},
-    bottomPadding: Dp = 0.dp,
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val scrollBehavior = MiuixScrollBehavior()
+    val resetDoneMsg = stringResource(Res.string.dialog_reset_done)
 
     // 列表编辑 Dialog 状态
     var showListDialog by remember { mutableStateOf(false) }
@@ -111,7 +114,6 @@ fun MetaSettingsScreen(
                 .nestedScroll(scrollBehavior.nestedScrollConnection),
             contentPadding = PaddingValues(
                 top = innerPadding.calculateTopPadding(),
-                bottom = bottomPadding,
             ),
         ) {
             item { RestartRequiredHint() }
@@ -191,7 +193,7 @@ fun MetaSettingsScreen(
                 }
             }
 
-            item { Spacer(Modifier.navigationBarsPadding()) }
+            item { Spacer(Modifier.height(24.dp).navigationBarsPadding()) }
         }
     }
 
@@ -202,7 +204,10 @@ fun MetaSettingsScreen(
         textState = listTextState,
         onDismiss = { showListDialog = false },
         onConfirm = { list -> viewModel.updateStringList(editingListKey, list) },
-        onReset = { viewModel.updateStringList(editingListKey, null) },
+        onReset = {
+            viewModel.updateStringList(editingListKey, null)
+            showToast(resetDoneMsg)
+        },
     )
 }
 

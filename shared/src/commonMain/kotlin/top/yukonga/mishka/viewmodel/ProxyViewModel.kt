@@ -1,5 +1,6 @@
 package top.yukonga.mishka.viewmodel
 
+import androidx.compose.runtime.Immutable
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -10,6 +11,7 @@ import top.yukonga.mishka.data.database.SelectionDao
 import top.yukonga.mishka.data.database.SelectionEntity
 import top.yukonga.mishka.data.repository.MihomoRepository
 
+@Immutable
 data class ProxyGroupUi(
     val name: String = "",
     val type: String = "",
@@ -20,6 +22,7 @@ data class ProxyGroupUi(
     val icon: String = "",
 )
 
+@Immutable
 data class ProxyUiState(
     val groups: List<ProxyGroupUi> = emptyList(),
     val isLoading: Boolean = false,

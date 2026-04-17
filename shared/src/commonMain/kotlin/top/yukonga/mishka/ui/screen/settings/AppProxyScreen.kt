@@ -5,12 +5,10 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -36,7 +34,6 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -46,6 +43,7 @@ import mishka.shared.generated.resources.app_proxy_allow_all_summary
 import mishka.shared.generated.resources.app_proxy_allow_selected
 import mishka.shared.generated.resources.app_proxy_allow_selected_summary
 import mishka.shared.generated.resources.app_proxy_app_list
+import mishka.shared.generated.resources.app_proxy_applied
 import mishka.shared.generated.resources.app_proxy_deny_selected
 import mishka.shared.generated.resources.app_proxy_deny_selected_summary
 import mishka.shared.generated.resources.app_proxy_deselect_all
@@ -63,6 +61,7 @@ import mishka.shared.generated.resources.common_back
 import mishka.shared.generated.resources.common_more
 import org.jetbrains.compose.resources.stringResource
 import top.yukonga.mishka.platform.AppIcon
+import top.yukonga.mishka.platform.showToast
 import top.yukonga.mishka.ui.component.ListPopupDefaults.MenuPositionProvider
 import top.yukonga.mishka.ui.component.SearchBarFake
 import top.yukonga.mishka.ui.component.SearchBox
@@ -99,7 +98,6 @@ import top.yukonga.miuix.kmp.window.WindowListPopup
 fun AppProxyScreen(
     viewModel: AppProxyViewModel,
     onBack: () -> Unit = {},
-    bottomPadding: Dp = 0.dp,
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val scrollBehavior = MiuixScrollBehavior()
@@ -108,6 +106,7 @@ fun AppProxyScreen(
     val clipboardManager = LocalClipboardManager.current
 
     val searchLabel = stringResource(Res.string.app_proxy_search)
+    val appliedMsg = stringResource(Res.string.app_proxy_applied)
     var searchStatus by remember { mutableStateOf(SearchStatus(label = searchLabel)) }
 
     // 语言变更时同步 label
@@ -125,9 +124,8 @@ fun AppProxyScreen(
         viewModel.setSearchQuery(searchText)
     }
 
-    val filteredApps = remember(searchText, uiState.apps, uiState.showSystemApps, uiState.selectedPackages) {
-        viewModel.filteredApps(searchText)
-    }
+    // 使用 ViewModel 缓存的 filteredAppsFlow（不依赖 selectedPackages，勾选不引起排序重算）
+    val filteredApps by viewModel.filteredAppsFlow.collectAsState()
 
     // 更新搜索结果状态
     val resultStatus by remember(searchText, filteredApps) {
@@ -157,7 +155,9 @@ fun AppProxyScreen(
                     scrollBehavior = scrollBehavior,
                     navigationIcon = {
                         IconButton(onClick = {
-                            viewModel.applyIfChanged()
+                            if (viewModel.applyIfChanged()) {
+                                showToast(appliedMsg)
+                            }
                             onBack()
                         }) {
                             val layoutDirection = LocalLayoutDirection.current
@@ -305,11 +305,11 @@ fun AppProxyScreen(
                 searchBarTopPadding = dynamicTopPadding,
             ) {
                 // 搜索结果列表
-                val imeBottomPadding = WindowInsets.ime.asPaddingValues().calculateBottomPadding()
                 LazyColumn(
                     modifier = Modifier
                         .fillMaxSize()
-                        .overScrollVertical(),
+                        .overScrollVertical()
+                        .imePadding(),
                 ) {
                     item {
                         Spacer(Modifier.height(6.dp))
@@ -345,9 +345,7 @@ fun AppProxyScreen(
                         }
                     }
 
-                    item {
-                        Spacer(Modifier.height(maxOf(bottomPadding, imeBottomPadding)))
-                    }
+                    item { Spacer(Modifier.height(24.dp).navigationBarsPadding()) }
                 }
             }
         },
@@ -363,7 +361,6 @@ fun AppProxyScreen(
                     .nestedScroll(scrollBehavior.nestedScrollConnection),
                 contentPadding = PaddingValues(
                     top = innerPadding.calculateTopPadding(),
-                    bottom = bottomPadding,
                 ),
             ) {
                 // 代理模式
@@ -403,8 +400,7 @@ fun AppProxyScreen(
                         item(key = "loading") {
                             Box(
                                 modifier = Modifier
-                                    .fillParentMaxSize()
-                                    .padding(bottom = bottomPadding),
+                                    .fillParentMaxSize(),
                                 contentAlignment = Alignment.Center,
                             ) {
                                 InfiniteProgressIndicator()
@@ -429,9 +425,7 @@ fun AppProxyScreen(
                     }
                 }
 
-                item(key = "bottom_spacer") {
-                    Spacer(Modifier.navigationBarsPadding())
-                }
+                item { Spacer(Modifier.height(24.dp).navigationBarsPadding()) }
             }
         }
     }

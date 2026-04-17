@@ -1,13 +1,17 @@
 package top.yukonga.mishka.viewmodel
 
+import androidx.compose.runtime.Immutable
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.yield
 import top.yukonga.mishka.data.database.AppDatabase
+import top.yukonga.mishka.data.model.ProfileType
 import top.yukonga.mishka.data.model.Subscription
 import top.yukonga.mishka.data.repository.ConfigProcessor
 import top.yukonga.mishka.data.repository.ConfigValidationException
@@ -16,12 +20,14 @@ import top.yukonga.mishka.data.repository.SubscriptionRepository
 import top.yukonga.mishka.platform.PlatformStorage
 import top.yukonga.mishka.platform.ProfileFileManager
 
+@Immutable
 data class ImportProgress(
     val step: String,
     val current: Int = 0,
     val total: Int = 0,
 )
 
+@Immutable
 data class SubscriptionUiState(
     val subscriptions: List<Subscription> = emptyList(),
     val isLoading: Boolean = false,
@@ -33,7 +39,7 @@ data class SubscriptionUiState(
 class SubscriptionViewModel(
     database: AppDatabase,
     storage: PlatformStorage,
-    private val fileManager: ProfileFileManager,
+    val fileManager: ProfileFileManager,
 ) : ViewModel() {
 
     private val repository = SubscriptionRepository(
@@ -41,6 +47,7 @@ class SubscriptionViewModel(
         pendingDao = database.pendingDao(),
         selectionDao = database.selectionDao(),
         storage = storage,
+        fileManager = fileManager,
         scope = viewModelScope,
     )
     private val fetcher = SubscriptionFetcher()
@@ -78,7 +85,7 @@ class SubscriptionViewModel(
         viewModelScope.launch {
             var subId: String? = null
             try {
-                val sub = repository.create("Url", name, url, interval)
+                val sub = repository.create(ProfileType.Url, name, url, interval)
                 subId = sub.id
                 yield()
 
@@ -115,7 +122,7 @@ class SubscriptionViewModel(
             var subId: String? = null
             try {
                 val name = fileName.removeSuffix(".yaml").removeSuffix(".yml")
-                val sub = repository.create("File", name, "")
+                val sub = repository.create(ProfileType.File, name, "")
                 subId = sub.id
                 yield()
 
@@ -236,7 +243,7 @@ class SubscriptionViewModel(
         fetcher.close()
     }
 
-    private suspend fun processAndCommit(subscription: Subscription, configContent: String) {
+    private suspend fun processAndCommit(subscription: Subscription, configContent: String) = withContext(Dispatchers.IO) {
         fileManager.saveConfig(subscription.id, configContent)
 
         downloadProviders(subscription.id, configContent)
@@ -267,7 +274,7 @@ class SubscriptionViewModel(
         _uiState.value = _uiState.value.copy(isLoading = false, importProgress = null)
     }
 
-    private suspend fun processAndUpdateImported(subscription: Subscription, configContent: String) {
+    private suspend fun processAndUpdateImported(subscription: Subscription, configContent: String) = withContext(Dispatchers.IO) {
         fileManager.saveConfig(subscription.id, configContent)
 
         downloadProviders(subscription.id, configContent)
