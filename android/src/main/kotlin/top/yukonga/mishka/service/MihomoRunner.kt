@@ -33,9 +33,7 @@ class MihomoRunner(private val context: Context) {
      *   2. cmdline 含 libmihomo.so（防 PID 复用撞其他 root 进程）
      *   3. stored secret 能通过 /configs 鉴权（防 secret 漂移导致 UI 假 Running）
      * 校验阶段**不**修改任何 field，全部通过后再原子赋值。
-     *
-     * TODO: 后续还应校验 persisted subscriptionId 与请求的 subscriptionId 是否一致，
-     *       不一致时应 kill + 全新启动。本次修复暂不覆盖该场景。
+     * 订阅一致性由调用方在此之前校验（persisted subscriptionId vs 请求的 subscriptionId）。
      */
     fun attachToExisting(
         pid: Int,

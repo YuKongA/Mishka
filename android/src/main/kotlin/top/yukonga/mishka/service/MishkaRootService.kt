@@ -86,7 +86,13 @@ class MishkaRootService : Service() {
             // 1. 尝试重连已有的 mihomo 进程（app 被杀后 root 进程仍存活）
             val existingPid = storage.getString(StorageKeys.ROOT_MIHOMO_PID, "").toIntOrNull() ?: -1
             val existingSecret = storage.getString(StorageKeys.ROOT_MIHOMO_SECRET, "")
-            if (existingPid > 0 && existingSecret.isNotEmpty()) {
+            val existingSubscriptionId = storage.getString(StorageKeys.ROOT_ACTIVE_SUBSCRIPTION_ID, "").ifEmpty { null }
+            // 请求的订阅与运行中的不一致时拒绝重连，走全新启动加载新 config
+            val subscriptionMismatch = existingPid > 0 && subscriptionId != existingSubscriptionId
+            if (subscriptionMismatch) {
+                Log.i(TAG, "Existing process pid=$existingPid runs subscription=$existingSubscriptionId, requested=$subscriptionId, restarting")
+            }
+            if (existingPid > 0 && existingSecret.isNotEmpty() && !subscriptionMismatch) {
                 val ec = OverrideStorageHelper.readNullableString(storage, OverrideStorageHelper.KEY_EXTERNAL_CONTROLLER) ?: "127.0.0.1:9090"
                 if (runner.attachToExisting(existingPid, existingSecret, ec, subscriptionId)) {
                     val existingStartTime = storage.getString(StorageKeys.ROOT_START_TIME, "").toLongOrNull() ?: System.currentTimeMillis()
@@ -132,9 +138,9 @@ class MishkaRootService : Service() {
                 return@launch
             }
 
-            // 6. 持久化 PID、secret 和启动时间（用于 app 重启后重连）
+            // 6. 持久化 PID、secret、启动时间和订阅 ID（用于 app 重启后重连 + 订阅一致性校验）
             val startTime = System.currentTimeMillis()
-            persistState(storage, runner.secret, startTime)
+            persistState(storage, runner.secret, startTime, subscriptionId)
 
             // 7. 更新状态和通知
             ProxyServiceBridge.updateState(ProxyServiceStatus(ProxyState.Running, secret = runner.secret, externalController = result.externalController, tunMode = TunMode.Root, startTime = startTime, mihomoPid = runner.pid))
@@ -172,16 +178,18 @@ class MishkaRootService : Service() {
         }
     }
 
-    private fun persistState(storage: PlatformStorage, secret: String, startTime: Long) {
+    private fun persistState(storage: PlatformStorage, secret: String, startTime: Long, subscriptionId: String?) {
         storage.putString(StorageKeys.ROOT_MIHOMO_PID, runner.pid.toString())
         storage.putString(StorageKeys.ROOT_MIHOMO_SECRET, secret)
         storage.putString(StorageKeys.ROOT_START_TIME, startTime.toString())
+        storage.putString(StorageKeys.ROOT_ACTIVE_SUBSCRIPTION_ID, subscriptionId ?: "")
     }
 
     private fun clearPersistedState(storage: PlatformStorage) {
         storage.putString(StorageKeys.ROOT_MIHOMO_PID, "")
         storage.putString(StorageKeys.ROOT_MIHOMO_SECRET, "")
         storage.putString(StorageKeys.ROOT_START_TIME, "")
+        storage.putString(StorageKeys.ROOT_ACTIVE_SUBSCRIPTION_ID, "")
     }
 
     private fun restartProxy(subscriptionId: String?) {
