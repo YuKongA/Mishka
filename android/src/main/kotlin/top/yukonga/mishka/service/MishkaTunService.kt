@@ -105,7 +105,9 @@ class MishkaTunService : VpnService() {
             val hadRootPid = storage.getString(StorageKeys.ROOT_MIHOMO_PID, "").isNotEmpty()
             val hasRoot = storage.getString(StorageKeys.HAS_ROOT, "false") == "true"
             if (hadRootPid || hasRoot) {
-                RootHelper.cleanupOrphanedMihomo()
+                // 同时清理 TUN 接口防止下次启动 sing-tun EEXIST（silent failure 源头）
+                val residualTun = storage.getString(StorageKeys.ROOT_TUN_DEVICE, ConfigGenerator.DEFAULT_TUN_DEVICE)
+                RootHelper.cleanupOrphanedMihomo(tunDevice = residualTun)
                 storage.putString(StorageKeys.ROOT_MIHOMO_PID, "")
                 storage.putString(StorageKeys.ROOT_MIHOMO_SECRET, "")
                 storage.putString(StorageKeys.ROOT_ACTIVE_SUBSCRIPTION_ID, "")
@@ -230,6 +232,7 @@ class MishkaTunService : VpnService() {
 
             // 清除 O_CLOEXEC 标志，使 fd 能被子进程（mihomo）继承
             // Android 默认给 fd 设置 O_CLOEXEC，fork+exec 时会关闭，导致 mihomo 拿不到 fd
+            // 清除失败视为致命：继续启动必然 silent failure（mihomo TUN init 拿到无效 fd 仍不会退出）
             try {
                 val pfd = ParcelFileDescriptor.adoptFd(fd)
                 val flags = Os.fcntlInt(pfd.fileDescriptor, OsConstants.F_GETFD, 0)
@@ -239,7 +242,17 @@ class MishkaTunService : VpnService() {
                 Log.i(TAG, "fd=$fd flags after: $flagsAfter")
                 pfd.detachFd() // 释放所有权，防止 GC 关闭 fd
             } catch (e: Exception) {
-                Log.w(TAG, "Failed to clear O_CLOEXEC on fd=$fd: $e")
+                Log.e(TAG, "Failed to clear O_CLOEXEC on fd=$fd, aborting: $e")
+                closeTunFd()
+                ProxyServiceBridge.updateState(
+                    ProxyServiceStatus(
+                        ProxyState.Error,
+                        errorMessage = getString(R.string.error_fd_setup_failed, e.message ?: e.javaClass.simpleName),
+                        tunMode = TunMode.Vpn,
+                    )
+                )
+                stopSelf()
+                return@launch
             }
 
             // 2. 生成配置（注入 file-descriptor）

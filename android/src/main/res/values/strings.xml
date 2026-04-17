@@ -42,4 +42,6 @@
     <string name="error_mihomo_start_failed">mihomo start failed:\n%1$s</string>
     <string name="error_generic_start_failed">Start failed: %1$s</string>
     <string name="error_foreground_failed">Failed to start foreground service: %1$s</string>
+    <string name="error_fd_setup_failed">Failed to prepare TUN file descriptor: %1$s</string>
+    <string name="error_tun_init_failed">TUN init failed: %1$s</string>
 </resources>

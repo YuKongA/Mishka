@@ -158,6 +158,8 @@ class MihomoRunner(private val context: Context) {
     /**
      * 轮询等待 mihomo 就绪。返回 null 表示成功，返回错误消息表示失败。
      * 每轮先检查进程是否存活（快速失败），再尝试 API 连接。
+     * API 就绪后再扫描日志检查 TUN init —— mihomo TUN 失败走 log.Errorln 不退出，
+     * 其他 inbound 仍响应 /version，只有日志能区分 silent failure。
      */
     private suspend fun waitForReady(useRoot: Boolean, workDir: File): String? {
         repeat(20) {
@@ -173,8 +175,12 @@ class MihomoRunner(private val context: Context) {
                     context.getString(R.string.error_mihomo_exited)
                 }
             }
-            // API 响应则就绪
-            if (isApiReady()) return null
+            // API 响应则就绪 —— 但还需要确认 TUN inbound 也成功
+            if (isApiReady()) {
+                // 额外等待让 mihomo 完成 TUN init 并输出日志
+                delay(500)
+                return scanLogForTunError(useRoot, workDir)
+            }
         }
         // 超时：尝试读取日志辅助诊断
         val logContent = readStartupLog(useRoot, workDir)
@@ -184,6 +190,30 @@ class MihomoRunner(private val context: Context) {
         } else {
             context.getString(R.string.error_api_not_ready)
         }
+    }
+
+    /**
+     * 扫描 mihomo 启动日志，识别 TUN inbound 初始化失败。
+     * 与 mihomo listener.ReCreateTun / PatchInboundListeners 的 log.Errorln 对齐：
+     *   - "Start TUN listening error"（listener.go:497-534 ReCreateTun 主路径）
+     *   - "configure tun interface"（sing_tun/server.go TUN 创建失败）
+     *   - "create NetworkUpdateMonitor"（netlink 监听器创建失败）
+     * 固定模式比泛匹配更精准，误报率低。
+     */
+    private fun scanLogForTunError(useRoot: Boolean, workDir: File): String? {
+        val log = readStartupLog(useRoot, workDir)
+        if (log.isBlank()) return null
+        val tunErrorPatterns = listOf(
+            "Start TUN listening error",
+            "configure tun interface",
+            "create NetworkUpdateMonitor",
+        )
+        val errorLine = log.lines().firstOrNull { line ->
+            (line.contains("level=error") || line.contains("level=fatal")) &&
+                tunErrorPatterns.any { line.contains(it, ignoreCase = true) }
+        } ?: return null
+        Log.e(TAG, "TUN init failed: $errorLine")
+        return context.getString(R.string.error_tun_init_failed, extractErrorMessage(errorLine))
     }
 
     /** 统一读取 mihomo 启动日志 */

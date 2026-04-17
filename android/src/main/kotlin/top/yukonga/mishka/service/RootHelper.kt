@@ -156,27 +156,42 @@ object RootHelper {
     }
 
     /**
-     * 清理残留的 mihomo 进程（孤儿进程，非当前 App 子进程）。
-     * 将探测 → SIGTERM → 等退 → SIGKILL → 等退整个流程下沉到单次 su shell 执行，
-     * 避免 Kotlin 侧 Thread.sleep 轮询 + 多次 su 调用的开销。
-     * exit code: 0=无残留或已清理；1=SIGKILL 后仍存活；其他=shell 或 su 错误。
+     * 清理残留的 mihomo 进程（孤儿进程，非当前 App 子进程），可选带 TUN 清理。
+     * 整个流程下沉到单次 su shell 执行，避免 Kotlin 侧 Thread.sleep 轮询 + 多次 su 调用的开销。
+     *
+     * TUN 清理动机：SIGKILL 不给 mihomo 清理机会，残留的 TUN 设备会导致下次启动
+     * sing-tun `tun.New()` 返回 EEXIST → TUN inbound 失败 → mihomo 继续运行其他
+     * inbound 但实际无 TUN → UI 显示 Running 但无网（silent failure）。
+     *
+     * @param tunDevice 即将启动的 mihomo 配置的 TUN 设备名，清理孤儿后兜底删除该接口；null 则不清 TUN
+     * exit code: 0=无残留（或已清理）；1=SIGKILL 后仍存活；其他=shell 或 su 错误。
      */
-    fun cleanupOrphanedMihomo() {
+    fun cleanupOrphanedMihomo(tunDevice: String? = null) {
+        val tunCleanupLine = tunDevice?.let {
+            "ip link delete ${escapeShellSingleQuoted(it)} 2>/dev/null; true"
+        } ?: "true"
+
         val script = """
-            pgrep -f libmihomo.so >/dev/null 2>&1 || exit 0
-            pkill -TERM -f libmihomo.so 2>/dev/null
-            i=0; while [ ${'$'}i -lt 6 ]; do
-                sleep 0.5
-                pgrep -f libmihomo.so >/dev/null 2>&1 || exit 0
-                i=${'$'}((i+1))
-            done
-            pkill -KILL -f libmihomo.so 2>/dev/null
-            i=0; while [ ${'$'}i -lt 4 ]; do
-                sleep 0.5
-                pgrep -f libmihomo.so >/dev/null 2>&1 || exit 0
-                i=${'$'}((i+1))
-            done
-            exit 1
+            pgrep -f libmihomo.so >/dev/null 2>&1 && {
+                pkill -TERM -f libmihomo.so 2>/dev/null
+                i=0; while [ ${'$'}i -lt 6 ]; do
+                    sleep 0.5
+                    pgrep -f libmihomo.so >/dev/null 2>&1 || break
+                    i=${'$'}((i+1))
+                done
+                pgrep -f libmihomo.so >/dev/null 2>&1 && {
+                    pkill -KILL -f libmihomo.so 2>/dev/null
+                    i=0; while [ ${'$'}i -lt 4 ]; do
+                        sleep 0.5
+                        pgrep -f libmihomo.so >/dev/null 2>&1 || break
+                        i=${'$'}((i+1))
+                    done
+                }
+            }
+            # 进程清理后（或本就不存在孤儿），兜底清 TUN 避免下次启动 EEXIST
+            $tunCleanupLine
+            pgrep -f libmihomo.so >/dev/null 2>&1 && exit 1
+            exit 0
         """.trimIndent()
 
         try {
@@ -196,4 +211,11 @@ object RootHelper {
             // 无 su 设备 ProcessBuilder 抛 IOException，静默降级
         }
     }
+
+    /**
+     * POSIX shell 单引号转义：外层用单引号包裹，内部单引号替换为 `'\''`。
+     * 防止用户可配置的 device name 注入命令（Settings 已有正则约束，此处是 defense in depth）。
+     */
+    private fun escapeShellSingleQuoted(s: String): String =
+        "'" + s.replace("'", "'\\''") + "'"
 }

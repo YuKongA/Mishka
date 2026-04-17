@@ -26,7 +26,7 @@ object ConfigGenerator {
 
     private const val TAG = "ConfigGenerator"
     private const val DEFAULT_CONTROLLER = "127.0.0.1:9090"
-    private const val DEFAULT_TUN_DEVICE = "Mishka"
+    internal const val DEFAULT_TUN_DEVICE = "Mishka"
 
     fun generateSecret(): String = UUID.randomUUID().toString().take(16)
 

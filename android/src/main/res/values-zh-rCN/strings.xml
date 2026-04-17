@@ -42,4 +42,6 @@
     <string name="error_mihomo_start_failed">mihomo 启动失败:\n%1$s</string>
     <string name="error_generic_start_failed">启动失败: %1$s</string>
     <string name="error_foreground_failed">前台服务启动失败: %1$s</string>
+    <string name="error_fd_setup_failed">TUN 文件描述符准备失败: %1$s</string>
+    <string name="error_tun_init_failed">TUN 初始化失败: %1$s</string>
 </resources>
