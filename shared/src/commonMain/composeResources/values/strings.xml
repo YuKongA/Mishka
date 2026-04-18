@@ -298,6 +298,7 @@
 
     <!-- External Control -->
     <string name="external_control_title">External Controller</string>
+    <string name="external_control_ip">API Address</string>
     <string name="external_control_controller_hint">Bind address for the mihomo HTTP API (e.g. 127.0.0.1:9090). Takes effect after restarting the proxy.</string>
     <string name="external_control_secret">API Secret</string>
     <string name="external_control_secret_hint">Bearer token for the HTTP API. When empty, falls back to the secret defined in the subscription config, or a random one if the subscription does not set it.</string>

@@ -7,9 +7,6 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.util.Log
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import top.yukonga.mishka.data.database.ImportedEntity
@@ -33,10 +30,9 @@ class ProfileReceiver : BroadcastReceiver() {
             Intent.ACTION_MY_PACKAGE_REPLACED,
             Intent.ACTION_TIMEZONE_CHANGED,
             Intent.ACTION_TIME_CHANGED -> {
-                CoroutineScope(Dispatchers.IO).launch {
-                    reset()
-                    startProfileWorker(context, ProfileWorker.ACTION_SCHEDULE_UPDATES)
-                }
+                // onReceive 栈内同步完成，保留 BroadcastReceiver 的 FGS 启动豁免窗口
+                reset()
+                startProfileWorker(context, ProfileWorker.ACTION_SCHEDULE_UPDATES)
             }
             ACTION_PROFILE_REQUEST_UPDATE -> {
                 val uuid = intent.data?.host ?: return
@@ -101,9 +97,23 @@ class ProfileReceiver : BroadcastReceiver() {
             if (lastModified < 0) return
 
             val delay = (imported.interval - (current - lastModified)).coerceAtLeast(0)
+            val triggerAt = current + delay
 
             Log.i(TAG, "Schedule ${imported.uuid} (${imported.name}) in ${delay / 1000}s")
-            alarmManager.set(AlarmManager.RTC, current + delay, intent)
+            scheduleAlarm(alarmManager, triggerAt, intent)
+        }
+
+        /**
+         * API 31+ 精确闹钟进入 FGS 启动豁免白名单；
+         * 若用户在系统"闹钟和提醒"撤销 SCHEDULE_EXACT_ALARM，退化为 inexact，
+         * 并依赖 startProfileWorker 的 catch + re-arm 兜底。
+         */
+        private fun scheduleAlarm(alarmManager: AlarmManager, triggerAt: Long, pi: PendingIntent) {
+            if (alarmManager.canScheduleExactAlarms()) {
+                alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pi)
+            } else {
+                alarmManager.set(AlarmManager.RTC_WAKEUP, triggerAt, pi)
+            }
         }
 
         /**
@@ -132,7 +142,43 @@ class ProfileReceiver : BroadcastReceiver() {
                 this.action = action
                 if (uuid != null) data = Uri.parse("uuid://$uuid")
             }
-            context.startForegroundService(intent)
+            try {
+                context.startForegroundService(intent)
+            } catch (e: Exception) {
+                // Android 12+ ForegroundServiceStartNotAllowedException 及各 OEM ROM 后台启动限制；
+                // 吞异常避免 BroadcastReceiver 进程崩溃，同时主动 re-arm 保调度链不断
+                Log.e(TAG, "startForegroundService failed for $action", e)
+                rescheduleAfterFailure(context, action, uuid)
+            }
         }
+
+        private fun rescheduleAfterFailure(context: Context, action: String, uuid: String?) {
+            val alarmManager = context.getSystemService(AlarmManager::class.java) ?: return
+            val triggerAt = Clock.System.now().toEpochMilliseconds() + MIN_INTERVAL_MS
+
+            when (action) {
+                ProfileWorker.ACTION_UPDATE_PROFILE -> {
+                    uuid ?: return
+                    val pi = pendingIntentOf(context, uuid)
+                    scheduleAlarm(alarmManager, triggerAt, pi)
+                    Log.i(TAG, "Re-armed $uuid update in ${MIN_INTERVAL_MS / 1000}s after FGS denial")
+                }
+                ProfileWorker.ACTION_SCHEDULE_UPDATES -> {
+                    // boot / time_change 路径：rescheduleAll 没跑，所有单订阅闹钟链断了；
+                    // 用一个 retry PendingIntent 触发下次 onReceive ACTION_BOOT_COMPLETED 分支
+                    val retryIntent = Intent(context, ProfileReceiver::class.java).apply {
+                        this.action = Intent.ACTION_BOOT_COMPLETED
+                    }
+                    val pi = PendingIntent.getBroadcast(
+                        context, BOOT_RETRY_REQUEST_CODE, retryIntent,
+                        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+                    )
+                    scheduleAlarm(alarmManager, triggerAt, pi)
+                    Log.i(TAG, "Re-armed rescheduleAll in ${MIN_INTERVAL_MS / 1000}s after FGS denial")
+                }
+            }
+        }
+
+        private const val BOOT_RETRY_REQUEST_CODE = -1 // 避开 uuid.hashCode() 正值碰撞
     }
 }
