@@ -39,6 +39,7 @@ import mishka.shared.generated.resources.provider_title
 import mishka.shared.generated.resources.provider_update
 import mishka.shared.generated.resources.subscription_update_all
 import org.jetbrains.compose.resources.stringResource
+import top.yukonga.mishka.util.formatIsoTimeAsLocalShort
 import top.yukonga.mishka.viewmodel.ProviderItemUi
 import top.yukonga.mishka.viewmodel.ProviderViewModel
 import top.yukonga.miuix.kmp.basic.BasicComponent
@@ -163,8 +164,7 @@ fun ProviderScreen(
                         ProviderItem(
                             provider = provider,
                             onUpdate = {
-                                val isRule = provider.type.startsWith("规则")
-                                viewModel.updateProvider(provider.name, isRule)
+                                viewModel.updateProvider(provider.name, provider.isRuleProvider)
                             },
                         )
                     }
@@ -174,6 +174,11 @@ fun ProviderScreen(
             item { Spacer(Modifier.height(24.dp).navigationBarsPadding()) }
         }
     }
+
+    ProviderRefreshDialog(
+        show = uiState.refresh != null,
+        progress = uiState.refresh,
+    )
 }
 
 @Composable
@@ -191,7 +196,7 @@ private fun ProviderItem(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     Text(
-                        text = formatUpdatedAt(provider.updatedAt),
+                        text = formatIsoTimeAsLocalShort(provider.updatedAt),
                         fontSize = 12.sp,
                         color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                     )
@@ -211,26 +216,4 @@ private fun ProviderItem(
             }
         },
     )
-}
-
-private fun formatUpdatedAt(isoTime: String): String {
-    if (isoTime.isBlank()) return ""
-    return try {
-        // Go 零值时间 "0001-01-01T00:00:00Z" 表示未更新
-        if (isoTime.startsWith("0001-")) return ""
-
-        // mihomo 返回 ISO 8601 格式如 "2025-04-14T16:51:30.123456+08:00"
-        // 提取为 "04-14 16:51"
-        val dateTime = isoTime.substringBefore(".").substringBefore("+").substringBefore("Z")
-        val parts = dateTime.split("T")
-        if (parts.size == 2) {
-            val datePart = parts[0].substringAfter("-") // "04-14"
-            val timePart = parts[1].substringBeforeLast(":") // "16:51"
-            "$datePart $timePart"
-        } else {
-            isoTime
-        }
-    } catch (_: Exception) {
-        isoTime
-    }
 }

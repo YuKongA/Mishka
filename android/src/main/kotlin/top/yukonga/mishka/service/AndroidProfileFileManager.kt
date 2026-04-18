@@ -34,6 +34,10 @@ class AndroidProfileFileManager(private val context: Context) : ProfileFileManag
         return MihomoValidator.validate(context, workDir, configFileName, onProgress)
     }
 
+    override suspend fun prefetch(workDir: String, configFileName: String, onProgress: ((String) -> Unit)?): Boolean {
+        return MihomoPrefetcher.prefetch(context, workDir, configFileName, onProgress)
+    }
+
     override fun getMihomoWorkDir(): String = ConfigGenerator.getWorkDir(context).absolutePath
 
     override fun readMihomoFile(relativePath: String): String? {

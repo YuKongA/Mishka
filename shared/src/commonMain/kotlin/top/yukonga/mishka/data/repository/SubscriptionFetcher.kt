@@ -8,6 +8,7 @@ import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.isSuccess
 import top.yukonga.mishka.data.model.Subscription
+import kotlin.time.Clock
 
 /**
  * 订阅 HTTP 下载。
@@ -80,7 +81,7 @@ class SubscriptionFetcher(private val userAgent: String) {
             download = download,
             total = total,
             expire = expire,
-            updatedAt = System.currentTimeMillis(),
+            updatedAt = Clock.System.now().toEpochMilliseconds(),
         )
 
         return FetchResult(updatedSub, configContent)

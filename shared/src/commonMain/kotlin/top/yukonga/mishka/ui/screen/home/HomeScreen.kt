@@ -12,6 +12,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import top.yukonga.mishka.util.formatUptime
 import top.yukonga.mishka.viewmodel.HomeUiState
 import top.yukonga.mishka.viewmodel.HomeViewModel
 import top.yukonga.mishka.viewmodel.MemorySnapshot
@@ -48,7 +49,8 @@ fun HomeScreen(
     val speed by (viewModel?.speedState?.collectAsState() ?: remember { mutableStateOf(SpeedSnapshot()) })
     val memory by (viewModel?.memoryState?.collectAsState() ?: remember { mutableStateOf(MemorySnapshot()) })
     val systemInfo by (viewModel?.systemInfoState?.collectAsState() ?: remember { mutableStateOf(SystemInfoSnapshot()) })
-    val uptime by (viewModel?.uptimeState?.collectAsState() ?: remember { mutableStateOf("") })
+    val uptimeSeconds by (viewModel?.uptimeState?.collectAsState() ?: remember { mutableStateOf(-1L) })
+    val uptime = formatUptime(uptimeSeconds)
 
     Scaffold(
         modifier = modifier,

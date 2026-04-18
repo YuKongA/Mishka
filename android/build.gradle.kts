@@ -11,9 +11,9 @@ plugins {
 dependencies {
     implementation(projects.shared)
     implementation(libs.androidx.activity)
-    implementation(libs.quickie.bundled)
     implementation(libs.hiddenapibypass)
     implementation(libs.kotlinx.serialization.json)
+    implementation(libs.quickie.bundled)
 }
 
 

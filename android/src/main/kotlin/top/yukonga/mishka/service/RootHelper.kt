@@ -218,4 +218,46 @@ object RootHelper {
      */
     private fun escapeShellSingleQuoted(s: String): String =
         "'" + s.replace("'", "'\\''") + "'"
+
+    /**
+     * 以 root 身份 rm -rf 指定路径。调用方自行保证路径语义（仅用于 app 自己的数据目录下）。
+     * best-effort：无 su 设备或失败返回 false，不抛异常。
+     */
+    fun rmRfAsRoot(path: String): Boolean {
+        return try {
+            val escaped = escapeShellSingleQuoted(path)
+            val process = ProcessBuilder("su", "-c", "rm -rf $escaped")
+                .redirectErrorStream(true)
+                .start()
+            val exited = process.waitFor(8, TimeUnit.SECONDS)
+            if (!exited) {
+                process.destroyForcibly()
+                return false
+            }
+            process.exitValue() == 0
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    /**
+     * 以 root 身份 chown -R 指定路径到 uid:gid（Android 应用数据目录 uid==gid）。
+     * 用于一次性迁移旧版本 mihomo 以 root 权限直写入 imported/ 产生的 root:root 文件。
+     */
+    fun chownRecursiveAsRoot(path: String, uid: Int): Boolean {
+        return try {
+            val escaped = escapeShellSingleQuoted(path)
+            val process = ProcessBuilder("su", "-c", "chown -R $uid:$uid $escaped")
+                .redirectErrorStream(true)
+                .start()
+            val exited = process.waitFor(10, TimeUnit.SECONDS)
+            if (!exited) {
+                process.destroyForcibly()
+                return false
+            }
+            process.exitValue() == 0
+        } catch (_: Exception) {
+            false
+        }
+    }
 }

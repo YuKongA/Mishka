@@ -30,34 +30,34 @@ kotlin {
         }
         commonMain.dependencies {
             api(libs.miuix.ui)
+            api(libs.androidx.room3.runtime)
+            implementation(libs.androidx.lifecycle.viewmodel)
+            implementation(libs.androidx.lifecycle.runtime)
+            implementation(libs.androidx.navigation3.runtime)
+            implementation(libs.androidx.sqlite.bundled)
+            implementation(libs.jetbrains.components.resources)
+            implementation(libs.jetbrains.navigationevent)
+            implementation(libs.kotlinx.coroutines.core)
+            implementation(libs.kotlinx.datetime)
+            implementation(libs.kotlinx.serialization.json)
+            implementation(libs.ktor.client.core)
+            implementation(libs.ktor.client.content.negotiation)
+            implementation(libs.ktor.client.okhttp)
+            implementation(libs.ktor.client.websockets)
+            implementation(libs.ktor.serialization.json)
+            implementation(libs.material.icons.extended)
             implementation(libs.miuix.blur)
             implementation(libs.miuix.icons)
             implementation(libs.miuix.preference)
             implementation(libs.miuix.navigation3.ui)
-            implementation(libs.material.icons.extended)
-            implementation(libs.androidx.navigation3.runtime)
-            implementation(libs.jetbrains.navigationevent)
-            implementation(libs.kotlinx.serialization.json)
-            implementation(libs.kotlinx.coroutines.core)
-            implementation(libs.components.resources)
-            implementation(libs.ktor.client.core)
-            implementation(libs.ktor.client.content.negotiation)
-            implementation(libs.ktor.serialization.json)
-            implementation(libs.ktor.client.websockets)
-            implementation(libs.androidx.lifecycle.viewmodel)
-            implementation(libs.androidx.lifecycle.runtime)
-            api(libs.androidx.room3.runtime)
-            implementation(libs.androidx.sqlite.bundled)
         }
 
         named("androidMain").dependencies {
             implementation(libs.androidx.activity)
-            implementation(libs.ktor.client.okhttp)
         }
 
         named("desktopMain").dependencies {
             implementation(libs.kotlinx.coroutines.swing)
-            implementation(libs.ktor.client.okhttp)
         }
     }
 }

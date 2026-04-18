@@ -28,6 +28,7 @@ import top.yukonga.mishka.platform.StorageKeys
 import top.yukonga.mishka.platform.TunMode
 import java.io.File
 import java.io.FileDescriptor
+import kotlin.time.Clock
 
 @SuppressLint("VpnServicePolicy")
 class MishkaTunService : VpnService() {
@@ -112,6 +113,8 @@ class MishkaTunService : VpnService() {
                 // 同时清理 TUN 接口防止下次启动 sing-tun EEXIST（silent failure 源头）
                 val residualTun = storage.getString(StorageKeys.ROOT_TUN_DEVICE, RuntimeOverrideBuilder.DEFAULT_TUN_DEVICE)
                 RootHelper.cleanupOrphanedMihomo(tunDevice = residualTun)
+                // 清掉上一轮 ROOT 运行时沙箱（里面可能有 root:root 的 provider 缓存遗孤）
+                ProfileFileOps.cleanupAllRootRuntime(this@MishkaTunService)
                 storage.putString(StorageKeys.ROOT_MIHOMO_PID, "")
                 storage.putString(StorageKeys.ROOT_MIHOMO_SECRET, "")
                 storage.putString(StorageKeys.ROOT_ACTIVE_SUBSCRIPTION_ID, "")
@@ -172,13 +175,18 @@ class MishkaTunService : VpnService() {
                     val proxyMode = storage.getString(StorageKeys.APP_PROXY_MODE, "AllowAll")
                     val packages = storage.getStringSet(StorageKeys.APP_PROXY_PACKAGES, emptySet())
 
+                    // Mishka 自身保持排除，避免死循环
                     when (proxyMode) {
                         "AllowSelected" -> {
-                            addAllowedApplication(packageName)
-                            packages.forEach { pkg ->
-                                if (pkg != packageName) {
+                            val filtered = packages.filter { it != packageName }
+                            if (filtered.isEmpty()) {
+                                // 用户没选任何要代理的 app → 退化为全直连（等价 AllowAll + 排除 self）
+                                addDisallowedApplication(packageName)
+                            } else {
+                                filtered.forEach { pkg ->
                                     try { addAllowedApplication(pkg) } catch (_: Exception) {}
                                 }
+                                // AllowSelected 下 Mishka 不在 allow 列表内自然绕过 VPN（Android 默认行为）
                             }
                         }
                         "DenySelected" -> {
@@ -301,7 +309,7 @@ class MishkaTunService : VpnService() {
                     secret = runner.secret,
                     externalController = extCtl,
                     tunMode = TunMode.Vpn,
-                    startTime = System.currentTimeMillis(),
+                    startTime = Clock.System.now().toEpochMilliseconds(),
                     mihomoPid = runner.pid
                 )
             )

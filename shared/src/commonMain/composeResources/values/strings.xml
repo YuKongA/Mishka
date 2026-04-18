@@ -37,6 +37,10 @@
     <string name="home_tun">TUN</string>
     <string name="home_switch_mode">Switch Mode</string>
     <string name="home_switch_tun_stack">Switch TUN Stack</string>
+    <string name="home_uptime_seconds">%1$ds</string>
+    <string name="home_uptime_minutes">%1$dm</string>
+    <string name="home_uptime_hours_minutes">%1$dh %2$dm</string>
+    <string name="home_uptime_days_hours">%1$dd %2$dh</string>
 
     <!-- Home - Action Buttons -->
     <string name="home_restart">Restart</string>
@@ -117,6 +121,9 @@
     <string name="subscription_auto_update">Auto-update interval</string>
     <string name="subscription_auto_update_placeholder">minutes, 0 or empty to disable, min 15</string>
     <string name="subscription_import_config">Import Config</string>
+    <string name="subscription_updating_title">Updating subscriptions</string>
+    <string name="subscription_updating_single">Updating %1$s…</string>
+    <string name="subscription_updating_progress">%1$s (%2$d / %3$d)</string>
     <string name="subscription_downloading">Downloading config...</string>
     <string name="subscription_validating">Validating config...</string>
     <string name="subscription_file_only_no_update">File-imported config cannot be updated online</string>
@@ -170,6 +177,10 @@
     <string name="provider_start_first">Please start the proxy service first</string>
     <string name="provider_list">Provider List</string>
     <string name="provider_not_updated">Not updated</string>
+    <string name="provider_updating_title">Updating provider</string>
+    <string name="provider_updating_single">Updating %1$s…</string>
+    <string name="provider_updating_progress">%1$d / %2$d</string>
+    <string name="provider_update_failed">Failed to update %1$s: %2$s</string>
 
     <!-- Settings -->
     <string name="settings_title">Settings</string>

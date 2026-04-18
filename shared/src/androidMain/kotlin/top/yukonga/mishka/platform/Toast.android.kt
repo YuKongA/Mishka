@@ -1,10 +1,10 @@
 package top.yukonga.mishka.platform
 
 import android.content.Context
+import android.os.Handler
 import android.os.Looper
 import android.widget.Toast
 import androidx.core.os.HandlerCompat
-import android.os.Handler
 
 private var appContext: Context? = null
 private val mainHandler: Handler by lazy { HandlerCompat.createAsync(Looper.getMainLooper()) }

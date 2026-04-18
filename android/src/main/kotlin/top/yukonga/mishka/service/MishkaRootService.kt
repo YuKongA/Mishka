@@ -24,6 +24,7 @@ import top.yukonga.mishka.platform.ProxyState
 import top.yukonga.mishka.platform.StorageKeys
 import top.yukonga.mishka.platform.TunMode
 import java.io.File
+import kotlin.time.Clock
 
 /**
  * ROOT TUN 模式前台服务。
@@ -111,12 +112,13 @@ class MishkaRootService : Service() {
             if (existingPid > 0 && existingSecret.isNotEmpty() && !subscriptionMismatch) {
                 val ec = overrideStore.load().resolveExternalController()
                 if (runner.attachToExisting(existingPid, existingSecret, ec, subscriptionId)) {
-                    val existingStartTime = storage.getString(StorageKeys.ROOT_START_TIME, "").toLongOrNull() ?: System.currentTimeMillis()
+                    val existingStartTime = storage.getString(StorageKeys.ROOT_START_TIME, "").toLongOrNull() ?: Clock.System.now().toEpochMilliseconds()
                     Log.i(TAG, "Reconnected to existing mihomo: pid=$existingPid")
                     ProxyServiceBridge.updateState(ProxyServiceStatus(ProxyState.Running, secret = existingSecret, externalController = ec, tunMode = TunMode.Root, startTime = existingStartTime, mihomoPid = runner.pid))
                     dynamicNotification.startOrFallbackStatic(storage, existingSecret, ec, TunMode.Root)
                     storage.putString(StorageKeys.SERVICE_WAS_RUNNING, "true")
-                    val workDir = if (subscriptionId != null) ProfileFileOps.getSubscriptionDir(this@MishkaRootService, subscriptionId) else ConfigGenerator.getWorkDir(this@MishkaRootService)
+                    // 重连到活着的 mihomo：它仍在 runtime/{uuid}/ 下跑，监控日志从同一目录读
+                    val workDir = if (subscriptionId != null) ProfileFileOps.getRuntimeDir(this@MishkaRootService, subscriptionId) else ConfigGenerator.getWorkDir(this@MishkaRootService)
                     startProcessMonitor(workDir)
                     return@launch
                 }
@@ -141,6 +143,25 @@ class MishkaRootService : Service() {
                 )
                 stopSelf()
                 return@launch
+            }
+
+            // 3.5 准备 runtime/{uuid}/ 沙箱：从 imported/{uuid}/ 复制，mihomo 在此以 root 写入
+            //     不污染 imported/，保证更新/删除始终在 app UID 下工作
+            if (subscriptionId != null) {
+                try {
+                    ProfileFileOps.prepareRootRuntime(this@MishkaRootService, subscriptionId)
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to prepare runtime sandbox", e)
+                    ProxyServiceBridge.updateState(
+                        ProxyServiceStatus(
+                            ProxyState.Error,
+                            errorMessage = getString(R.string.error_generic_start_failed, e.message ?: e.javaClass.simpleName),
+                            tunMode = TunMode.Root,
+                        )
+                    )
+                    stopSelf()
+                    return@launch
+                }
             }
 
             // 4. 装配 override.run.json（ROOT 模式：auto-route / auto-detect-interface / AppProxy）
@@ -177,7 +198,7 @@ class MishkaRootService : Service() {
             }
 
             // 6. 持久化 PID、secret、启动时间和订阅 ID（用于 app 重启后重连 + 订阅一致性校验）
-            val startTime = System.currentTimeMillis()
+            val startTime = Clock.System.now().toEpochMilliseconds()
             persistState(storage, runner.secret, startTime, subscriptionId)
 
             // 7. 更新状态和通知
@@ -186,7 +207,7 @@ class MishkaRootService : Service() {
             storage.putString(StorageKeys.SERVICE_WAS_RUNNING, "true")
             Log.i(TAG, "Proxy running (ROOT)")
 
-            val workDir = if (subscriptionId != null) ProfileFileOps.getSubscriptionDir(this@MishkaRootService, subscriptionId) else ConfigGenerator.getWorkDir(this@MishkaRootService)
+            val workDir = if (subscriptionId != null) ProfileFileOps.getRuntimeDir(this@MishkaRootService, subscriptionId) else ConfigGenerator.getWorkDir(this@MishkaRootService)
             startProcessMonitor(workDir)
         }
     }
@@ -207,8 +228,11 @@ class MishkaRootService : Service() {
             }
             Log.e(TAG, "mihomo process died unexpectedly (ROOT): $errorMsg")
             val storage = PlatformStorage(this@MishkaRootService)
+            val runningSubscriptionId = storage.getString(StorageKeys.ROOT_ACTIVE_SUBSCRIPTION_ID, "").ifEmpty { null }
             clearPersistedState(storage)
             storage.putString(StorageKeys.SERVICE_WAS_RUNNING, "false")
+            // 进程死透了，清 runtime/{uuid}/（里面有 root:root 的 provider 缓存，app 删不动）
+            runningSubscriptionId?.let { ProfileFileOps.cleanupRootRuntime(this@MishkaRootService, it) }
             ProxyServiceBridge.updateState(ProxyServiceStatus(ProxyState.Error, errorMessage = errorMsg, tunMode = TunMode.Root))
             dynamicNotification.stop()
             stopForeground(STOP_FOREGROUND_REMOVE)
@@ -236,8 +260,11 @@ class MishkaRootService : Service() {
         ProxyServiceBridge.updateState(ProxyServiceStatus(ProxyState.Stopping, tunMode = TunMode.Root))
         dynamicNotification.stop()
         scope.launch(Dispatchers.IO) {
-            runner.stop()
             val storage = PlatformStorage(this@MishkaRootService)
+            val runningSubscriptionId = storage.getString(StorageKeys.ROOT_ACTIVE_SUBSCRIPTION_ID, "").ifEmpty { null }
+            runner.stop()
+            // 清掉上一轮 runtime 沙箱，下轮 startProxy 会 prepareRootRuntime 重新从 imported/ 复制
+            runningSubscriptionId?.let { ProfileFileOps.cleanupRootRuntime(this@MishkaRootService, it) }
             clearPersistedState(storage)
             withContext(Dispatchers.Main) {
                 startProxy(subscriptionId)
@@ -251,8 +278,10 @@ class MishkaRootService : Service() {
         ProxyServiceBridge.updateState(ProxyServiceStatus(ProxyState.Stopping, tunMode = TunMode.Root))
         dynamicNotification.stop()
         scope.launch(Dispatchers.IO) {
-            runner.stop()
             val storage = PlatformStorage(this@MishkaRootService)
+            val runningSubscriptionId = storage.getString(StorageKeys.ROOT_ACTIVE_SUBSCRIPTION_ID, "").ifEmpty { null }
+            runner.stop()
+            runningSubscriptionId?.let { ProfileFileOps.cleanupRootRuntime(this@MishkaRootService, it) }
             clearPersistedState(storage)
             storage.putString(StorageKeys.SERVICE_WAS_RUNNING, "false")
             ProxyServiceBridge.updateState(ProxyServiceStatus(ProxyState.Stopped))

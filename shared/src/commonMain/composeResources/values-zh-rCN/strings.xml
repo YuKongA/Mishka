@@ -37,6 +37,10 @@
     <string name="home_tun">TUN</string>
     <string name="home_switch_mode">切换模式</string>
     <string name="home_switch_tun_stack">切换 TUN Stack</string>
+    <string name="home_uptime_seconds">%1$d 秒</string>
+    <string name="home_uptime_minutes">%1$d 分钟</string>
+    <string name="home_uptime_hours_minutes">%1$d 小时 %2$d 分</string>
+    <string name="home_uptime_days_hours">%1$d 天 %2$d 时</string>
 
     <!-- Home - Action Buttons -->
     <string name="home_restart">重启</string>
@@ -117,6 +121,9 @@
     <string name="subscription_auto_update">自动更新间隔</string>
     <string name="subscription_auto_update_placeholder">分钟，0 或留空为禁用，最小 15</string>
     <string name="subscription_import_config">导入配置</string>
+    <string name="subscription_updating_title">正在更新订阅</string>
+    <string name="subscription_updating_single">正在更新 %1$s…</string>
+    <string name="subscription_updating_progress">%1$s (%2$d / %3$d)</string>
     <string name="subscription_downloading">下载配置...</string>
     <string name="subscription_validating">验证配置...</string>
     <string name="subscription_file_only_no_update">该配置为文件导入，无法在线更新</string>
@@ -170,6 +177,10 @@
     <string name="provider_start_first">请先启动代理服务</string>
     <string name="provider_list">资源列表</string>
     <string name="provider_not_updated">未更新</string>
+    <string name="provider_updating_title">正在更新资源</string>
+    <string name="provider_updating_single">正在更新 %1$s…</string>
+    <string name="provider_updating_progress">%1$d / %2$d</string>
+    <string name="provider_update_failed">更新 %1$s 失败: %2$s</string>
 
     <!-- Settings -->
     <string name="settings_title">设置</string>

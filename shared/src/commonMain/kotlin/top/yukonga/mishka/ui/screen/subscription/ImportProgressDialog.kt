@@ -24,10 +24,11 @@ import top.yukonga.miuix.kmp.window.WindowDialog
 fun ImportProgressDialog(
     show: Boolean,
     step: String,
+    title: String = stringResource(Res.string.subscription_import_config),
 ) {
     WindowDialog(
         show = show,
-        title = stringResource(Res.string.subscription_import_config),
+        title = title,
         onDismissRequest = null,
         content = {
             Row(

@@ -19,6 +19,7 @@ import top.yukonga.mishka.platform.PlatformStorage
 import top.yukonga.mishka.platform.ProfileFileManager
 import top.yukonga.mishka.platform.ProxyServiceBridge
 import top.yukonga.mishka.platform.StorageKeys
+import kotlin.time.Clock
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
@@ -81,7 +82,7 @@ class SubscriptionRepository(
             type = type,
             source = source,
             interval = interval,
-            createdAt = System.currentTimeMillis(),
+            createdAt = Clock.System.now().toEpochMilliseconds(),
         )
         pendingDao.insert(pending)
 
@@ -233,7 +234,7 @@ class SubscriptionRepository(
                 type = ProfileType.File,
                 source = "",
                 interval = 0,
-                createdAt = System.currentTimeMillis(),
+                createdAt = Clock.System.now().toEpochMilliseconds(),
             )
         )
         newUuid

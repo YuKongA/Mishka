@@ -41,6 +41,12 @@ object ProfileFileOps {
     fun getSubscriptionConfigFile(context: Context, uuid: String): File =
         File(getImportedDir(context, uuid), "config.yaml")
 
+    /**
+     * ROOT 模式运行时沙箱目录（mihomo 以 uid=0 在此写 provider/ruleset 缓存，不污染 imported/）。
+     */
+    fun getRuntimeDir(context: Context, uuid: String): File =
+        File(getWorkDir(context), "runtime/$uuid")
+
     // === pending 写入 ===
 
     fun savePendingConfig(context: Context, uuid: String, content: String): File {
@@ -92,7 +98,10 @@ object ProfileFileOps {
         val processing = getProcessingDir(context)
         val imported = File(getWorkDir(context), "imported/$uuid")
         val pending = File(getWorkDir(context), "pending/$uuid")
-        imported.deleteRecursively()
+        // 旧版本 ROOT 模式可能在 imported/ 里留下 root:root 文件，Kotlin delete 失败后走 su 兜底
+        if (imported.exists() && !imported.deleteRecursively()) {
+            RootHelper.rmRfAsRoot(imported.absolutePath)
+        }
         imported.mkdirs()
         if (processing.exists()) {
             processing.copyRecursively(imported, overwrite = true)
@@ -105,8 +114,63 @@ object ProfileFileOps {
     fun deleteProfileDirs(context: Context, uuid: String) {
         val imported = File(getWorkDir(context), "imported/$uuid")
         val pending = File(getWorkDir(context), "pending/$uuid")
-        if (imported.exists()) imported.deleteRecursively()
+        val runtime = File(getWorkDir(context), "runtime/$uuid")
+        if (imported.exists() && !imported.deleteRecursively()) {
+            RootHelper.rmRfAsRoot(imported.absolutePath)
+        }
         if (pending.exists()) pending.deleteRecursively()
+        // runtime/{uuid} 通常在 ROOT 停止时已被 cleanupRootRuntime 清掉；
+        // 此处是兜底：若 app 崩溃未走正常 stop 路径，会有 root:root 残留，Kotlin 删不掉。
+        if (runtime.exists() && !runtime.deleteRecursively()) {
+            RootHelper.rmRfAsRoot(runtime.absolutePath)
+        }
+    }
+
+    // === ROOT 运行时沙箱 ===
+
+    /**
+     * ROOT 启动前准备：清残留 → 从 imported/{uuid}/ 复制一份到 runtime/{uuid}/（app UID 写入）→ 重建 geodata 链接。
+     * imported/ 里已包含 -prefetch 落盘的 provider 文件，copy 一并带过去，mihomo 启动可跳过 HTTP 拉取。
+     */
+    fun prepareRootRuntime(context: Context, uuid: String): File {
+        val imported = File(getWorkDir(context), "imported/$uuid")
+        val runtime = getRuntimeDir(context, uuid)
+        // 先清残留（可能是 root:root 遗孤，Kotlin 删不掉走 su）
+        if (runtime.exists()) {
+            if (!runtime.deleteRecursively()) {
+                RootHelper.rmRfAsRoot(runtime.absolutePath)
+            }
+        }
+        runtime.mkdirs()
+        if (imported.exists()) {
+            imported.copyRecursively(runtime, overwrite = true)
+        }
+        ensureGeodataLinks(context, runtime)
+        return runtime
+    }
+
+    /**
+     * ROOT 停止后清理 runtime/{uuid}/。必须在 mihomo 进程确认死亡后调用。
+     * 运行期 mihomo 以 root 写入的文件 Kotlin 无法 unlink，直接走 su rm -rf。
+     */
+    fun cleanupRootRuntime(context: Context, uuid: String) {
+        val runtime = getRuntimeDir(context, uuid)
+        if (!runtime.exists()) return
+        // app 权限能删的先删（省 su 调用）；失败走 root
+        if (!runtime.deleteRecursively()) {
+            RootHelper.rmRfAsRoot(runtime.absolutePath)
+        }
+    }
+
+    /**
+     * 兜底：擦净整个 runtime/ 目录。切换到 VPN 模式时调用，回收 root 遗孤。
+     */
+    fun cleanupAllRootRuntime(context: Context) {
+        val runtime = File(getWorkDir(context), "runtime")
+        if (!runtime.exists()) return
+        if (!runtime.deleteRecursively()) {
+            RootHelper.rmRfAsRoot(runtime.absolutePath)
+        }
     }
 
     fun cloneImportedToPending(context: Context, sourceUuid: String, targetUuid: String) {

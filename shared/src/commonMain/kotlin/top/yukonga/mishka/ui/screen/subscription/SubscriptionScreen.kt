@@ -35,6 +35,7 @@ import mishka.shared.generated.resources.Res
 import mishka.shared.generated.resources.common_back
 import mishka.shared.generated.resources.common_delete
 import mishka.shared.generated.resources.common_edit
+import mishka.shared.generated.resources.common_processing
 import mishka.shared.generated.resources.common_update
 import mishka.shared.generated.resources.subscription_add
 import mishka.shared.generated.resources.subscription_config
@@ -45,10 +46,13 @@ import mishka.shared.generated.resources.subscription_tap_add
 import mishka.shared.generated.resources.subscription_title
 import mishka.shared.generated.resources.subscription_update_all
 import mishka.shared.generated.resources.subscription_updated_at
+import mishka.shared.generated.resources.subscription_updating_progress
+import mishka.shared.generated.resources.subscription_updating_title
 import mishka.shared.generated.resources.subscription_used_traffic
 import org.jetbrains.compose.resources.stringResource
 import top.yukonga.mishka.data.model.Subscription
 import top.yukonga.mishka.util.FormatUtils
+import top.yukonga.mishka.util.formatEpochMillisAsLocal
 import top.yukonga.mishka.viewmodel.SubscriptionViewModel
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
@@ -142,10 +146,16 @@ fun SubscriptionScreen(
                 bottom = bottomPadding,
             ),
         ) {
+            if (uiState.subscriptions.isNotEmpty()) {
+                item(key = "top_padding") {
+                    Spacer(modifier = Modifier.height(12.dp))
+                }
+            }
+
             if (uiState.error.isNotEmpty()) {
                 item(key = "error") {
                     Card(
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp).padding(top = 12.dp, bottom = 6.dp),
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp).padding(bottom = 12.dp),
                         insideMargin = PaddingValues(16.dp),
                     ) {
                         Text(
@@ -178,12 +188,6 @@ fun SubscriptionScreen(
                 }
             }
 
-            if (uiState.subscriptions.isNotEmpty()) {
-                item(key = "top_padding") {
-                    Spacer(modifier = Modifier.height(12.dp))
-                }
-            }
-
             items(uiState.subscriptions, key = { it.id }) { sub ->
                 SubscriptionItem(
                     subscription = sub,
@@ -198,6 +202,33 @@ fun SubscriptionScreen(
                 )
             }
         }
+    }
+
+    // 批量更新优先展示（含 currentName + (done/total) + step）；
+    // 单条刷新退化为 ImportProgressDialog 默认态（标题"导入配置"）。
+    val updateAll = uiState.updateAll
+    if (updateAll != null) {
+        val progressText = stringResource(
+            Res.string.subscription_updating_progress,
+            updateAll.currentName,
+            updateAll.completed + 1,
+            updateAll.total,
+        )
+        val step = if (updateAll.currentStep.isNotEmpty()) {
+            "$progressText\n${updateAll.currentStep}"
+        } else {
+            progressText
+        }
+        ImportProgressDialog(
+            show = true,
+            step = step,
+            title = stringResource(Res.string.subscription_updating_title),
+        )
+    } else {
+        ImportProgressDialog(
+            show = uiState.importProgress != null,
+            step = uiState.importProgress?.step ?: stringResource(Res.string.common_processing),
+        )
     }
 }
 
@@ -287,7 +318,7 @@ private fun SubscriptionItem(
 
                 if (subscription.updatedAt > 0) {
                     Text(
-                        text = stringResource(Res.string.subscription_updated_at, formatTime(subscription.updatedAt)),
+                        text = stringResource(Res.string.subscription_updated_at, formatEpochMillisAsLocal(subscription.updatedAt)),
                         modifier = Modifier.padding(top = 2.dp),
                         fontSize = 12.sp,
                         color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
@@ -341,9 +372,4 @@ private fun SubscriptionItem(
             }
         }
     }
-}
-
-private fun formatTime(timestamp: Long): String {
-    val sdf = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.getDefault())
-    return sdf.format(java.util.Date(timestamp))
 }

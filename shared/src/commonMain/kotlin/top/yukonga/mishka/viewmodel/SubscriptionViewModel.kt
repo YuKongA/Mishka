@@ -35,6 +35,19 @@ data class SubscriptionUiState(
     val error: String = "",
     val showAddDialog: Boolean = false,
     val importProgress: ImportProgress? = null,
+    val updateAll: UpdateAllProgress? = null,
+)
+
+/**
+ * 批量"全部更新"进度。`completed` = 已完成条目数（0-based 正在处理的是第 completed+1 条）。
+ * `currentStep` 由 ProfileProcessor.onProgress 回调推进，允许空串表示当前订阅还未开始内部阶段。
+ */
+@Immutable
+data class UpdateAllProgress(
+    val completed: Int,
+    val total: Int,
+    val currentName: String,
+    val currentStep: String = "",
 )
 
 class SubscriptionViewModel(
@@ -156,10 +169,45 @@ class SubscriptionViewModel(
         }
     }
 
+    /**
+     * 串行批量更新所有 URL 订阅。ProfileProcessor.processLock 已保证串行，这里显式 await
+     * 便于每次只推进一条目的进度，避免并发 launch 让 `updateAll.currentName` 乱跳。
+     * 失败聚合到 `error`；任一条失败不影响后续继续。
+     */
     fun updateAllSubscriptions() {
-        _uiState.value.subscriptions
-            .filter { it.url.isNotBlank() }
-            .forEach { sub -> fetchSubscription(sub.id) }
+        val targets = _uiState.value.subscriptions.filter { it.url.isNotBlank() }
+        if (targets.isEmpty()) return
+        if (_uiState.value.updateAll != null || _uiState.value.isLoading) return
+
+        viewModelScope.launch {
+            val failures = mutableListOf<String>()
+            val total = targets.size
+            targets.forEachIndexed { index, sub ->
+                _uiState.value = _uiState.value.copy(
+                    updateAll = UpdateAllProgress(index, total, sub.name),
+                    error = "",
+                )
+                try {
+                    processor.update(sub.id) { progress ->
+                        val state = _uiState.value.updateAll ?: return@update
+                        _uiState.value = _uiState.value.copy(
+                            updateAll = state.copy(currentStep = progress.step),
+                        )
+                    }
+                } catch (e: Throwable) {
+                    val label = if (e is ConfigValidationException) {
+                        getString(Res.string.error_validation_failed, e.describe())
+                    } else {
+                        getString(Res.string.error_update_failed, e.describe())
+                    }
+                    failures += "${sub.name}: $label"
+                }
+            }
+            _uiState.value = _uiState.value.copy(
+                updateAll = null,
+                error = if (failures.isEmpty()) "" else failures.joinToString("\n"),
+            )
+        }
     }
 
     fun getActiveSubscription(): Subscription? = repository.getActive()

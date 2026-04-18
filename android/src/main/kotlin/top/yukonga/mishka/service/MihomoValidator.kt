@@ -43,8 +43,8 @@ object MihomoValidator {
             return@withContext "Configuration file does not exist: ${configFile.absolutePath}"
         }
 
-        try {
-            val process = ProcessBuilder(
+        val process = try {
+            ProcessBuilder(
                 binary.absolutePath,
                 "-t",
                 "-d", workDir,
@@ -53,38 +53,53 @@ object MihomoValidator {
                 .directory(File(workDir))
                 .redirectErrorStream(true)
                 .start()
+        } catch (e: Exception) {
+            Log.e(TAG, "mihomo -t failed to start", e)
+            return@withContext "mihomo -t failed: ${e.message ?: e.javaClass.simpleName}"
+        }
 
-            val outputBuilder = StringBuilder()
-            process.inputStream.bufferedReader().useLines { lines ->
-                for (line in lines) {
-                    outputBuilder.appendLine(line)
-                    if (onProgress != null) {
-                        parseProgressLine(line)?.let { onProgress(it) }
+        // 独立线程消费 stdout：读在主协程会阻塞到 EOF，让 waitFor(timeout) 失效
+        val outputBuilder = StringBuilder()
+        val readerThread = Thread({
+            try {
+                process.inputStream.bufferedReader().useLines { lines ->
+                    for (line in lines) {
+                        synchronized(outputBuilder) { outputBuilder.appendLine(line) }
+                        if (onProgress != null) {
+                            parseProgressLine(line)?.let { onProgress(it) }
+                        }
                     }
                 }
+            } catch (_: Exception) {
             }
-            val output = outputBuilder.toString()
+        }, "mihomo-validate-reader").apply {
+            isDaemon = true
+            start()
+        }
 
+        return@withContext try {
             val exited = process.waitFor(TIMEOUT_MS, TimeUnit.MILLISECONDS)
             if (!exited) {
                 process.destroyForcibly()
-                Log.e(TAG, "mihomo -t timed out")
-                return@withContext "mihomo -t timed out"
-            }
-
-            val exitCode = process.exitValue()
-            Log.i(TAG, "mihomo -t exit=$exitCode, output:\n$output")
-
-            if (exitCode == 0) {
-                null
+                readerThread.join(1000)
+                Log.e(TAG, "mihomo -t timed out, output so far:\n${snapshotOutput(outputBuilder)}")
+                "mihomo -t timed out"
             } else {
-                parseErrorMessage(output)
+                readerThread.join(1000)
+                val output = snapshotOutput(outputBuilder)
+                val exitCode = process.exitValue()
+                Log.i(TAG, "mihomo -t exit=$exitCode, output:\n$output")
+                if (exitCode == 0) null else parseErrorMessage(output)
             }
-        } catch (e: Exception) {
-            Log.e(TAG, "mihomo -t failed", e)
-            "mihomo -t failed: ${e.message}"
+        } catch (e: InterruptedException) {
+            process.destroyForcibly()
+            readerThread.join(500)
+            Thread.currentThread().interrupt()
+            "mihomo -t interrupted"
         }
     }
+
+    private fun snapshotOutput(sb: StringBuilder): String = synchronized(sb) { sb.toString() }
 
     /**
      * 从 mihomo 输出中提取错误信息。
@@ -136,7 +151,7 @@ object MihomoValidator {
         return null
     }
 
-    private fun getMihomoBinary(context: Context): File? {
+    internal fun getMihomoBinary(context: Context): File? {
         val nativeDir = context.applicationInfo.nativeLibraryDir
         val binary = File(nativeDir, "libmihomo.so")
         return if (binary.exists()) binary else null

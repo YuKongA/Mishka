@@ -61,26 +61,29 @@ object RuntimeOverrideBuilder {
 
         // 分应用代理：仅 ROOT 模式通过 mihomo include/exclude-package 实现；
         // VPN 模式由 VpnService.Builder.addAllowed/DisallowedApplication 管，不走 mihomo
+        // Mishka 自身保持排除，避免死循环
         val include: List<String>?
         val exclude: List<String>?
         if (rootMode) {
+            val selfPkg = context.packageName
             val proxyMode = parseAppProxyMode(storage.getString(StorageKeys.APP_PROXY_MODE, AppProxyMode.AllowAll.name))
             val packages = storage.getStringSet(StorageKeys.APP_PROXY_PACKAGES, emptySet())
             when (proxyMode) {
                 // 空列表时用无效包名占位，确保不代理任何应用
                 AppProxyMode.AllowSelected -> {
-                    include = if (packages.isNotEmpty()) packages.toList() else listOf("-")
+                    val filtered = packages.filter { it != selfPkg }
+                    include = if (filtered.isNotEmpty()) filtered else listOf("-")
                     exclude = null
                 }
 
                 AppProxyMode.DenySelected -> {
                     include = null
-                    exclude = packages.toList().takeIf { it.isNotEmpty() }
+                    exclude = (packages + selfPkg).distinct()
                 }
 
                 AppProxyMode.AllowAll -> {
                     include = null
-                    exclude = null
+                    exclude = listOf(selfPkg)
                 }
             }
         } else {

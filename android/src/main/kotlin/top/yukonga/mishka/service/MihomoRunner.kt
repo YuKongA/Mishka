@@ -87,16 +87,21 @@ class MihomoRunner(private val context: Context) {
         this@MihomoRunner.secret = secret
         this@MihomoRunner.externalController = externalController
 
-        val workDir = if (subscriptionId != null) {
-            ProfileFileOps.getSubscriptionDir(context, subscriptionId)
-        } else {
-            ConfigGenerator.getWorkDir(context)
+        // ROOT 模式走独立 runtime/{uuid}/ 沙箱（mihomo 会以 uid=0 写 provider 缓存，不能污染 imported/）；
+        // 调用方（MishkaRootService）必须在 start 之前调 ProfileFileOps.prepareRootRuntime 准备好内容。
+        val workDir = when {
+            useRoot && subscriptionId != null -> ProfileFileOps.getRuntimeDir(context, subscriptionId)
+            subscriptionId != null -> ProfileFileOps.getSubscriptionDir(context, subscriptionId)
+            else -> ConfigGenerator.getWorkDir(context)
         }
         // 订阅原文 config.yaml 作为主配置；override 通过 --override-json 在 mihomo 内存中注入，
         // 订阅 YAML 全程不被 Kotlin 改写
         val configFile = File(workDir, "config.yaml")
 
-        ProfileFileOps.ensureGeodataLinks(context, workDir)
+        // ROOT 模式的 geodata 链接已在 prepareRootRuntime 内建立；VPN 模式首启时需要建立
+        if (!useRoot) {
+            ProfileFileOps.ensureGeodataLinks(context, workDir)
+        }
 
         try {
             val args = arrayOf(
@@ -234,14 +239,18 @@ class MihomoRunner(private val context: Context) {
         return context.getString(R.string.error_tun_init_failed, extractErrorMessage(errorLine))
     }
 
-    /** 统一读取 mihomo 启动日志 */
+    /**
+     * 统一读取 mihomo 启动日志。
+     * 取 200 行足以容纳 Go panic stack（通常 30-50 行）+ panic 前的 log.Errorln / stderr 输出，
+     * 避免"panic stack 占满 20 行" 把真正的 first error 挤出来。
+     */
     private fun readStartupLog(useRoot: Boolean, workDir: File): String {
         return if (useRoot) {
             RootHelper.readLogFile(File(workDir, "mihomo.log").absolutePath)
         } else {
             val logFile = File(workDir, "mihomo.log")
             if (logFile.exists()) {
-                logFile.readText().trim().lines().takeLast(20).joinToString("\n")
+                logFile.readText().trim().lines().takeLast(200).joinToString("\n")
             } else ""
         }
     }

@@ -22,6 +22,7 @@ import top.yukonga.mishka.platform.PlatformSystemInfo
 import top.yukonga.mishka.platform.ProxyServiceController
 import top.yukonga.mishka.platform.ProxyState
 import top.yukonga.mishka.util.FormatUtils
+import kotlin.time.Clock
 
 /** 低频状态：mihomo 运行状态、配置、代理组、延迟、错误等；改变频率与生命周期事件相当 */
 @Immutable
@@ -86,8 +87,9 @@ class HomeViewModel(
     private val _systemInfoState = MutableStateFlow(SystemInfoSnapshot())
     val systemInfoState: StateFlow<SystemInfoSnapshot> = _systemInfoState.asStateFlow()
 
-    private val _uptimeState = MutableStateFlow("")
-    val uptimeState: StateFlow<String> = _uptimeState.asStateFlow()
+    // 秒；-1 表示尚未启动/已重置（UI 层格式化时转为空串）
+    private val _uptimeState = MutableStateFlow(-1L)
+    val uptimeState: StateFlow<Long> = _uptimeState.asStateFlow()
 
     private var repository: MihomoRepository? = null
     private var trafficJob: Job? = null
@@ -110,7 +112,7 @@ class HomeViewModel(
                         val client = MihomoApiClient(baseUrl = "http://${status.externalController}", secret = status.secret)
                         val ws = MihomoWebSocket(client)
                         repository = MihomoRepository(client, ws)
-                        startTime = if (status.startTime > 0) status.startTime else System.currentTimeMillis()
+                        startTime = if (status.startTime > 0) status.startTime else Clock.System.now().toEpochMilliseconds()
                         mihomoPid = status.mihomoPid
                         connectToMihomo()
                     }
@@ -199,8 +201,8 @@ class HomeViewModel(
         uptimeJob?.cancel()
         uptimeJob = viewModelScope.launch {
             while (true) {
-                val elapsed = (System.currentTimeMillis() - startTime) / 1000
-                _uptimeState.value = FormatUtils.formatUptime(elapsed)
+                val elapsed = (Clock.System.now().toEpochMilliseconds() - startTime) / 1000
+                _uptimeState.value = elapsed
                 delay(1000)
             }
         }
@@ -226,7 +228,7 @@ class HomeViewModel(
         _speedState.value = SpeedSnapshot()
         _memoryState.value = MemorySnapshot()
         _systemInfoState.value = SystemInfoSnapshot()
-        _uptimeState.value = ""
+        _uptimeState.value = -1L
     }
 
     fun startProxy() {

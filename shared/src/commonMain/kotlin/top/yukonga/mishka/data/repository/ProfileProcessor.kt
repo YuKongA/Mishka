@@ -91,15 +91,21 @@ class ProfileProcessor(
                     if (result.subscription.name.isNotBlank()) resolvedName = result.subscription.name
                 }
 
-                // 阶段 3: 校验（providers 由 mihomo -t 自身按需下载）
-                // mihomo -t 只做 parse + provider 校验，不 bind 端口不 init TUN，
-                // 订阅内 tun.enable: true 也不会失败；直接校验订阅原文，无需写 override 合并的临时文件
+                // 阶段 3: 校验（mihomo -t 只做 parse，不碰网）
                 fileManager.ensureGeodataAvailable(workDir)
                 onProgress(ImportProgress("验证配置..."))
                 val err = fileManager.validate(workDir, "config.yaml") {
                     onProgress(ImportProgress(it))
                 }
                 if (err != null) throw ConfigValidationException(err)
+
+                // 阶段 3': 预下载 providers 到 processing/（best-effort，失败不阻塞 commit）。
+                // 目的是规避 mihomo 启动瞬间（TUN/DNS bring-up 窗口）并发 HTTP provider 拉取
+                // 被 TCP/TLS 瞬态错误打断导致代理组 include-all+filter 拉空的问题。
+                onProgress(ImportProgress("下载 providers..."))
+                fileManager.prefetch(workDir, "config.yaml") {
+                    onProgress(ImportProgress(it))
+                }
 
                 // 阶段 4: 提交（snapshot 一致性检查 + 文件 swap + DB 更新）
                 repo.withProfileLock {

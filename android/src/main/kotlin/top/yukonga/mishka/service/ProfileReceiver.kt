@@ -16,6 +16,7 @@ import top.yukonga.mishka.data.database.ImportedEntity
 import top.yukonga.mishka.data.database.getAppDatabase
 import top.yukonga.mishka.data.model.ProfileType
 import java.io.File
+import kotlin.time.Clock
 
 /**
  * 配置自动更新调度器。
@@ -91,7 +92,7 @@ class ProfileReceiver : BroadcastReceiver() {
 
             if (imported.interval < MIN_INTERVAL_MS) return
 
-            val current = System.currentTimeMillis()
+            val current = Clock.System.now().toEpochMilliseconds()
             val configFile = File(
                 ProfileFileOps.getImportedDir(context, imported.uuid),
                 "config.yaml"
