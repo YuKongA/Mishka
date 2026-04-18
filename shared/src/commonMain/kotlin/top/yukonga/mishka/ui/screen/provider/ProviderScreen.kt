@@ -171,9 +171,7 @@ fun ProviderScreen(
                 }
             }
 
-            item(key = "bottom_spacer") {
-                androidx.compose.foundation.layout.Spacer(Modifier.navigationBarsPadding())
-            }
+            item { Spacer(Modifier.height(24.dp).navigationBarsPadding()) }
         }
     }
 }
@@ -187,7 +185,6 @@ private fun ProviderItem(
         title = provider.name,
         summary = provider.type,
         endActions = {
-            // Inline 类型不显示更新时间和按钮（同 CMFA）
             if (provider.vehicleType != "Inline") {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,

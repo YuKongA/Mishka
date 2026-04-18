@@ -57,7 +57,8 @@ import mishka.shared.generated.resources.network_settings_title
 import mishka.shared.generated.resources.network_socks_port
 import mishka.shared.generated.resources.network_tproxy_port
 import org.jetbrains.compose.resources.stringResource
-import top.yukonga.mishka.data.repository.OverrideStorageHelper
+import top.yukonga.mishka.data.model.ConfigurationOverride
+import top.yukonga.mishka.data.model.DnsOverride
 import top.yukonga.mishka.platform.showToast
 import top.yukonga.mishka.ui.component.ListEditDialog
 import top.yukonga.mishka.ui.component.RestartRequiredHint
@@ -87,51 +88,65 @@ fun NetworkSettingsScreen(
     viewModel: OverrideSettingsViewModel,
     onBack: () -> Unit = {},
 ) {
-    val uiState by viewModel.uiState.collectAsState()
+    val uiState by viewModel.state.collectAsState()
     val scrollBehavior = MiuixScrollBehavior()
     val resetDoneMsg = stringResource(Res.string.dialog_reset_done)
 
-    // 端口编辑 Dialog 状态
+    // 更新顶层字段
+    fun updateTop(transform: (ConfigurationOverride) -> ConfigurationOverride) {
+        viewModel.update(transform)
+    }
+
+    // 更新 dns 子段：沿用当前 dns 对象 copy 指定字段
+    fun updateDns(transform: (DnsOverride) -> DnsOverride) {
+        viewModel.update { state ->
+            val current = state.dns ?: DnsOverride()
+            val next = transform(current)
+            val allNull = next == DnsOverride()
+            state.copy(dns = if (allNull) null else next)
+        }
+    }
+
+    // 端口编辑 Dialog 状态（setter 在 open 时绑定）
     var showPortDialog by remember { mutableStateOf(false) }
-    var editingPortKey by remember { mutableStateOf("") }
     var editingPortTitle by remember { mutableStateOf("") }
+    var editingPortSetter by remember { mutableStateOf<(Int?) -> Unit>({}) }
     val portTextState = rememberTextFieldState()
 
     // 字符串编辑 Dialog 状态
     var showStringDialog by remember { mutableStateOf(false) }
-    var editingStringKey by remember { mutableStateOf("") }
     var editingStringTitle by remember { mutableStateOf("") }
+    var editingStringSetter by remember { mutableStateOf<(String?) -> Unit>({}) }
     val stringTextState = rememberTextFieldState()
 
     // 列表编辑 Dialog 状态
     var showListDialog by remember { mutableStateOf(false) }
-    var editingListKey by remember { mutableStateOf("") }
     var editingListTitle by remember { mutableStateOf("") }
+    var editingListSetter by remember { mutableStateOf<(List<String>?) -> Unit>({}) }
     val listTextState = rememberTextFieldState()
 
-    // 端口 item 点击辅助
-    fun openPortDialog(title: String, key: String, value: Int?) {
-        editingPortKey = key
+    fun openPortDialog(title: String, value: Int?, setter: (Int?) -> Unit) {
         editingPortTitle = title
+        editingPortSetter = setter
         portTextState.edit { replace(0, length, value?.toString() ?: "") }
         showPortDialog = true
     }
 
-    // 字符串 item 点击辅助
-    fun openStringDialog(title: String, key: String, value: String?) {
-        editingStringKey = key
+    fun openStringDialog(title: String, value: String?, setter: (String?) -> Unit) {
         editingStringTitle = title
+        editingStringSetter = setter
         stringTextState.edit { replace(0, length, value ?: "") }
         showStringDialog = true
     }
 
-    // 列表 item 点击辅助
-    fun openListDialog(title: String, key: String, value: List<String>?) {
-        editingListKey = key
+    fun openListDialog(title: String, value: List<String>?, setter: (List<String>?) -> Unit) {
         editingListTitle = title
+        editingListSetter = setter
         listTextState.edit { replace(0, length, value?.joinToString("\n") ?: "") }
         showListDialog = true
     }
+
+    val dns = uiState.dns
 
     Scaffold(
         topBar = {
@@ -179,31 +194,31 @@ fun NetworkSettingsScreen(
                     ArrowPreference(
                         title = httpPortTitle,
                         summary = portSummary(uiState.httpPort),
-                        onClick = { openPortDialog(httpPortTitle, OverrideStorageHelper.KEY_HTTP_PORT, uiState.httpPort) },
+                        onClick = { openPortDialog(httpPortTitle, uiState.httpPort) { v -> updateTop { it.copy(httpPort = v) } } },
                     )
                     val socksPortTitle = stringResource(Res.string.network_socks_port)
                     ArrowPreference(
                         title = socksPortTitle,
                         summary = portSummary(uiState.socksPort),
-                        onClick = { openPortDialog(socksPortTitle, OverrideStorageHelper.KEY_SOCKS_PORT, uiState.socksPort) },
+                        onClick = { openPortDialog(socksPortTitle, uiState.socksPort) { v -> updateTop { it.copy(socksPort = v) } } },
                     )
                     val redirPortTitle = stringResource(Res.string.network_redir_port)
                     ArrowPreference(
                         title = redirPortTitle,
                         summary = portSummary(uiState.redirPort),
-                        onClick = { openPortDialog(redirPortTitle, OverrideStorageHelper.KEY_REDIR_PORT, uiState.redirPort) },
+                        onClick = { openPortDialog(redirPortTitle, uiState.redirPort) { v -> updateTop { it.copy(redirPort = v) } } },
                     )
                     val tproxyPortTitle = stringResource(Res.string.network_tproxy_port)
                     ArrowPreference(
                         title = tproxyPortTitle,
                         summary = portSummary(uiState.tproxyPort),
-                        onClick = { openPortDialog(tproxyPortTitle, OverrideStorageHelper.KEY_TPROXY_PORT, uiState.tproxyPort) },
+                        onClick = { openPortDialog(tproxyPortTitle, uiState.tproxyPort) { v -> updateTop { it.copy(tproxyPort = v) } } },
                     )
                     val mixedPortTitle = stringResource(Res.string.network_mixed_port)
                     ArrowPreference(
                         title = mixedPortTitle,
                         summary = portSummary(uiState.mixedPort),
-                        onClick = { openPortDialog(mixedPortTitle, OverrideStorageHelper.KEY_MIXED_PORT, uiState.mixedPort) },
+                        onClick = { openPortDialog(mixedPortTitle, uiState.mixedPort) { v -> updateTop { it.copy(mixedPort = v) } } },
                     )
                 }
             }
@@ -220,22 +235,22 @@ fun NetworkSettingsScreen(
                     TriStatePreference(
                         title = stringResource(Res.string.network_allow_lan),
                         value = uiState.allowLan,
-                        onValueChange = { viewModel.updateBoolean(OverrideStorageHelper.KEY_ALLOW_LAN, it) },
+                        onValueChange = { v -> updateTop { it.copy(allowLan = v) } },
                     )
                     TriStatePreference(
                         title = "IPv6",
                         value = uiState.ipv6,
-                        onValueChange = { viewModel.updateBoolean(OverrideStorageHelper.KEY_IPV6, it) },
+                        onValueChange = { v -> updateTop { it.copy(ipv6 = v) } },
                     )
                     val bindAddrTitle = stringResource(Res.string.network_bind_address)
                     ArrowPreference(
                         title = bindAddrTitle,
                         summary = uiState.bindAddress ?: stringResource(Res.string.common_not_modified),
-                        onClick = { openStringDialog(bindAddrTitle, OverrideStorageHelper.KEY_BIND_ADDRESS, uiState.bindAddress) },
+                        onClick = { openStringDialog(bindAddrTitle, uiState.bindAddress) { v -> updateTop { it.copy(bindAddress = v) } } },
                     )
                     LogLevelPreference(
                         value = uiState.logLevel,
-                        onValueChange = { viewModel.updateString(OverrideStorageHelper.KEY_LOG_LEVEL, it) },
+                        onValueChange = { v -> updateTop { it.copy(logLevel = v) } },
                     )
                 }
             }
@@ -251,65 +266,65 @@ fun NetworkSettingsScreen(
                 ) {
                     TriStatePreference(
                         title = stringResource(Res.string.network_dns_enable),
-                        value = uiState.dnsEnable,
-                        onValueChange = { viewModel.updateBoolean(OverrideStorageHelper.KEY_DNS_ENABLE, it) },
+                        value = dns?.enable,
+                        onValueChange = { v -> updateDns { it.copy(enable = v) } },
                     )
                     // DNS 显式关闭时禁用子项；null（不修改）仍保留可编辑，允许用户预配置子覆写
-                    val dnsSubEnabled = uiState.dnsEnable != false
+                    val dnsSubEnabled = dns?.enable != false
                     val dnsListenTitle = stringResource(Res.string.network_dns_listen_title)
                     ArrowPreference(
                         title = stringResource(Res.string.network_dns_listen),
-                        summary = uiState.dnsListen ?: stringResource(Res.string.common_not_modified),
-                        onClick = { openStringDialog(dnsListenTitle, OverrideStorageHelper.KEY_DNS_LISTEN, uiState.dnsListen) },
+                        summary = dns?.listen ?: stringResource(Res.string.common_not_modified),
+                        onClick = { openStringDialog(dnsListenTitle, dns?.listen) { v -> updateDns { it.copy(listen = v) } } },
                         enabled = dnsSubEnabled,
                     )
                     TriStatePreference(
                         title = "DNS IPv6",
-                        value = uiState.dnsIpv6,
-                        onValueChange = { viewModel.updateBoolean(OverrideStorageHelper.KEY_DNS_IPV6, it) },
+                        value = dns?.ipv6,
+                        onValueChange = { v -> updateDns { it.copy(ipv6 = v) } },
                         enabled = dnsSubEnabled,
                     )
                     TriStatePreference(
                         title = "Prefer H3",
-                        value = uiState.dnsPreferH3,
-                        onValueChange = { viewModel.updateBoolean(OverrideStorageHelper.KEY_DNS_PREFER_H3, it) },
+                        value = dns?.preferH3,
+                        onValueChange = { v -> updateDns { it.copy(preferH3 = v) } },
                         enabled = dnsSubEnabled,
                     )
                     TriStatePreference(
                         title = stringResource(Res.string.network_dns_use_hosts),
-                        value = uiState.dnsUseHosts,
-                        onValueChange = { viewModel.updateBoolean(OverrideStorageHelper.KEY_DNS_USE_HOSTS, it) },
+                        value = dns?.useHosts,
+                        onValueChange = { v -> updateDns { it.copy(useHosts = v) } },
                         enabled = dnsSubEnabled,
                     )
                     DnsEnhancedModePreference(
-                        value = uiState.dnsEnhancedMode,
-                        onValueChange = { viewModel.updateString(OverrideStorageHelper.KEY_DNS_ENHANCED_MODE, it) },
+                        value = dns?.enhancedMode,
+                        onValueChange = { v -> updateDns { it.copy(enhancedMode = v) } },
                         enabled = dnsSubEnabled,
                     )
                     ArrowPreference(
                         title = "Nameserver",
-                        summary = listSummary(uiState.dnsNameservers),
-                        onClick = { openListDialog("Nameserver", OverrideStorageHelper.KEY_DNS_NAMESERVERS, uiState.dnsNameservers) },
+                        summary = listSummary(dns?.nameserver),
+                        onClick = { openListDialog("Nameserver", dns?.nameserver) { v -> updateDns { it.copy(nameserver = v) } } },
                         enabled = dnsSubEnabled,
                     )
                     ArrowPreference(
                         title = "Fallback",
-                        summary = listSummary(uiState.dnsFallback),
-                        onClick = { openListDialog("Fallback", OverrideStorageHelper.KEY_DNS_FALLBACK, uiState.dnsFallback) },
+                        summary = listSummary(dns?.fallback),
+                        onClick = { openListDialog("Fallback", dns?.fallback) { v -> updateDns { it.copy(fallback = v) } } },
                         enabled = dnsSubEnabled,
                     )
                     val defaultNsTitle = stringResource(Res.string.network_dns_default_nameserver)
                     ArrowPreference(
                         title = defaultNsTitle,
-                        summary = listSummary(uiState.dnsDefaultNameserver),
-                        onClick = { openListDialog(defaultNsTitle, OverrideStorageHelper.KEY_DNS_DEFAULT_NAMESERVER, uiState.dnsDefaultNameserver) },
+                        summary = listSummary(dns?.defaultNameserver),
+                        onClick = { openListDialog(defaultNsTitle, dns?.defaultNameserver) { v -> updateDns { it.copy(defaultNameserver = v) } } },
                         enabled = dnsSubEnabled,
                     )
                     val fakeipFilterTitle = stringResource(Res.string.network_dns_fakeip_filter)
                     ArrowPreference(
                         title = fakeipFilterTitle,
-                        summary = listSummary(uiState.dnsFakeIpFilter),
-                        onClick = { openListDialog(fakeipFilterTitle, OverrideStorageHelper.KEY_DNS_FAKEIP_FILTER, uiState.dnsFakeIpFilter) },
+                        summary = listSummary(dns?.fakeIpFilter),
+                        onClick = { openListDialog(fakeipFilterTitle, dns?.fakeIpFilter) { v -> updateDns { it.copy(fakeIpFilter = v) } } },
                         enabled = dnsSubEnabled,
                     )
                 }
@@ -325,9 +340,9 @@ fun NetworkSettingsScreen(
         title = editingPortTitle,
         textState = portTextState,
         onDismiss = { showPortDialog = false },
-        onConfirm = { port -> viewModel.updatePort(editingPortKey, port) },
+        onConfirm = { port -> editingPortSetter(port) },
         onReset = {
-            viewModel.updatePort(editingPortKey, null)
+            editingPortSetter(null)
             showToast(resetDoneMsg)
         },
     )
@@ -338,9 +353,9 @@ fun NetworkSettingsScreen(
         title = editingStringTitle,
         textState = stringTextState,
         onDismiss = { showStringDialog = false },
-        onConfirm = { value -> viewModel.updateString(editingStringKey, value) },
+        onConfirm = { value -> editingStringSetter(value) },
         onReset = {
-            viewModel.updateString(editingStringKey, null)
+            editingStringSetter(null)
             showToast(resetDoneMsg)
         },
     )
@@ -351,9 +366,9 @@ fun NetworkSettingsScreen(
         title = editingListTitle,
         textState = listTextState,
         onDismiss = { showListDialog = false },
-        onConfirm = { list -> viewModel.updateStringList(editingListKey, list) },
+        onConfirm = { list -> editingListSetter(list) },
         onReset = {
-            viewModel.updateStringList(editingListKey, null)
+            editingListSetter(null)
             showToast(resetDoneMsg)
         },
     )

@@ -2,30 +2,61 @@ package top.yukonga.mishka.service
 
 import android.content.Context
 import top.yukonga.mishka.platform.ProfileFileManager
+import java.io.File
 
 class AndroidProfileFileManager(private val context: Context) : ProfileFileManager {
-    override fun saveConfig(uuid: String, content: String) {
-        ProfileFileOps.saveSubscriptionConfig(context, uuid, content)
-    }
 
-    override fun getDir(uuid: String): String {
-        return ProfileFileOps.getSubscriptionDir(context, uuid).absolutePath
-    }
-
-    override fun commitToImported(uuid: String) {
-        ProfileFileOps.commitPendingToImported(context, uuid)
+    override fun savePendingConfig(uuid: String, content: String) {
+        ProfileFileOps.savePendingConfig(context, uuid, content)
     }
 
     override fun releasePending(uuid: String) {
         ProfileFileOps.releasePending(context, uuid)
     }
 
-    override fun deleteDirs(uuid: String) {
-        ProfileFileOps.deleteProfileDirs(context, uuid)
+    override fun prepareProcessing(uuid: String): String {
+        return ProfileFileOps.prepareProcessing(context, uuid).absolutePath
     }
 
-    override fun cloneFiles(sourceUuid: String, targetUuid: String) {
-        ProfileFileOps.cloneImportedToPending(context, sourceUuid, targetUuid)
+    override fun writeProcessingConfig(workDir: String, content: String) {
+        ProfileFileOps.writeProcessingConfig(workDir, content)
+    }
+
+    override fun cleanupProcessing() {
+        ProfileFileOps.cleanupProcessing(context)
+    }
+
+    override fun commitProcessingToImported(uuid: String) {
+        ProfileFileOps.commitProcessingToImported(context, uuid)
+    }
+
+    override suspend fun validate(workDir: String, configFileName: String, onProgress: ((String) -> Unit)?): String? {
+        return MihomoValidator.validate(context, workDir, configFileName, onProgress)
+    }
+
+    override fun getMihomoWorkDir(): String = ConfigGenerator.getWorkDir(context).absolutePath
+
+    override fun readMihomoFile(relativePath: String): String? {
+        val file = File(ConfigGenerator.getWorkDir(context), relativePath)
+        return if (file.exists()) file.readText() else null
+    }
+
+    override fun writeMihomoFile(relativePath: String, content: String) {
+        val file = File(ConfigGenerator.getWorkDir(context), relativePath)
+        file.parentFile?.mkdirs()
+        file.writeText(content)
+    }
+
+    override fun ensureGeodataAvailable(workDir: String) {
+        ProfileFileOps.ensureGeodataLinks(context, File(workDir))
+    }
+
+    override fun collectGeodata(workDir: String) {
+        ProfileFileOps.collectGeodataFiles(context, File(workDir))
+    }
+
+    override fun getImportedDir(uuid: String): String {
+        return ProfileFileOps.getImportedDir(context, uuid).absolutePath
     }
 
     override fun getDirectoryLastModified(uuid: String, pending: Boolean): Long? {
@@ -44,25 +75,11 @@ class AndroidProfileFileManager(private val context: Context) : ProfileFileManag
         ProfileFileOps.writeImportedFile(context, uuid, relativePath, content)
     }
 
-    override suspend fun validate(workDir: String, configFileName: String, onProgress: ((String) -> Unit)?): String? {
-        return MihomoValidator.validate(context, workDir, configFileName, onProgress)
+    override fun deleteDirs(uuid: String) {
+        ProfileFileOps.deleteProfileDirs(context, uuid)
     }
 
-    override fun generateValidationConfig(uuid: String): String {
-        ConfigGenerator.writeValidationConfig(context, uuid)
-        return ConfigGenerator.VALIDATION_CONFIG_NAME
-    }
-
-    override fun cleanupValidationConfig(uuid: String) {
-        val file = java.io.File(ProfileFileOps.getSubscriptionDir(context, uuid), ConfigGenerator.VALIDATION_CONFIG_NAME)
-        if (file.exists()) file.delete()
-    }
-
-    override fun ensureGeodataAvailable(workDir: String) {
-        ProfileFileOps.ensureGeodataLinks(context, java.io.File(workDir))
-    }
-
-    override fun collectGeodata(workDir: String) {
-        ProfileFileOps.collectGeodataFiles(context, java.io.File(workDir))
+    override fun cloneFiles(sourceUuid: String, targetUuid: String) {
+        ProfileFileOps.cloneImportedToPending(context, sourceUuid, targetUuid)
     }
 }

@@ -23,9 +23,9 @@ import io.github.g00fy2.quickie.config.ScannerConfig
 import kotlinx.coroutines.launch
 import top.yukonga.mishka.data.api.MihomoApiClient
 import top.yukonga.mishka.data.api.MihomoWebSocket
-import top.yukonga.mishka.data.database.DataMigration
 import top.yukonga.mishka.data.database.getAppDatabase
 import top.yukonga.mishka.data.repository.MihomoRepository
+import top.yukonga.mishka.data.repository.OverrideJsonStore
 import top.yukonga.mishka.platform.AppListProvider
 import top.yukonga.mishka.platform.BootStartManager
 import top.yukonga.mishka.platform.FilePicker
@@ -114,8 +114,7 @@ class MainActivity : ComponentActivity() {
 
         val storage = PlatformStorage(this)
         val database = getAppDatabase(this)
-        DataMigration.migrateIfNeeded(storage, database)
-        ProfileFileOps.migrateProfileDirs(this)
+        ProfileFileOps.cleanupProcessing(this)
         top.yukonga.mishka.platform.IconDiskCache.init(this)
         serviceController = ProxyServiceController(this)
         filePicker = FilePicker(this)
@@ -123,18 +122,19 @@ class MainActivity : ComponentActivity() {
         providerViewModel = ProviderViewModel()
         connectionViewModel = ConnectionViewModel()
         dnsQueryViewModel = DnsQueryViewModel()
-        overrideSettingsViewModel = OverrideSettingsViewModel(storage = storage)
+        val fileManager = AndroidProfileFileManager(this)
+        overrideSettingsViewModel = OverrideSettingsViewModel(store = OverrideJsonStore(fileManager))
         appProxyViewModel = AppProxyViewModel(
             storage = storage,
             appListProvider = AppListProvider(this),
             serviceController = serviceController,
         )
 
-        val fileManager = AndroidProfileFileManager(this)
         subscriptionViewModel = SubscriptionViewModel(
             database = database,
             storage = storage,
             fileManager = fileManager,
+            userAgent = "ClashMetaForAndroid/${misc.VersionInfo.VERSION_NAME}",
         )
 
         proxyViewModel = ProxyViewModel(
@@ -145,6 +145,7 @@ class MainActivity : ComponentActivity() {
         homeViewModel = HomeViewModel(
             serviceController = serviceController,
             storage = storage,
+            overrideStore = OverrideJsonStore(fileManager),
             getActiveSubscriptionId = { subscriptionViewModel.getActiveSubscription()?.id },
         )
 

@@ -17,6 +17,9 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import top.yukonga.mishka.R
+import top.yukonga.mishka.data.model.resolveExternalController
+import top.yukonga.mishka.data.model.resolveSecretOrNull
+import top.yukonga.mishka.data.repository.OverrideJsonStore
 import top.yukonga.mishka.platform.PlatformStorage
 import top.yukonga.mishka.platform.ProxyServiceBridge
 import top.yukonga.mishka.platform.ProxyServiceStatus
@@ -32,6 +35,7 @@ class MishkaTunService : VpnService() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val runner by lazy { MihomoRunner(this) }
     private val dynamicNotification by lazy { DynamicNotificationManager(this, scope) }
+    private val overrideStore by lazy { OverrideJsonStore(AndroidProfileFileManager(this)) }
     private var tunFd: Int = -1
     private var monitorJob: Job? = null
     private var notificationRefreshJob: Job? = null
@@ -106,12 +110,15 @@ class MishkaTunService : VpnService() {
             val hasRoot = storage.getString(StorageKeys.HAS_ROOT, "false") == "true"
             if (hadRootPid || hasRoot) {
                 // 同时清理 TUN 接口防止下次启动 sing-tun EEXIST（silent failure 源头）
-                val residualTun = storage.getString(StorageKeys.ROOT_TUN_DEVICE, ConfigGenerator.DEFAULT_TUN_DEVICE)
+                val residualTun = storage.getString(StorageKeys.ROOT_TUN_DEVICE, RuntimeOverrideBuilder.DEFAULT_TUN_DEVICE)
                 RootHelper.cleanupOrphanedMihomo(tunDevice = residualTun)
                 storage.putString(StorageKeys.ROOT_MIHOMO_PID, "")
                 storage.putString(StorageKeys.ROOT_MIHOMO_SECRET, "")
                 storage.putString(StorageKeys.ROOT_ACTIVE_SUBSCRIPTION_ID, "")
             }
+
+            // 加载用户 override（后续 VpnService.Builder 和 mihomo 启动共用同一份）
+            val userOverride = overrideStore.load()
 
             // 1. 建立 VPN 接口，获取 fd
             val fd = try {
@@ -193,8 +200,7 @@ class MishkaTunService : VpnService() {
                         // VPN 设置：系统代理
                         val systemProxy = storage.getString(StorageKeys.VPN_SYSTEM_PROXY, "true") == "true"
                         if (systemProxy) {
-                            val port = storage.getString("override_mixed_port", "null")
-                                .toIntOrNull() ?: 7890
+                            val port = userOverride.mixedPort ?: 7890
                             setHttpProxy(
                                 android.net.ProxyInfo.buildDirectProxy(
                                     "127.0.0.1",
@@ -255,13 +261,28 @@ class MishkaTunService : VpnService() {
                 return@launch
             }
 
-            // 2. 生成配置（注入 file-descriptor）
-            val result = ConfigGenerator.writeRunConfig(this@MishkaTunService, ConfigGenerator.generateSecret(), subscriptionId, tunFd = fd)
-            runner.secret = result.secret
-            runner.externalController = result.externalController
+            // 2. 装配 override.run.json（用户设置 + 运行时字段 tun.file-descriptor 等）
+            // secret / extCtl 走 CLI flag 不进 JSON
+            // secret 解析优先级：用户 override > 订阅 config.yaml 中的 secret > 随机生成
+            val secret = userOverride.resolveSecretOrNull()
+                ?: subscriptionId?.let { ConfigGenerator.readSubscriptionSecret(this@MishkaTunService, it) }
+                ?: ConfigGenerator.generateSecret()
+            val extCtl = userOverride.resolveExternalController()
+            val overrideFile = RuntimeOverrideBuilder.buildAndWriteForRun(
+                context = this@MishkaTunService,
+                userOverride = userOverride,
+                tunFd = fd,
+                rootMode = false,
+            )
 
             // 3. 启动 mihomo 核心
-            val success = runner.start(subscriptionId)
+            val success = runner.start(
+                subscriptionId = subscriptionId,
+                useRoot = false,
+                overrideJsonPath = overrideFile.absolutePath,
+                secret = secret,
+                externalController = extCtl,
+            )
             if (!success) {
                 val errorMsg = runner.errorMessage.ifBlank { getString(R.string.error_start_failed) }
                 Log.e(TAG, "Failed to start mihomo: $errorMsg")
@@ -274,9 +295,18 @@ class MishkaTunService : VpnService() {
             }
 
             // 4. 更新通知和状态
-            ProxyServiceBridge.updateState(ProxyServiceStatus(ProxyState.Running, secret = runner.secret, externalController = result.externalController, tunMode = TunMode.Vpn, startTime = System.currentTimeMillis(), mihomoPid = runner.pid))
+            ProxyServiceBridge.updateState(
+                ProxyServiceStatus(
+                    ProxyState.Running,
+                    secret = runner.secret,
+                    externalController = extCtl,
+                    tunMode = TunMode.Vpn,
+                    startTime = System.currentTimeMillis(),
+                    mihomoPid = runner.pid
+                )
+            )
 
-            dynamicNotification.startOrFallbackStatic(storage, runner.secret, result.externalController)
+            dynamicNotification.startOrFallbackStatic(storage, runner.secret, extCtl)
             // 记录运行状态，用于开机自启判断
             PlatformStorage(this@MishkaTunService).putString(StorageKeys.SERVICE_WAS_RUNNING, "true")
             Log.i(TAG, "Proxy running, fd=$fd")

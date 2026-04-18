@@ -45,7 +45,7 @@ class ProviderViewModel : ViewModel() {
         viewModelScope.launch {
             val items = mutableListOf<ProviderItemUi>()
 
-            // 加载代理 provider（过滤 Compatible 类型，同 CMFA）
+            // 加载代理 provider（过滤 Compatible 类型）
             repo.getProviders().onSuccess { response ->
                 response.providers.values
                     .filter { it.vehicleType != "Compatible" }
@@ -61,7 +61,7 @@ class ProviderViewModel : ViewModel() {
                     }
             }
 
-            // 加载规则 provider（过滤 Compatible 类型，同 CMFA）
+            // 加载规则 provider（过滤 Compatible 类型）
             repo.getRuleProviders().onSuccess { response ->
                 response.providers.values
                     .filter { it.vehicleType != "Compatible" }

@@ -4,8 +4,8 @@ import android.content.Context
 import java.io.File
 
 /**
- * 订阅文件操作：两阶段目录结构（imported/pending/processing）的文件管理。
- * 从 ConfigGenerator 拆分，专注于订阅配置文件的 CRUD 和生命周期。
+ * 订阅文件操作。三阶段目录：pending → processing → imported。
+ * processing 是单例目录，串行使用。
  */
 object ProfileFileOps {
 
@@ -29,26 +29,19 @@ object ProfileFileOps {
         return dir
     }
 
+    /** 单例 processing 沙箱目录。 */
     fun getProcessingDir(context: Context): File {
         val dir = File(getWorkDir(context), "processing")
         if (!dir.exists()) dir.mkdirs()
         return dir
     }
 
-    fun getSubscriptionDir(context: Context, uuid: String): File =
-        getImportedDir(context, uuid)
+    fun getSubscriptionDir(context: Context, uuid: String): File = getImportedDir(context, uuid)
 
     fun getSubscriptionConfigFile(context: Context, uuid: String): File =
         File(getImportedDir(context, uuid), "config.yaml")
 
-    // === 配置保存 ===
-
-    fun saveSubscriptionConfig(context: Context, uuid: String, content: String): File {
-        val dir = getImportedDir(context, uuid)
-        val file = File(dir, "config.yaml")
-        file.writeText(content)
-        return file
-    }
+    // === pending 写入 ===
 
     fun savePendingConfig(context: Context, uuid: String, content: String): File {
         val dir = getPendingDir(context, uuid)
@@ -57,22 +50,57 @@ object ProfileFileOps {
         return file
     }
 
-    // === 两阶段文件操作 ===
-
-    fun commitPendingToImported(context: Context, uuid: String) {
-        val pending = getPendingDir(context, uuid)
-        val imported = getImportedDir(context, uuid)
-        if (pending.exists()) {
-            imported.deleteRecursively()
-            pending.copyRecursively(imported, overwrite = true)
-            pending.deleteRecursively()
-        }
-    }
-
     fun releasePending(context: Context, uuid: String) {
         val pending = File(getWorkDir(context), "pending/$uuid")
         if (pending.exists()) pending.deleteRecursively()
     }
+
+    // === processing 沙箱 ===
+
+    /**
+     * 清空 processing/ 并复制 pending/{uuid}/ → processing/。
+     * 若 pending/{uuid}/ 不存在（File 类型尚未写入），仍创建空 processing/。
+     */
+    fun prepareProcessing(context: Context, uuid: String): File {
+        val processing = getProcessingDir(context)
+        processing.deleteRecursively()
+        processing.mkdirs()
+        val pending = File(getWorkDir(context), "pending/$uuid")
+        if (pending.exists()) {
+            pending.copyRecursively(processing, overwrite = true)
+        }
+        return processing
+    }
+
+    fun writeProcessingConfig(workDir: String, content: String): File {
+        val file = File(workDir, "config.yaml")
+        file.parentFile?.mkdirs()
+        file.writeText(content)
+        return file
+    }
+
+    fun cleanupProcessing(context: Context) {
+        val processing = File(getWorkDir(context), "processing")
+        if (processing.exists()) processing.deleteRecursively()
+    }
+
+    /**
+     * 提交：清 imported/{uuid}/ → 复制 processing/ → imported/{uuid}/ → 删 pending/{uuid}/。
+     * 用 copy 而非 move：processing 残留由下次 prepareProcessing 清理。
+     */
+    fun commitProcessingToImported(context: Context, uuid: String) {
+        val processing = getProcessingDir(context)
+        val imported = File(getWorkDir(context), "imported/$uuid")
+        val pending = File(getWorkDir(context), "pending/$uuid")
+        imported.deleteRecursively()
+        imported.mkdirs()
+        if (processing.exists()) {
+            processing.copyRecursively(imported, overwrite = true)
+        }
+        if (pending.exists()) pending.deleteRecursively()
+    }
+
+    // === 删除与复制 ===
 
     fun deleteProfileDirs(context: Context, uuid: String) {
         val imported = File(getWorkDir(context), "imported/$uuid")
@@ -185,23 +213,5 @@ object ProfileFileOps {
                 }
             }
         }
-    }
-
-    // === 迁移 ===
-
-    fun migrateProfileDirs(context: Context) {
-        val oldProfilesDir = File(getWorkDir(context), "profiles")
-        if (!oldProfilesDir.exists()) return
-        val importedBaseDir = File(getWorkDir(context), "imported")
-        importedBaseDir.mkdirs()
-        oldProfilesDir.listFiles()?.forEach { subDir ->
-            if (subDir.isDirectory) {
-                val target = File(importedBaseDir, subDir.name)
-                if (!target.exists()) {
-                    subDir.copyRecursively(target, overwrite = true)
-                }
-            }
-        }
-        oldProfilesDir.deleteRecursively()
     }
 }

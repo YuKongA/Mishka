@@ -119,7 +119,19 @@
     <string name="subscription_import_config">Import Config</string>
     <string name="subscription_downloading">Downloading config...</string>
     <string name="subscription_validating">Validating config...</string>
-    <string name="subscription_downloading_providers">Downloading providers (%1$d/%2$d)</string>
+    <string name="subscription_file_only_no_update">File-imported config cannot be updated online</string>
+
+    <!-- Subscription import errors -->
+    <string name="error_http_status">Subscription server returned HTTP %1$d</string>
+    <string name="error_empty_body">Subscription response was empty</string>
+    <string name="error_invalid_scheme">URL must start with http:// or https://</string>
+    <string name="error_invalid_name">Subscription name cannot be empty</string>
+    <string name="error_interval_too_small">Auto-update interval must be 0 or at least 15 minutes</string>
+    <string name="error_import_failed">Import failed: %1$s</string>
+    <string name="error_update_failed">Update failed: %1$s</string>
+    <string name="error_save_failed">Save failed: %1$s</string>
+    <string name="error_duplicate_failed">Duplicate failed: %1$s</string>
+    <string name="error_validation_failed">Validation failed: %1$s</string>
 
     <!-- Connection -->
     <string name="connection_title">Connections</string>
@@ -276,6 +288,8 @@
     <!-- External Control -->
     <string name="external_control_title">External Controller</string>
     <string name="external_control_controller_hint">Bind address for the mihomo HTTP API (e.g. 127.0.0.1:9090). Takes effect after restarting the proxy.</string>
+    <string name="external_control_secret">API Secret</string>
+    <string name="external_control_secret_hint">Bearer token for the HTTP API. When empty, falls back to the secret defined in the subscription config, or a random one if the subscription does not set it.</string>
     <string name="settings_external_control">External Controller</string>
     <string name="settings_external_control_summary">Override the mihomo HTTP API bind address</string>
 

@@ -18,7 +18,7 @@ import top.yukonga.mishka.data.model.ProfileType
 import java.io.File
 
 /**
- * 配置自动更新调度器（对齐 CMFA ProfileReceiver）。
+ * 配置自动更新调度器。
  *
  * 监听系统事件（开机、升级、时间变更）后重新调度所有配置更新。
  * 监听自定义 ACTION_PROFILE_REQUEST_UPDATE 触发单个配置更新。

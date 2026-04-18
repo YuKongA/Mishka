@@ -14,8 +14,9 @@ import top.yukonga.mishka.data.api.MihomoApiClient
 import top.yukonga.mishka.data.api.MihomoWebSocket
 import top.yukonga.mishka.data.model.MihomoConfig
 import top.yukonga.mishka.data.model.SubscriptionInfo
+import top.yukonga.mishka.data.model.TunOverride
 import top.yukonga.mishka.data.repository.MihomoRepository
-import top.yukonga.mishka.data.repository.OverrideStorageHelper
+import top.yukonga.mishka.data.repository.OverrideJsonStore
 import top.yukonga.mishka.platform.PlatformStorage
 import top.yukonga.mishka.platform.PlatformSystemInfo
 import top.yukonga.mishka.platform.ProxyServiceController
@@ -69,6 +70,7 @@ data class SystemInfoSnapshot(
 class HomeViewModel(
     private val serviceController: ProxyServiceController,
     private val storage: PlatformStorage,
+    private val overrideStore: OverrideJsonStore,
     private val getActiveSubscriptionId: () -> String? = { null },
 ) : ViewModel() {
 
@@ -245,13 +247,16 @@ class HomeViewModel(
     }
 
     fun switchMode(mode: String) {
-        OverrideStorageHelper.writeNullableString(storage, OverrideStorageHelper.KEY_MODE, mode)
+        val current = overrideStore.load()
+        overrideStore.save(current.copy(mode = mode))
         _uiState.value = _uiState.value.copy(mode = mode)
         serviceController.restart(getActiveSubscriptionId())
     }
 
     fun switchTunStack(stack: String) {
-        OverrideStorageHelper.writeNullableString(storage, OverrideStorageHelper.KEY_TUN_STACK, stack)
+        val current = overrideStore.load()
+        val nextTun = (current.tun ?: TunOverride()).copy(stack = stack)
+        overrideStore.save(current.copy(tun = nextTun))
         _uiState.value = _uiState.value.copy(tunStack = stack)
         serviceController.restart(getActiveSubscriptionId())
     }

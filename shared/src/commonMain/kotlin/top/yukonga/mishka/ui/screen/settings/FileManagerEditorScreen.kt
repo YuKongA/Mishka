@@ -189,7 +189,7 @@ private suspend fun saveWithValidation(
     }
     val original = fileManager.readImportedFile(uuid, relativePath)
     fileManager.writeImportedFile(uuid, relativePath, newContent)
-    val workDir = fileManager.getDir(uuid)
+    val workDir = fileManager.getImportedDir(uuid)
     val err = fileManager.validate(workDir, relativePath)
     if (err != null && original != null) {
         fileManager.writeImportedFile(uuid, relativePath, original)

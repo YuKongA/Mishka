@@ -19,7 +19,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalLayoutDirection
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import mishka.shared.generated.resources.Res
@@ -42,7 +41,8 @@ import mishka.shared.generated.resources.meta_sniffer_skip_domain
 import mishka.shared.generated.resources.meta_tcp_concurrent
 import mishka.shared.generated.resources.meta_unified_delay
 import org.jetbrains.compose.resources.stringResource
-import top.yukonga.mishka.data.repository.OverrideStorageHelper
+import top.yukonga.mishka.data.model.ConfigurationOverride
+import top.yukonga.mishka.data.model.SnifferOverride
 import top.yukonga.mishka.platform.showToast
 import top.yukonga.mishka.ui.component.ListEditDialog
 import top.yukonga.mishka.ui.component.RestartRequiredHint
@@ -68,22 +68,36 @@ fun MetaSettingsScreen(
     viewModel: OverrideSettingsViewModel,
     onBack: () -> Unit = {},
 ) {
-    val uiState by viewModel.uiState.collectAsState()
+    val uiState by viewModel.state.collectAsState()
     val scrollBehavior = MiuixScrollBehavior()
     val resetDoneMsg = stringResource(Res.string.dialog_reset_done)
 
-    // 列表编辑 Dialog 状态
+    fun updateTop(transform: (ConfigurationOverride) -> ConfigurationOverride) {
+        viewModel.update(transform)
+    }
+
+    fun updateSniffer(transform: (SnifferOverride) -> SnifferOverride) {
+        viewModel.update { state ->
+            val current = state.sniffer ?: SnifferOverride()
+            val next = transform(current)
+            val allNull = next == SnifferOverride()
+            state.copy(sniffer = if (allNull) null else next)
+        }
+    }
+
     var showListDialog by remember { mutableStateOf(false) }
-    var editingListKey by remember { mutableStateOf("") }
     var editingListTitle by remember { mutableStateOf("") }
+    var editingListSetter by remember { mutableStateOf<(List<String>?) -> Unit>({}) }
     val listTextState = rememberTextFieldState()
 
-    fun openListDialog(title: String, key: String, value: List<String>?) {
-        editingListKey = key
+    fun openListDialog(title: String, value: List<String>?, setter: (List<String>?) -> Unit) {
         editingListTitle = title
+        editingListSetter = setter
         listTextState.edit { replace(0, length, value?.joinToString("\n") ?: "") }
         showListDialog = true
     }
+
+    val sniffer = uiState.sniffer
 
     Scaffold(
         topBar = {
@@ -130,21 +144,21 @@ fun MetaSettingsScreen(
                     TriStatePreference(
                         title = stringResource(Res.string.meta_unified_delay),
                         value = uiState.unifiedDelay,
-                        onValueChange = { viewModel.updateBoolean(OverrideStorageHelper.KEY_UNIFIED_DELAY, it) },
+                        onValueChange = { v -> updateTop { it.copy(unifiedDelay = v) } },
                     )
                     TriStatePreference(
                         title = stringResource(Res.string.meta_geodata_mode),
                         value = uiState.geodataMode,
-                        onValueChange = { viewModel.updateBoolean(OverrideStorageHelper.KEY_GEODATA_MODE, it) },
+                        onValueChange = { v -> updateTop { it.copy(geodataMode = v) } },
                     )
                     TriStatePreference(
                         title = stringResource(Res.string.meta_tcp_concurrent),
                         value = uiState.tcpConcurrent,
-                        onValueChange = { viewModel.updateBoolean(OverrideStorageHelper.KEY_TCP_CONCURRENT, it) },
+                        onValueChange = { v -> updateTop { it.copy(tcpConcurrent = v) } },
                     )
                     FindProcessModePreference(
                         value = uiState.findProcessMode,
-                        onValueChange = { viewModel.updateString(OverrideStorageHelper.KEY_FIND_PROCESS_MODE, it) },
+                        onValueChange = { v -> updateTop { it.copy(findProcessMode = v) } },
                     )
                 }
             }
@@ -160,35 +174,35 @@ fun MetaSettingsScreen(
                 ) {
                     TriStatePreference(
                         title = stringResource(Res.string.meta_sniffer_enable),
-                        value = uiState.snifferEnable,
-                        onValueChange = { viewModel.updateBoolean(OverrideStorageHelper.KEY_SNIFFER_ENABLE, it) },
+                        value = sniffer?.enable,
+                        onValueChange = { v -> updateSniffer { it.copy(enable = v) } },
                     )
                     TriStatePreference(
                         title = stringResource(Res.string.meta_sniffer_force_dns_mapping),
-                        value = uiState.snifferForceDnsMapping,
-                        onValueChange = { viewModel.updateBoolean(OverrideStorageHelper.KEY_SNIFFER_FORCE_DNS_MAPPING, it) },
+                        value = sniffer?.forceDnsMapping,
+                        onValueChange = { v -> updateSniffer { it.copy(forceDnsMapping = v) } },
                     )
                     TriStatePreference(
                         title = stringResource(Res.string.meta_sniffer_parse_pure_ip),
-                        value = uiState.snifferParsePureIp,
-                        onValueChange = { viewModel.updateBoolean(OverrideStorageHelper.KEY_SNIFFER_PARSE_PURE_IP, it) },
+                        value = sniffer?.parsePureIp,
+                        onValueChange = { v -> updateSniffer { it.copy(parsePureIp = v) } },
                     )
                     TriStatePreference(
                         title = stringResource(Res.string.meta_sniffer_override_dest),
-                        value = uiState.snifferOverrideDestination,
-                        onValueChange = { viewModel.updateBoolean(OverrideStorageHelper.KEY_SNIFFER_OVERRIDE_DEST, it) },
+                        value = sniffer?.overrideDestination,
+                        onValueChange = { v -> updateSniffer { it.copy(overrideDestination = v) } },
                     )
                     val forceDomainTitle = stringResource(Res.string.meta_sniffer_force_domain)
                     ArrowPreference(
                         title = forceDomainTitle,
-                        summary = listSummary(uiState.snifferForceDomain),
-                        onClick = { openListDialog(forceDomainTitle, OverrideStorageHelper.KEY_SNIFFER_FORCE_DOMAIN, uiState.snifferForceDomain) },
+                        summary = listSummary(sniffer?.forceDomain),
+                        onClick = { openListDialog(forceDomainTitle, sniffer?.forceDomain) { v -> updateSniffer { it.copy(forceDomain = v) } } },
                     )
                     val skipDomainTitle = stringResource(Res.string.meta_sniffer_skip_domain)
                     ArrowPreference(
                         title = skipDomainTitle,
-                        summary = listSummary(uiState.snifferSkipDomain),
-                        onClick = { openListDialog(skipDomainTitle, OverrideStorageHelper.KEY_SNIFFER_SKIP_DOMAIN, uiState.snifferSkipDomain) },
+                        summary = listSummary(sniffer?.skipDomain),
+                        onClick = { openListDialog(skipDomainTitle, sniffer?.skipDomain) { v -> updateSniffer { it.copy(skipDomain = v) } } },
                     )
                 }
             }
@@ -203,9 +217,9 @@ fun MetaSettingsScreen(
         title = editingListTitle,
         textState = listTextState,
         onDismiss = { showListDialog = false },
-        onConfirm = { list -> viewModel.updateStringList(editingListKey, list) },
+        onConfirm = { list -> editingListSetter(list) },
         onReset = {
-            viewModel.updateStringList(editingListKey, null)
+            editingListSetter(null)
             showToast(resetDoneMsg)
         },
     )

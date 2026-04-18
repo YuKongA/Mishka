@@ -15,13 +15,15 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import top.yukonga.mishka.R
 import top.yukonga.mishka.data.database.getAppDatabase
-import top.yukonga.mishka.data.model.Subscription
-import top.yukonga.mishka.data.repository.ConfigProcessor
+import top.yukonga.mishka.data.repository.ProfileProcessor
 import top.yukonga.mishka.data.repository.SubscriptionFetcher
+import top.yukonga.mishka.data.repository.SubscriptionRepository
+import top.yukonga.mishka.platform.PlatformStorage
+import top.yukonga.mishka.util.describe
 import java.util.concurrent.ConcurrentLinkedQueue
 
 /**
- * 配置后台更新前台服务（对齐 CMFA ProfileWorker）。
+ * 配置后台更新前台服务。
  *
  * 接收更新请求，在后台执行配置下载、Provider 下载、验证，
  * 显示进度通知和结果通知。
@@ -86,81 +88,40 @@ class ProfileWorker : Service() {
         val notificationManager = getSystemService(NotificationManager::class.java)
         val statusId = NotificationHelper.NOTIFICATION_ID_PROFILE_WORKER + uuid.hashCode().and(0xFFFF)
 
+        val storage = PlatformStorage(this)
+        val fileManager = AndroidProfileFileManager(this)
+        val repo = SubscriptionRepository(
+            importedDao = importedDao,
+            pendingDao = database.pendingDao(),
+            selectionDao = database.selectionDao(),
+            storage = storage,
+            fileManager = fileManager,
+            scope = scope,
+        )
+        val fetcher = SubscriptionFetcher(userAgent = "ClashMetaForAndroid/${misc.VersionInfo.VERSION_NAME}")
+        val processor = ProfileProcessor(repo, fileManager, fetcher)
+
         try {
-            // 显示更新中通知
             notificationManager.notify(
                 statusId,
                 NotificationHelper.buildProfileUpdatingNotification(this, imported.name),
             )
 
-            val fetcher = SubscriptionFetcher()
-            try {
-                // 1. 下载配置
-                val sub = Subscription(
-                    id = imported.uuid,
-                    name = imported.name,
-                    url = imported.source,
-                    upload = imported.upload,
-                    download = imported.download,
-                    total = imported.total,
-                    expire = imported.expire,
-                )
-                val result = fetcher.fetch(sub)
+            processor.update(uuid)
 
-                // 2. 保存配置
-                ProfileFileOps.saveSubscriptionConfig(this, uuid, result.configContent)
+            NotificationHelper.notifyProfileUpdateSuccess(this, imported.name)
+            Log.i(TAG, "Profile ${imported.name} updated successfully")
 
-                // 3. 下载 Provider
-                val providers = ConfigProcessor.parseProviders(result.configContent)
-                val downloadable = providers.filter { it.url.isNotEmpty() }
-                if (downloadable.isNotEmpty()) {
-                    ConfigProcessor.downloadProviders(
-                        providers = providers,
-                        subscriptionDir = ProfileFileOps.getSubscriptionDir(this, uuid).absolutePath,
-                        downloader = { url -> fetcher.downloadBytes(url) },
-                    )
-                }
-
-                // 4. mihomo -t 校验 override 合并后的配置（非原始订阅），捕捉 override 与订阅的交互 bug
-                val workDir = ProfileFileOps.getSubscriptionDir(this, uuid).absolutePath
-                ConfigGenerator.writeValidationConfig(this, uuid)
-                val error = try {
-                    MihomoValidator.validate(this, workDir, ConfigGenerator.VALIDATION_CONFIG_NAME)
-                } finally {
-                    java.io.File(workDir, ConfigGenerator.VALIDATION_CONFIG_NAME).takeIf { it.exists() }?.delete()
-                }
-                if (error != null) {
-                    throw Exception(error)
-                }
-
-                // 5. 更新数据库
-                importedDao.update(
-                    imported.copy(
-                        name = result.subscription.name,
-                        upload = result.subscription.upload,
-                        download = result.subscription.download,
-                        total = result.subscription.total,
-                        expire = result.subscription.expire,
-                    )
-                )
-
-                // 成功通知
-                NotificationHelper.notifyProfileUpdateSuccess(this, imported.name)
-                Log.i(TAG, "Profile ${imported.name} updated successfully")
-
-                // 重新调度下次更新
-                importedDao.queryByUUID(uuid)?.let { updated ->
-                    ProfileReceiver.scheduleNext(this, updated)
-                }
-            } finally {
-                fetcher.close()
+            importedDao.queryByUUID(uuid)?.let { updated ->
+                ProfileReceiver.scheduleNext(this, updated)
             }
         } catch (e: Exception) {
             Log.e(TAG, "Failed to update profile ${imported.name}", e)
             NotificationHelper.notifyProfileUpdateFailed(
-                this, imported.name, e.message ?: getString(R.string.notification_unknown_error)
+                this, imported.name, e.describe().ifBlank { getString(R.string.notification_unknown_error) }
             )
         } finally {
+            fetcher.close()
             notificationManager.cancel(statusId)
         }
     }

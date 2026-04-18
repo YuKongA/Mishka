@@ -64,7 +64,13 @@ class MihomoRunner(private val context: Context) {
         return true
     }
 
-    suspend fun start(subscriptionId: String? = null, useRoot: Boolean = false): Boolean = withContext(Dispatchers.IO) {
+    suspend fun start(
+        subscriptionId: String? = null,
+        useRoot: Boolean = false,
+        overrideJsonPath: String,
+        secret: String,
+        externalController: String,
+    ): Boolean = withContext(Dispatchers.IO) {
         if (isRunning) {
             Log.w(TAG, "mihomo already running")
             return@withContext true
@@ -78,13 +84,17 @@ class MihomoRunner(private val context: Context) {
 
         isRootMode = useRoot
         activeSubscriptionId = subscriptionId
-        val configFile = ConfigGenerator.getConfigFile(context)
+        this@MihomoRunner.secret = secret
+        this@MihomoRunner.externalController = externalController
 
         val workDir = if (subscriptionId != null) {
             ProfileFileOps.getSubscriptionDir(context, subscriptionId)
         } else {
             ConfigGenerator.getWorkDir(context)
         }
+        // 订阅原文 config.yaml 作为主配置；override 通过 --override-json 在 mihomo 内存中注入，
+        // 订阅 YAML 全程不被 Kotlin 改写
+        val configFile = File(workDir, "config.yaml")
 
         ProfileFileOps.ensureGeodataLinks(context, workDir)
 
@@ -92,13 +102,21 @@ class MihomoRunner(private val context: Context) {
             val args = arrayOf(
                 "-d", workDir.absolutePath,
                 "-f", configFile.absolutePath,
+                "--override-json", overrideJsonPath,
+                "--secret", secret,
+                "--ext-ctl", externalController,
             )
             val logFile = File(workDir, "mihomo.log")
 
-            if (useRoot) {
-                childPid = RootHelper.startAsRoot(binary.absolutePath, args, workDir.absolutePath, logFile.absolutePath)
+            childPid = if (useRoot) {
+                RootHelper.startAsRoot(
+                    binary.absolutePath,
+                    args,
+                    workDir.absolutePath,
+                    logFile.absolutePath
+                )
             } else {
-                childPid = ProcessHelper.nativeForkExec(
+                ProcessHelper.nativeForkExec(
                     binary.absolutePath,
                     args,
                     workDir.absolutePath,

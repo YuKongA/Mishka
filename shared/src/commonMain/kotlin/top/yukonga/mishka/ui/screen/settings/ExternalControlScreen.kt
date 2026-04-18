@@ -31,11 +31,13 @@ import mishka.shared.generated.resources.common_confirm
 import mishka.shared.generated.resources.common_not_modified
 import mishka.shared.generated.resources.dialog_reset_done
 import mishka.shared.generated.resources.external_control_controller_hint
+import mishka.shared.generated.resources.external_control_ip
+import mishka.shared.generated.resources.external_control_secret
+import mishka.shared.generated.resources.external_control_secret_hint
 import mishka.shared.generated.resources.external_control_title
 import mishka.shared.generated.resources.network_external_controller
 import mishka.shared.generated.resources.network_input_value
 import org.jetbrains.compose.resources.stringResource
-import top.yukonga.mishka.data.repository.OverrideStorageHelper
 import top.yukonga.mishka.platform.showToast
 import top.yukonga.mishka.ui.component.RestartRequiredHint
 import top.yukonga.mishka.viewmodel.OverrideSettingsViewModel
@@ -62,13 +64,16 @@ fun ExternalControlScreen(
     viewModel: OverrideSettingsViewModel,
     onBack: () -> Unit = {},
 ) {
-    val uiState by viewModel.uiState.collectAsState()
+    val uiState by viewModel.state.collectAsState()
     val scrollBehavior = MiuixScrollBehavior()
     val resetDoneMsg = stringResource(Res.string.dialog_reset_done)
     val notModifiedStr = stringResource(Res.string.common_not_modified)
 
     var showEditDialog by remember { mutableStateOf(false) }
     val controllerTextState = rememberTextFieldState()
+
+    var showSecretDialog by remember { mutableStateOf(false) }
+    val secretTextState = rememberTextFieldState()
 
     Scaffold(
         topBar = {
@@ -115,13 +120,23 @@ fun ExternalControlScreen(
                         .padding(bottom = 12.dp),
                 ) {
                     ArrowPreference(
-                        title = stringResource(Res.string.network_external_controller),
+                        title = stringResource(Res.string.external_control_ip),
                         summary = uiState.externalController ?: notModifiedStr,
                         onClick = {
                             controllerTextState.edit {
                                 replace(0, length, uiState.externalController ?: "")
                             }
                             showEditDialog = true
+                        },
+                    )
+                    ArrowPreference(
+                        title = stringResource(Res.string.external_control_secret),
+                        summary = uiState.secret ?: notModifiedStr,
+                        onClick = {
+                            secretTextState.edit {
+                                replace(0, length, uiState.secret ?: "")
+                            }
+                            showSecretDialog = true
                         },
                     )
                 }
@@ -136,6 +151,12 @@ fun ExternalControlScreen(
                 ) {
                     Text(
                         text = stringResource(Res.string.external_control_controller_hint),
+                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                        fontSize = 13.sp,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                    )
+                    Text(
+                        text = stringResource(Res.string.external_control_secret_hint),
                         color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                         fontSize = 13.sp,
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
@@ -166,7 +187,7 @@ fun ExternalControlScreen(
                 text = stringResource(Res.string.common_not_modified),
                 modifier = Modifier.weight(1f),
                 onClick = {
-                    viewModel.updateString(OverrideStorageHelper.KEY_EXTERNAL_CONTROLLER, null)
+                    viewModel.update { it.copy(externalController = null) }
                     showToast(resetDoneMsg)
                     showEditDialog = false
                 },
@@ -182,8 +203,50 @@ fun ExternalControlScreen(
                 colors = ButtonDefaults.textButtonColorsPrimary(),
                 onClick = {
                     val value = controllerTextState.text.toString().trim().takeIf { it.isNotEmpty() }
-                    viewModel.updateString(OverrideStorageHelper.KEY_EXTERNAL_CONTROLLER, value)
+                    viewModel.update { it.copy(externalController = value) }
                     showEditDialog = false
+                },
+            )
+        }
+    }
+
+    WindowDialog(
+        show = showSecretDialog,
+        title = stringResource(Res.string.external_control_secret),
+        onDismissRequest = { showSecretDialog = false },
+    ) {
+        TextField(
+            state = secretTextState,
+            modifier = Modifier.fillMaxWidth(),
+            label = stringResource(Res.string.network_input_value),
+        )
+        Spacer(Modifier.height(12.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            TextButton(
+                text = stringResource(Res.string.common_not_modified),
+                modifier = Modifier.weight(1f),
+                onClick = {
+                    viewModel.update { it.copy(secret = null) }
+                    showToast(resetDoneMsg)
+                    showSecretDialog = false
+                },
+            )
+            TextButton(
+                text = stringResource(Res.string.common_cancel),
+                modifier = Modifier.weight(1f),
+                onClick = { showSecretDialog = false },
+            )
+            TextButton(
+                text = stringResource(Res.string.common_confirm),
+                modifier = Modifier.weight(1f),
+                colors = ButtonDefaults.textButtonColorsPrimary(),
+                onClick = {
+                    val value = secretTextState.text.toString().trim().takeIf { it.isNotEmpty() }
+                    viewModel.update { it.copy(secret = value) }
+                    showSecretDialog = false
                 },
             )
         }

@@ -3,29 +3,30 @@ package top.yukonga.mishka.viewmodel
 import androidx.compose.runtime.Immutable
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import kotlinx.coroutines.yield
+import mishka.shared.generated.resources.Res
+import mishka.shared.generated.resources.error_duplicate_failed
+import mishka.shared.generated.resources.error_import_failed
+import mishka.shared.generated.resources.error_save_failed
+import mishka.shared.generated.resources.error_update_failed
+import mishka.shared.generated.resources.error_validation_failed
+import mishka.shared.generated.resources.subscription_file_only_no_update
+import org.jetbrains.compose.resources.getString
 import top.yukonga.mishka.data.database.AppDatabase
 import top.yukonga.mishka.data.model.ProfileType
 import top.yukonga.mishka.data.model.Subscription
-import top.yukonga.mishka.data.repository.ConfigProcessor
 import top.yukonga.mishka.data.repository.ConfigValidationException
+import top.yukonga.mishka.data.repository.ImportProgress
+import top.yukonga.mishka.data.repository.ProfileProcessor
 import top.yukonga.mishka.data.repository.SubscriptionFetcher
 import top.yukonga.mishka.data.repository.SubscriptionRepository
+import top.yukonga.mishka.data.repository.enforceFieldValid
 import top.yukonga.mishka.platform.PlatformStorage
 import top.yukonga.mishka.platform.ProfileFileManager
-
-@Immutable
-data class ImportProgress(
-    val step: String,
-    val current: Int = 0,
-    val total: Int = 0,
-)
+import top.yukonga.mishka.util.describe
 
 @Immutable
 data class SubscriptionUiState(
@@ -40,6 +41,7 @@ class SubscriptionViewModel(
     database: AppDatabase,
     storage: PlatformStorage,
     val fileManager: ProfileFileManager,
+    userAgent: String,
 ) : ViewModel() {
 
     private val repository = SubscriptionRepository(
@@ -50,7 +52,8 @@ class SubscriptionViewModel(
         fileManager = fileManager,
         scope = viewModelScope,
     )
-    private val fetcher = SubscriptionFetcher()
+    private val fetcher = SubscriptionFetcher(userAgent = userAgent)
+    private val processor = ProfileProcessor(repository, fileManager, fetcher)
 
     private val _uiState = MutableStateFlow(SubscriptionUiState())
     val uiState: StateFlow<SubscriptionUiState> = _uiState.asStateFlow()
@@ -76,105 +79,66 @@ class SubscriptionViewModel(
     }
 
     /**
-     * URL 导入：create Pending → 下载配置 → 校验 → commit → Imported
+     * URL 导入：create Pending → ProfileProcessor.apply（fetch + validate + commit）
      */
     fun addSubscription(name: String, url: String, interval: Long = 0, onComplete: () -> Unit = {}) {
         hideAddDialog()
-        _uiState.value = _uiState.value.copy(isLoading = true, error = "", importProgress = null)
-
+        beginImport()
         viewModelScope.launch {
             var subId: String? = null
             try {
                 val sub = repository.create(ProfileType.Url, name, url, interval)
                 subId = sub.id
-                yield()
-
-                _uiState.value = _uiState.value.copy(
-                    importProgress = ImportProgress("下载配置...")
-                )
-                val result = fetcher.fetch(sub)
-
-                processAndCommit(result.subscription, result.configContent)
+                processor.apply(sub.id, ::reportProgress)
+                finishImport()
                 onComplete()
-            } catch (e: ConfigValidationException) {
-                subId?.let { cleanupFailedPending(it) }
-                _uiState.value = _uiState.value.copy(
-                    isLoading = false, importProgress = null,
-                    error = e.message ?: "配置校验失败",
-                )
-            } catch (e: Exception) {
-                subId?.let { cleanupFailedPending(it) }
-                _uiState.value = _uiState.value.copy(
-                    isLoading = false, importProgress = null,
-                    error = "导入失败: ${e.message}",
-                )
+            } catch (e: Throwable) {
+                subId?.let { releaseFailedPending(it) }
+                showError(Res.string.error_import_failed, e)
             }
         }
     }
 
     /**
-     * 文件导入：create Pending → 校验 → commit → Imported
+     * 文件导入：create Pending → savePendingConfig → ProfileProcessor.apply（File 类型跳过 fetch）
      */
     fun addFromFile(fileName: String, content: String, onComplete: () -> Unit = {}) {
-        _uiState.value = _uiState.value.copy(isLoading = true, error = "", importProgress = null)
-
+        beginImport()
         viewModelScope.launch {
             var subId: String? = null
             try {
                 val name = fileName.removeSuffix(".yaml").removeSuffix(".yml")
                 val sub = repository.create(ProfileType.File, name, "")
                 subId = sub.id
-                yield()
-
-                val updated = sub.copy(updatedAt = System.currentTimeMillis())
-                processAndCommit(updated, content)
+                fileManager.savePendingConfig(sub.id, content)
+                processor.apply(sub.id, ::reportProgress)
+                finishImport()
                 onComplete()
-            } catch (e: ConfigValidationException) {
-                subId?.let { cleanupFailedPending(it) }
-                _uiState.value = _uiState.value.copy(
-                    isLoading = false, importProgress = null,
-                    error = e.message ?: "配置校验失败",
-                )
-            } catch (e: Exception) {
-                subId?.let { cleanupFailedPending(it) }
-                _uiState.value = _uiState.value.copy(
-                    isLoading = false, importProgress = null,
-                    error = "导入失败: ${e.message}",
-                )
+            } catch (e: Throwable) {
+                subId?.let { releaseFailedPending(it) }
+                showError(Res.string.error_import_failed, e)
             }
         }
     }
 
     /**
-     * 手动刷新已导入的订阅（直接更新 Imported，不经过 Pending）。
+     * 手动刷新已导入的订阅。
      */
     fun fetchSubscription(id: String) {
         val sub = _uiState.value.subscriptions.find { it.id == id } ?: return
         if (sub.url.isBlank()) {
-            _uiState.value = _uiState.value.copy(error = "该配置为文件导入，无法在线更新")
+            viewModelScope.launch {
+                _uiState.value = _uiState.value.copy(error = getString(Res.string.subscription_file_only_no_update))
+            }
             return
         }
-
-        _uiState.value = _uiState.value.copy(isLoading = true, error = "", importProgress = null)
-
+        beginImport()
         viewModelScope.launch {
-            yield()
             try {
-                _uiState.value = _uiState.value.copy(
-                    importProgress = ImportProgress("下载配置...")
-                )
-                val result = fetcher.fetch(sub)
-                processAndUpdateImported(result.subscription, result.configContent)
-            } catch (e: ConfigValidationException) {
-                _uiState.value = _uiState.value.copy(
-                    isLoading = false, importProgress = null,
-                    error = e.message ?: "配置校验失败",
-                )
-            } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(
-                    isLoading = false, importProgress = null,
-                    error = "更新失败: ${e.message}",
-                )
+                processor.update(id, ::reportProgress)
+                finishImport()
+            } catch (e: Throwable) {
+                showError(Res.string.error_update_failed, e)
             }
         }
     }
@@ -201,39 +165,42 @@ class SubscriptionViewModel(
     fun getActiveSubscription(): Subscription? = repository.getActive()
 
     /**
-     * 编辑订阅属性（名称、URL、更新间隔），通过 Pending → Commit 两阶段。
+     * 编辑订阅属性（名称、URL、更新间隔）。URL 类型走 ProfileProcessor 重新校验，
+     * File 类型仅 patch DB（无 source 可重新拉取）。
      */
     fun editSubscription(uuid: String, name: String, source: String, interval: Long, onComplete: () -> Unit = {}) {
-        _uiState.value = _uiState.value.copy(isLoading = true, error = "", importProgress = null)
-
+        beginImport()
         viewModelScope.launch {
             try {
                 repository.patch(uuid, name, source, interval)
-                repository.commit(uuid)
+                val pending = repository.queryPending(uuid)
+                pending?.enforceFieldValid()
+                if (pending?.type == ProfileType.Url && pending.source.isNotBlank()) {
+                    processor.apply(uuid, ::reportProgress)
+                } else {
+                    repository.withProfileLock { repository.commitPending(uuid) }
+                }
+                finishImport()
                 onComplete()
-            } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(
-                    error = "保存失败: ${e.message}",
-                )
-            } finally {
-                _uiState.value = _uiState.value.copy(isLoading = false, importProgress = null)
+            } catch (e: Throwable) {
+                showError(Res.string.error_save_failed, e)
             }
         }
     }
 
     /**
-     * 复制已导入的订阅。
+     * 复制已导入订阅：create Pending(File) → cloneFiles imported→pending → 写 pending → apply。
      */
     fun duplicateSubscription(uuid: String) {
+        beginImport()
         viewModelScope.launch {
             try {
                 val newUuid = repository.clone(uuid)
                 fileManager.cloneFiles(uuid, newUuid)
-                repository.commit(newUuid)
-            } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(
-                    error = "复制失败: ${e.message}",
-                )
+                processor.apply(newUuid, ::reportProgress)
+                finishImport()
+            } catch (e: Throwable) {
+                showError(Res.string.error_duplicate_failed, e)
             }
         }
     }
@@ -243,113 +210,37 @@ class SubscriptionViewModel(
         fetcher.close()
     }
 
-    private suspend fun processAndCommit(subscription: Subscription, configContent: String) = withContext(Dispatchers.IO) {
-        fileManager.saveConfig(subscription.id, configContent)
+    // === 内部辅助 ===
 
-        downloadProviders(subscription.id, configContent)
+    private fun beginImport() {
+        _uiState.value = _uiState.value.copy(isLoading = true, error = "", importProgress = null)
+    }
 
-        _uiState.value = _uiState.value.copy(
-            importProgress = ImportProgress("验证配置...")
-        )
-        yield()
-        val workDir = fileManager.getDir(subscription.id)
-        fileManager.ensureGeodataAvailable(workDir)
-        val error = validateWithOverrides(subscription.id, workDir)
-        if (error == null) {
-            fileManager.collectGeodata(workDir)
-        }
-        if (error != null) {
-            throw ConfigValidationException(error)
-        }
-
-        repository.commit(
-            uuid = subscription.id,
-            upload = subscription.upload,
-            download = subscription.download,
-            total = subscription.total,
-            expire = subscription.expire,
-        )
-        repository.setActive(subscription.id)
-
+    private fun finishImport() {
         _uiState.value = _uiState.value.copy(isLoading = false, importProgress = null)
     }
 
-    private suspend fun processAndUpdateImported(subscription: Subscription, configContent: String) = withContext(Dispatchers.IO) {
-        fileManager.saveConfig(subscription.id, configContent)
-
-        downloadProviders(subscription.id, configContent)
-
-        _uiState.value = _uiState.value.copy(
-            importProgress = ImportProgress("验证配置...")
-        )
-        yield()
-        val workDir = fileManager.getDir(subscription.id)
-        fileManager.ensureGeodataAvailable(workDir)
-        val error = validateWithOverrides(subscription.id, workDir)
-        if (error == null) {
-            fileManager.collectGeodata(workDir)
-        }
-        if (error != null) {
-            throw ConfigValidationException(error)
-        }
-
-        repository.updateImported(
-            uuid = subscription.id,
-            name = subscription.name,
-            upload = subscription.upload,
-            download = subscription.download,
-            total = subscription.total,
-            expire = subscription.expire,
-        )
-
-        _uiState.value = _uiState.value.copy(isLoading = false, importProgress = null)
+    private fun reportProgress(p: ImportProgress) {
+        _uiState.value = _uiState.value.copy(importProgress = p)
     }
 
-    private suspend fun downloadProviders(subscriptionId: String, configContent: String) {
-        val providers = ConfigProcessor.parseProviders(configContent)
-        val downloadable = providers.filter { it.url.isNotEmpty() }
-
-        if (downloadable.isNotEmpty()) {
-            val downloadResult = ConfigProcessor.downloadProviders(
-                providers = providers,
-                subscriptionDir = fileManager.getDir(subscriptionId),
-                downloader = { url -> fetcher.downloadBytes(url) },
-                onProgress = { current, total, _ ->
-                    _uiState.value = _uiState.value.copy(
-                        importProgress = ImportProgress(
-                            step = "下载外部资源 ($current/$total)",
-                            current = current,
-                            total = total,
-                        )
-                    )
-                },
-            )
-
-            if (downloadResult.failures.isNotEmpty()) {
-                _uiState.value = _uiState.value.copy(
-                    error = "部分外部资源下载失败（${downloadResult.failures.size} 个，启动时将重试）",
-                )
+    private fun showError(prefixKey: org.jetbrains.compose.resources.StringResource, e: Throwable) {
+        viewModelScope.launch {
+            val message = if (e is ConfigValidationException) {
+                getString(Res.string.error_validation_failed, e.describe())
+            } else {
+                getString(prefixKey, e.describe())
             }
+            _uiState.value = _uiState.value.copy(
+                isLoading = false,
+                importProgress = null,
+                error = message,
+            )
         }
     }
 
-    private suspend fun cleanupFailedPending(uuid: String) {
+    private suspend fun releaseFailedPending(uuid: String) {
         repository.release(uuid)
         fileManager.releasePending(uuid)
-    }
-
-    /**
-     * 生成 override 合并后的临时配置并 mihomo -t 校验，try/finally 确保清理临时文件。
-     * 校验将要运行的 YAML 而非原始订阅，捕捉 override（DNS/port/sniffer 等）与订阅的交互 bug。
-     */
-    private suspend fun validateWithOverrides(uuid: String, workDir: String): String? {
-        val validationFileName = fileManager.generateValidationConfig(uuid)
-        return try {
-            fileManager.validate(workDir, validationFileName) { provider ->
-                _uiState.value = _uiState.value.copy(importProgress = ImportProgress(provider))
-            }
-        } finally {
-            fileManager.cleanupValidationConfig(uuid)
-        }
     }
 }

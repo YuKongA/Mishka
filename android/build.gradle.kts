@@ -13,7 +13,7 @@ dependencies {
     implementation(libs.androidx.activity)
     implementation(libs.quickie.bundled)
     implementation(libs.hiddenapibypass)
-    implementation(libs.snakeyaml.engine)
+    implementation(libs.kotlinx.serialization.json)
 }
 
 

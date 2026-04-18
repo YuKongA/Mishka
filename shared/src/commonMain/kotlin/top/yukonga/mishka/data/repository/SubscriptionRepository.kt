@@ -23,11 +23,11 @@ import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 /**
- * 两阶段订阅管理器（对齐 CMFA ProfileManager）。
+ * 订阅 DB 层管理器。文件层操作由 ProfileProcessor 编排（pending → processing → imported）。
  *
  * 状态机：
  *   CREATE → Pending ✓, Imported ∅
- *     → COMMIT（下载+校验）→ Imported ✓, Pending ∅
+ *     → COMMIT（fetch+validate）→ Imported ✓, Pending ∅
  *     → RELEASE（放弃）→ 全部清除
  *
  *   PATCH（编辑已导入）→ Imported ✓, Pending ✓
@@ -60,6 +60,12 @@ class SubscriptionRepository(
             }
         }
     }
+
+    /** 暴露给 ProfileProcessor 用的 profileLock —— DB 快照与 commit 期间持有。 */
+    suspend fun <T> withProfileLock(block: suspend () -> T): T = profileLock.withLock { block() }
+
+    suspend fun queryPending(uuid: String): PendingEntity? = pendingDao.queryByUUID(uuid)
+    suspend fun queryImported(uuid: String): ImportedEntity? = importedDao.queryByUUID(uuid)
 
     // === 两阶段操作 ===
 
@@ -125,15 +131,16 @@ class SubscriptionRepository(
     }
 
     /**
-     * 提交 Pending → Imported（在 commit 前由调用方完成下载和校验）。
+     * 提交 Pending → Imported（DB 层写入；文件层提交由 ProfileProcessor 在 commit 前完成）。
+     * 必须在 withProfileLock 内调用以保证 snapshot 一致性。
      */
-    suspend fun commit(
+    suspend fun commitPending(
         uuid: String,
         upload: Long = 0,
         download: Long = 0,
         total: Long = 0,
         expire: Long = 0,
-    ) = profileLock.withLock {
+    ) {
         val pending = pendingDao.queryByUUID(uuid)
             ?: throw IllegalArgumentException("No pending profile for $uuid")
         val existingImported = importedDao.queryByUUID(uuid)
@@ -160,7 +167,10 @@ class SubscriptionRepository(
 
         // 首个导入自动激活
         if (importedDao.count() == 1) {
-            setActive(uuid)
+            _activeUuid.value = uuid
+            storage.putString(StorageKeys.ACTIVE_PROFILE_UUID, uuid)
+            storage.putString(StorageKeys.ACTIVE_PROFILE_NAME, imported.name)
+            ProxyServiceBridge.requestNotificationRefresh()
         }
     }
 
@@ -168,12 +178,7 @@ class SubscriptionRepository(
      * 放弃编辑，丢弃 Pending。
      */
     suspend fun release(uuid: String) = profileLock.withLock {
-        val hasImported = importedDao.exists(uuid)
         pendingDao.remove(uuid)
-        // 如果没有 Imported 记录（纯新建后放弃），不需要额外处理
-        if (!hasImported) {
-            // 纯新建后放弃，无需其他操作
-        }
     }
 
     /**
@@ -214,7 +219,7 @@ class SubscriptionRepository(
     }
 
     /**
-     * 复制已导入订阅为新的 Pending。
+     * 复制已导入订阅为新的 Pending（File 类型，无 source URL）。
      */
     @OptIn(ExperimentalUuidApi::class)
     suspend fun clone(uuid: String): String = profileLock.withLock {
@@ -226,8 +231,8 @@ class SubscriptionRepository(
                 uuid = newUuid,
                 name = imported.name,
                 type = ProfileType.File,
-                source = imported.source,
-                interval = imported.interval,
+                source = "",
+                interval = 0,
                 createdAt = System.currentTimeMillis(),
             )
         )
@@ -275,4 +280,29 @@ class SubscriptionRepository(
             pending = pending != null,
         )
     }
+}
+
+/**
+ * 订阅导入流程的类型化错误。所有错误都带有清晰的中文 message，避免 `e.message == null` 漏到 UI。
+ */
+sealed class ImportError(message: String) : Exception(message) {
+    class HttpStatus(val code: Int, description: String) : ImportError("HTTP $code $description")
+    class EmptyBody : ImportError("订阅返回内容为空")
+    class InvalidScheme(val source: String) : ImportError("URL 必须以 http:// 或 https:// 开头：$source")
+    class InvalidName : ImportError("订阅名称不能为空")
+    class IntervalTooSmall : ImportError("自动更新间隔最小 15 分钟（0 表示禁用）")
+}
+
+/**
+ * I/O 前的字段级校验：name 非空、URL 必须 http(s)、interval 0 或 ≥ 15min。
+ */
+fun PendingEntity.enforceFieldValid() {
+    if (name.isBlank()) throw ImportError.InvalidName()
+    if (type == ProfileType.Url) {
+        val lower = source.lowercase()
+        if (!lower.startsWith("http://") && !lower.startsWith("https://")) {
+            throw ImportError.InvalidScheme(source)
+        }
+    }
+    if (interval != 0L && interval < 15 * 60 * 1000L) throw ImportError.IntervalTooSmall()
 }

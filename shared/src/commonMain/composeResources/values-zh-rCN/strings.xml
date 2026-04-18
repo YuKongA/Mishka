@@ -119,7 +119,19 @@
     <string name="subscription_import_config">导入配置</string>
     <string name="subscription_downloading">下载配置...</string>
     <string name="subscription_validating">验证配置...</string>
-    <string name="subscription_downloading_providers">下载外部资源 (%1$d/%2$d)</string>
+    <string name="subscription_file_only_no_update">该配置为文件导入，无法在线更新</string>
+
+    <!-- 订阅导入错误 -->
+    <string name="error_http_status">订阅服务器返回 HTTP %1$d</string>
+    <string name="error_empty_body">订阅返回内容为空</string>
+    <string name="error_invalid_scheme">URL 必须以 http:// 或 https:// 开头</string>
+    <string name="error_invalid_name">订阅名称不能为空</string>
+    <string name="error_interval_too_small">自动更新间隔最小 15 分钟（0 表示禁用）</string>
+    <string name="error_import_failed">导入失败: %1$s</string>
+    <string name="error_update_failed">更新失败: %1$s</string>
+    <string name="error_save_failed">保存失败: %1$s</string>
+    <string name="error_duplicate_failed">复制失败: %1$s</string>
+    <string name="error_validation_failed">配置校验失败: %1$s</string>
 
     <!-- Connection -->
     <string name="connection_title">连接</string>
@@ -275,7 +287,10 @@
 
     <!-- External Control -->
     <string name="external_control_title">外部控制器</string>
-    <string name="external_control_controller_hint">mihomo HTTP API 的监听地址（例如 127.0.0.1:9090）。重启代理后生效。</string>
+    <string name="external_control_ip">API 地址</string>
+    <string name="external_control_controller_hint">HTTP API 的监听地址（例如 127.0.0.1:9090）。重启代理后生效。</string>
+    <string name="external_control_secret">API 密钥</string>
+    <string name="external_control_secret_hint">HTTP API 的 Bearer 鉴权令牌。留空时优先使用订阅配置中的 secret；若订阅未设置则随机生成。</string>
     <string name="settings_external_control">外部控制器</string>
     <string name="settings_external_control_summary">覆写 mihomo HTTP API 绑定地址</string>
 

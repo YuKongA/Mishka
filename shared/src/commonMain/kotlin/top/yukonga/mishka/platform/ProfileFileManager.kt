@@ -1,49 +1,58 @@
 package top.yukonga.mishka.platform
 
 /**
- * 订阅配置文件操作接口。
- * Android 端由 MainActivity 注入实现，Desktop 端使用默认空实现。
+ * 订阅配置文件操作接口。三阶段目录：
+ *
+ * - pending/{uuid}/    草稿，create/edit 阶段写入
+ * - processing/        单例沙箱，每次 prepareProcessing 清空后从 pending 复制；fetch / providers 下载 / mihomo -t 全部在此完成
+ * - imported/{uuid}/   commit 后从 processing 拷贝到这里，作为最终运行配置
  */
 interface ProfileFileManager {
-    fun saveConfig(uuid: String, content: String)
-    fun getDir(uuid: String): String
-    fun commitToImported(uuid: String)
+    // === per-uuid pending ===
+    fun savePendingConfig(uuid: String, content: String)
     fun releasePending(uuid: String)
-    fun deleteDirs(uuid: String)
-    fun cloneFiles(sourceUuid: String, targetUuid: String)
 
-    /**
-     * 返回订阅目录的最后修改时间（毫秒）。
-     * @param pending true 取 pending/{uuid}，false 取 imported/{uuid}
-     * @return 目录存在且 mtime > 0 返回时间戳，否则 null
-     */
-    fun getDirectoryLastModified(uuid: String, pending: Boolean): Long?
+    // === 单例 processing 沙箱 ===
+    /** 清空 processing/，复制 pending/{uuid}/ → processing/，返回 processing 绝对路径。 */
+    fun prepareProcessing(uuid: String): String
 
-    /** 列出 imported/{uuid} 下的文件（相对路径）。目录不存在返回空列表。 */
-    fun listImportedFiles(uuid: String): List<String>
+    /** 覆盖写 processing 目录下的 config.yaml（fetch 后调用）。 */
+    fun writeProcessingConfig(workDir: String, content: String)
 
-    /** 读取 imported/{uuid}/{relativePath} 文本内容，不存在或读失败返回 null。 */
-    fun readImportedFile(uuid: String, relativePath: String): String?
+    /** 删除 processing/ 全部内容（失败回滚或启动时清理调用）。 */
+    fun cleanupProcessing()
 
-    /** 写入 imported/{uuid}/{relativePath} 文本内容。调用方负责先校验 YAML 合法性。 */
-    fun writeImportedFile(uuid: String, relativePath: String, content: String)
+    // === 提交 ===
+    /** 清 imported/{uuid}/ → 复制 processing/ → imported/{uuid}/ → 删 pending/{uuid}/。 */
+    fun commitProcessingToImported(uuid: String)
 
-    /**
-     * 使用 mihomo -t 校验指定工作目录下的配置文件。
-     * @param configFileName 相对 workDir 的配置文件名，默认校验订阅原始 config.yaml；
-     *                       调用方传 config.validate.yaml 可校验 override 合并后的 YAML
-     */
-    suspend fun validate(workDir: String, configFileName: String = "config.yaml", onProgress: ((String) -> Unit)? = null): String?
+    // === 校验（基于 processing 工作目录） ===
+    suspend fun validate(
+        workDir: String,
+        configFileName: String = "config.yaml",
+        onProgress: ((String) -> Unit)? = null,
+    ): String?
 
-    /**
-     * 生成 override 合并后的校验专用配置，写入订阅目录并返回文件名（相对 workDir）。
-     * 供 processAndCommit 在 validate 前调用 —— 确保被校验的 YAML 即将被实际运行。
-     */
-    fun generateValidationConfig(uuid: String): String
+    /** mihomo 运行时工作目录（files/mihomo/），存放 override.user.json 等通用文件。 */
+    fun getMihomoWorkDir(): String
 
-    /** 清理 generateValidationConfig 产生的临时文件。在 try/finally 中调用避免污染目录。 */
-    fun cleanupValidationConfig(uuid: String)
+    /** 读 mihomo workDir 下的文件（如 override.user.json），文件不存在返回 null。 */
+    fun readMihomoFile(relativePath: String): String?
+
+    /** 写 mihomo workDir 下的文件（覆盖写入）。 */
+    fun writeMihomoFile(relativePath: String, content: String)
 
     fun ensureGeodataAvailable(workDir: String)
     fun collectGeodata(workDir: String)
+
+    // === imported 目录操作 ===
+    fun getImportedDir(uuid: String): String
+    fun getDirectoryLastModified(uuid: String, pending: Boolean): Long?
+    fun listImportedFiles(uuid: String): List<String>
+    fun readImportedFile(uuid: String, relativePath: String): String?
+    fun writeImportedFile(uuid: String, relativePath: String, content: String)
+    fun deleteDirs(uuid: String)
+
+    /** 复制 imported/{sourceUuid}/ → pending/{targetUuid}/，供 duplicate 流程使用。 */
+    fun cloneFiles(sourceUuid: String, targetUuid: String)
 }

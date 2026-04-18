@@ -1,33 +1,44 @@
 package top.yukonga.mishka.data.repository
 
 import io.ktor.client.HttpClient
-import io.ktor.client.call.body
+import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsText
+import io.ktor.http.isSuccess
 import top.yukonga.mishka.data.model.Subscription
 
-class SubscriptionFetcher {
+/**
+ * 订阅 HTTP 下载。
+ * - User-Agent 由调用方注入（典型 `ClashMetaForAndroid/{version}` —— 订阅服务白名单匹配）
+ * - 强制状态码与空 body 检查 → 抛 [ImportError]
+ * - 不在客户端转换格式，原始 YAML 直接交给 mihomo 解析（V2Ray base64 订阅须由用户用 proxy-providers 引用）
+ */
+class SubscriptionFetcher(private val userAgent: String) {
 
-    private val client = HttpClient()
+    private val client = HttpClient {
+        install(HttpTimeout) {
+            connectTimeoutMillis = 30_000
+            requestTimeoutMillis = 60_000
+            socketTimeoutMillis = 60_000
+        }
+    }
 
     /**
      * 下载订阅配置并返回更新后的 Subscription 信息和配置内容。
      */
     suspend fun fetch(subscription: Subscription): FetchResult {
         val response: HttpResponse = client.get(subscription.url) {
-            header("User-Agent", "clash.meta")
+            header("User-Agent", userAgent)
         }
 
-        val rawContent = response.bodyAsText()
-
-        // 检测 V2Ray 格式并转换为 mihomo YAML
-        val configContent = if (V2RayConverter.isV2RaySubscription(rawContent)) {
-            V2RayConverter.convert(rawContent)
-        } else {
-            rawContent
+        if (!response.status.isSuccess()) {
+            throw ImportError.HttpStatus(response.status.value, response.status.description)
         }
+
+        val configContent = response.bodyAsText()
+        if (configContent.isBlank()) throw ImportError.EmptyBody()
 
         // 解析 subscription-userinfo 头
         // 格式: upload=xxx; download=xxx; total=xxx; expire=xxx
@@ -76,23 +87,12 @@ class SubscriptionFetcher {
     }
 
     /**
-     * 解析数值，处理浮点数（只取整数部分，参考 CMFA）
+     * 解析数值，处理浮点数（只取整数部分）
      */
     private fun parseNumericValue(value: String): Long? {
         if (value.isBlank()) return null
-        // 移除小数部分
         val intPart = value.split(".").first()
         return intPart.toLongOrNull()
-    }
-
-    /**
-     * 下载指定 URL 的内容并返回字节数组，供 ConfigProcessor 预下载 provider 使用。
-     */
-    suspend fun downloadBytes(url: String): ByteArray {
-        val response = client.get(url) {
-            header("User-Agent", "clash.meta")
-        }
-        return response.body()
     }
 
     fun close() {

@@ -7,7 +7,7 @@ import top.yukonga.mishka.platform.PlatformStorage
 import top.yukonga.mishka.platform.StorageKeys
 
 /**
- * 自动重启接收器（对齐 CMFA RestartReceiver）。
+ * 开机/升级自动重启接收器。
  *
  * 监听开机和应用升级事件，如果上次代理正在运行则自动重启。
  * 开关通过 BootStartManager 控制本 Receiver 的 enabled/disabled 状态，
