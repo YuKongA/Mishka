@@ -251,6 +251,7 @@
     <string name="root_tether_scan_scanning">Scanning...</string>
     <string name="root_tether_scan_empty">No active hotspot interface detected</string>
     <string name="root_tether_scan_result_title">Detected interfaces</string>
+    <string name="root_tether_tproxy_unavailable_warning">Kernel lacks xt_TPROXY module. Running in fallback path (slower, connections still work). Use a kernel with xt_TPROXY for native TPROXY performance.</string>
     <string name="root_tproxy_tether_note">TPROXY mode proxies all hotspot traffic via kernel rules; no Bypass/Through toggle needed.</string>
     <string name="root_tun_jumbo_mtu_title">Jumbo MTU &amp; GSO</string>
     <string name="root_tun_jumbo_mtu_summary">Large-packet aggregation (mtu=9000, gso=on) reduces per-packet syscalls for throughput. Disable if the upstream link drops fragmented traffic.</string>

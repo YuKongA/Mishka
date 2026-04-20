@@ -66,6 +66,10 @@ object RootTetherHijacker {
     // 仅打 fwmark + ACCEPT，跳过后面的 TPROXY 目标，避免每包重复 socket lookup
     private const val CHAIN_DIVERT_NAME = "mishka_tether_divert"
 
+    // xt_comment 前缀：所有 iptables 规则都打此标签，teardown 精度与第三方模块共存
+    // 隔离靠它兜底（grep "mishka:tether:" 即可判定是否为 Mishka 所加）
+    internal const val COMMENT_TAG_PREFIX = "mishka:tether:"
+
     const val DEFAULT_IFACES = "wlan1,wlan2"
 
     enum class Mode(val storageValue: String) {
@@ -164,15 +168,15 @@ object RootTetherHijacker {
         // 2. DIVERT 子链：ESTABLISHED 流快速通道（MARK + ACCEPT 终止本链匹配）
         sb.appendLine("# === 2. DIVERT chain (fast path for ESTABLISHED) ===")
         for (bin in listOf("iptables", "ip6tables")) {
-            sb.appendLine("$bin -w -t mangle -A $CHAIN_DIVERT_NAME -j MARK --set-xmark $TPROXY_MARK/$TPROXY_MASK")
-            sb.appendLine("$bin -w -t mangle -A $CHAIN_DIVERT_NAME -j ACCEPT")
+            sb.appendLine("$bin -w -t mangle -A $CHAIN_DIVERT_NAME -j MARK --set-xmark $TPROXY_MARK/$TPROXY_MASK ${tag("divert-mark")}")
+            sb.appendLine("$bin -w -t mangle -A $CHAIN_DIVERT_NAME -j ACCEPT ${tag("divert-accept")}")
         }
 
         // 3a. 主链头部：丢弃 conntrack INVALID 包（协议栈异常 / 序列号乱跳 / 校验失败），
         //     避免无效包浪费下游 -m socket 查询与 TPROXY 目标匹配
         sb.appendLine("# === 3a. drop INVALID ===")
         for (bin in listOf("iptables", "ip6tables")) {
-            sb.appendLine("$bin -w -t mangle -A $CHAIN_NAME -m conntrack --ctstate INVALID -j DROP 2>/dev/null")
+            sb.appendLine("$bin -w -t mangle -A $CHAIN_NAME -m conntrack --ctstate INVALID -j DROP ${tag("invalid-drop")} 2>/dev/null")
         }
 
         // 3. 主链头部：intranet RETURN（除 UDP/53 外）
@@ -180,19 +184,19 @@ object RootTetherHijacker {
         //    直接跳出，不进 DIVERT / TPROXY。DNS 留给 TPROXY 让 mihomo 处理 fake-ip。
         sb.appendLine("# === 3. intranet RETURN (except UDP/53) ===")
         for (net in IptablesIntranet.V4) {
-            sb.appendLine("iptables -w -t mangle -A $CHAIN_NAME -d $net -p udp ! --dport 53 -j RETURN")
-            sb.appendLine("iptables -w -t mangle -A $CHAIN_NAME -d $net ! -p udp -j RETURN")
+            sb.appendLine("iptables -w -t mangle -A $CHAIN_NAME -d $net -p udp ! --dport 53 -j RETURN ${tag("intranet-v4")}")
+            sb.appendLine("iptables -w -t mangle -A $CHAIN_NAME -d $net ! -p udp -j RETURN ${tag("intranet-v4")}")
         }
         for (net in IptablesIntranet.V6) {
-            sb.appendLine("ip6tables -w -t mangle -A $CHAIN_NAME -d $net -p udp ! --dport 53 -j RETURN 2>/dev/null")
-            sb.appendLine("ip6tables -w -t mangle -A $CHAIN_NAME -d $net ! -p udp -j RETURN 2>/dev/null")
+            sb.appendLine("ip6tables -w -t mangle -A $CHAIN_NAME -d $net -p udp ! --dport 53 -j RETURN ${tag("intranet-v6")} 2>/dev/null")
+            sb.appendLine("ip6tables -w -t mangle -A $CHAIN_NAME -d $net ! -p udp -j RETURN ${tag("intranet-v6")} 2>/dev/null")
         }
 
         // 4. 已有 socket → DIVERT（跳过 TPROXY 重拦截）
         sb.appendLine("# === 4. established socket → DIVERT ===")
         for (bin in listOf("iptables", "ip6tables")) {
-            sb.appendLine("$bin -w -t mangle -A $CHAIN_NAME -p tcp -m socket -j $CHAIN_DIVERT_NAME")
-            sb.appendLine("$bin -w -t mangle -A $CHAIN_NAME -p udp -m socket -j $CHAIN_DIVERT_NAME")
+            sb.appendLine("$bin -w -t mangle -A $CHAIN_NAME -p tcp -m socket -j $CHAIN_DIVERT_NAME ${tag("divert-match-tcp")}")
+            sb.appendLine("$bin -w -t mangle -A $CHAIN_NAME -p udp -m socket -j $CHAIN_DIVERT_NAME ${tag("divert-match-udp")}")
         }
 
         // 5. 新连接 → TPROXY 到 mihomo tproxy-port
@@ -200,11 +204,11 @@ object RootTetherHijacker {
         for (proto in listOf("tcp", "udp")) {
             sb.appendLine(
                 "iptables -w -t mangle -A $CHAIN_NAME -p $proto -j TPROXY " +
-                        "--on-ip 127.0.0.1 --on-port $TPROXY_PORT --tproxy-mark $TPROXY_MARK/$TPROXY_MASK"
+                        "--on-ip 127.0.0.1 --on-port $TPROXY_PORT --tproxy-mark $TPROXY_MARK/$TPROXY_MASK ${tag("tproxy-$proto")}"
             )
             sb.appendLine(
                 "ip6tables -w -t mangle -A $CHAIN_NAME -p $proto -j TPROXY " +
-                        "--on-ip ::1 --on-port $TPROXY_PORT --tproxy-mark $TPROXY_MARK/$TPROXY_MASK 2>/dev/null"
+                        "--on-ip ::1 --on-port $TPROXY_PORT --tproxy-mark $TPROXY_MARK/$TPROXY_MASK ${tag("tproxy-$proto-v6")} 2>/dev/null"
             )
         }
 
@@ -212,8 +216,8 @@ object RootTetherHijacker {
         sb.appendLine("# === 6. attach PREROUTING per tether iface ===")
         for (iface in interfaces) {
             val esc = RootHelper.escapeShellSingleQuoted(iface)
-            sb.appendLine("iptables -w -t mangle -A PREROUTING -i $esc -j $CHAIN_NAME")
-            sb.appendLine("ip6tables -w -t mangle -A PREROUTING -i $esc -j $CHAIN_NAME 2>/dev/null")
+            sb.appendLine("iptables -w -t mangle -A PREROUTING -i $esc -j $CHAIN_NAME ${tag("prejump")}")
+            sb.appendLine("ip6tables -w -t mangle -A PREROUTING -i $esc -j $CHAIN_NAME ${tag("prejump-v6")} 2>/dev/null")
         }
 
         // 7. 策略路由：fwmark → 专用表；表里声明整个地址空间为 local → 内核在 PREROUTING
@@ -441,14 +445,26 @@ object RootTetherHijacker {
      * 已丢"，attach 路径应当 re-apply；全部存在则 skip 重建，避免不必要的 teardown+apply。
      */
     fun anyRulesPresent(): Boolean {
+        // TPROXY 路径优先按 xt_comment 扫描（精度最高，可从第三方模块的同 priority 规则中
+        // 精确区分出 Mishka 自身的规则）
+        val mangle4 = runWithOutput("iptables -t mangle -S").output
+        if (mangle4.contains(COMMENT_TAG_PREFIX) || mangle4.contains(CHAIN_NAME)) return true
+        val mangle6 = runWithOutput("ip6tables -t mangle -S").output
+        if (mangle6.contains(COMMENT_TAG_PREFIX) || mangle6.contains(CHAIN_NAME)) return true
+        // BYPASS / PROXY-fallback 不走 iptables，只靠 ip rule；priority 属 Mishka 独占区间
         val v4Rules = runWithOutput("ip rule show").output
         if (v4Rules.lineSequence().any { it.startsWith("$PRIORITY_V4:") || it.startsWith("$PRIORITY_FWMARK:") }) {
             return true
         }
-        val mangle4 = runWithOutput("iptables -t mangle -S").output
-        if (mangle4.contains(CHAIN_NAME)) return true
         return false
     }
+
+    /**
+     * 生成 `-m comment --comment "mishka:tether:<tag>"` 片段；追加到 iptables 命令末尾。
+     * sh 双引号解析后 iptables 收到单个 arg `mishka:tether:<tag>`，与 teardown 侧的
+     * 逐行 -S → -D 反向构造兼容（`-m comment --comment` 作为规则一部分随同删除）。
+     */
+    private fun tag(label: String): String = "-m comment --comment \"$COMMENT_TAG_PREFIX$label\""
 
     /** 启动代理后 dump 一次完整路由状态，便于诊断"规则加了但没生效"类问题。 */
     private fun dumpState() {

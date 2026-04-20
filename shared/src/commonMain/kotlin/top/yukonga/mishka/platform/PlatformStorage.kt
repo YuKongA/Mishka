@@ -50,6 +50,10 @@ object StorageKeys {
     // 默认 false → 先 probe anyRulesPresent()，规则齐全则 skip re-apply（避免无谓 teardown+apply）；
     // true → 强制 re-apply，兼容"第三方模块清掉过规则"的偏执场景，诊断用
     const val ROOT_ATTACH_FORCE_REAPPLY = "root_attach_force_reapply"
+    // 上次启动时探测 xt_TPROXY 的结果（"true"/"false"/""），仅在 PROXY 或 ROOT TPROXY
+    // 路径下有值。UI 读取此 key 决定是否显示「内核不支持 TPROXY，已降级」告警。
+    // 空串表示「不适用」（BYPASS 模式 / 未启动过 PROXY）。
+    const val ROOT_TPROXY_KERNEL_CAPABLE = "root_tproxy_kernel_capable"
 
     // 通用设置
     const val DARK_MODE = "dark_mode"

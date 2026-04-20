@@ -225,13 +225,17 @@ class MishkaRootService : Service() {
             }
 
             // 3.3 TPROXY submode 需要内核支持 xt_TPROXY；不具备时直接失败，不做静默降级
-            if (submode == Submode.Tproxy && !RootTproxyApplier.probeTproxySupport()) {
-                Log.e(TAG, "xt_TPROXY unsupported, cannot start ROOT TPROXY mode")
-                ProxyServiceBridge.updateState(
-                    ProxyServiceStatus(ProxyState.Error, errorMessage = getString(R.string.error_tproxy_unsupported), tunMode = tunMode)
-                )
-                stopSelf()
-                return@launch
+            if (submode == Submode.Tproxy) {
+                if (!RootTproxyApplier.probeTproxySupport()) {
+                    storage.putString(StorageKeys.ROOT_TPROXY_KERNEL_CAPABLE, "false")
+                    Log.e(TAG, "xt_TPROXY unsupported, cannot start ROOT TPROXY mode")
+                    ProxyServiceBridge.updateState(
+                        ProxyServiceStatus(ProxyState.Error, errorMessage = getString(R.string.error_tproxy_unsupported), tunMode = tunMode)
+                    )
+                    stopSelf()
+                    return@launch
+                }
+                storage.putString(StorageKeys.ROOT_TPROXY_KERNEL_CAPABLE, "true")
             }
 
             // 3.5 准备 runtime/{uuid}/ 沙箱：从 imported/{uuid}/ 复制，mihomo 在此以 root 写入
@@ -261,12 +265,20 @@ class MishkaRootService : Service() {
                 ?: subscriptionId?.let { ConfigGenerator.readSubscriptionSecret(this@MishkaRootService, it) }
                 ?: ConfigGenerator.generateSecret()
             val extCtl = userOverride.resolveExternalController()
-            // 仅 TUN submode 且用户选 PROXY 时才探测 xt_TPROXY 为 RootTetherHijacker 开 tproxy-port 入站
-            val tproxyForTether = submode == Submode.Tun &&
-                tetherModeRequested == RootTetherHijacker.Mode.PROXY.storageValue &&
-                RootTetherHijacker.probeTproxySupport().also { supported ->
-                    if (!supported) Log.w(TAG, "xt_TPROXY unavailable, PROXY degraded to userspace TUN")
-                }
+            // 仅 TUN submode 且用户选 PROXY 时才探测 xt_TPROXY 为 RootTetherHijacker 开 tproxy-port 入站；
+            // 探测结果同步写入 StorageKeys.ROOT_TPROXY_KERNEL_CAPABLE，UI 据此决定是否显示降级告警
+            val userWantsProxy = submode == Submode.Tun &&
+                tetherModeRequested == RootTetherHijacker.Mode.PROXY.storageValue
+            val tproxyForTether = if (userWantsProxy) {
+                val supported = RootTetherHijacker.probeTproxySupport()
+                if (!supported) Log.w(TAG, "xt_TPROXY unavailable, PROXY degraded to userspace TUN")
+                storage.putString(StorageKeys.ROOT_TPROXY_KERNEL_CAPABLE, if (supported) "true" else "false")
+                supported
+            } else {
+                // 非 PROXY 路径没有理由在 UI 里显示 TPROXY 相关告警，清空状态
+                storage.putString(StorageKeys.ROOT_TPROXY_KERNEL_CAPABLE, "")
+                false
+            }
             val overrideFile = RuntimeOverrideBuilder.buildAndWriteForRun(
                 context = this@MishkaRootService,
                 userOverride = userOverride,

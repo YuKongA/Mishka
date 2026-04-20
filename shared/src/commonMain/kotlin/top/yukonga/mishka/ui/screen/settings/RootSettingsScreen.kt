@@ -37,6 +37,7 @@ import mishka.shared.generated.resources.root_tether_ifaces_title
 import mishka.shared.generated.resources.root_tether_mode_bypass
 import mishka.shared.generated.resources.root_tether_mode_proxy
 import mishka.shared.generated.resources.root_tether_mode_title
+import mishka.shared.generated.resources.root_tether_tproxy_unavailable_warning
 import mishka.shared.generated.resources.root_tproxy_tether_note
 import mishka.shared.generated.resources.root_tun_jumbo_mtu_summary
 import mishka.shared.generated.resources.root_tun_jumbo_mtu_title
@@ -49,6 +50,7 @@ import top.yukonga.mishka.ui.component.TetherInterfaceEditDialog
 import top.yukonga.mishka.ui.component.tetherInterfaceSummary
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Card
+import top.yukonga.miuix.kmp.basic.CardDefaults
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
@@ -111,6 +113,10 @@ fun RootSettingsScreen(
     // （用户改 TUN_MODE 必须先停代理，不需要热更新）
     val isTproxy = storage.getString(StorageKeys.TUN_MODE, "vpn") == "root_tproxy"
 
+    // xt_TPROXY 内核能力探测结果，仅在 TPROXY submode 或 PROXY 热点模式下显示告警
+    val tproxyCapable = storage.getString(StorageKeys.ROOT_TPROXY_KERNEL_CAPABLE, "")
+    val showTproxyWarning = tproxyCapable == "false" && (isTproxy || tetherMode == "proxy")
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -169,6 +175,23 @@ fun RootSettingsScreen(
                 }
             }
             item { SmallTitle(text = stringResource(Res.string.root_section_tether)) }
+            if (showTproxyWarning) {
+                item {
+                    Card(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp).padding(bottom = 12.dp),
+                        colors = CardDefaults.defaultColors(
+                            color = MiuixTheme.colorScheme.errorContainer,
+                            contentColor = MiuixTheme.colorScheme.onErrorContainer,
+                        ),
+                    ) {
+                        Text(
+                            text = stringResource(Res.string.root_tether_tproxy_unavailable_warning),
+                            fontSize = 13.sp,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                        )
+                    }
+                }
+            }
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp).padding(bottom = 12.dp),

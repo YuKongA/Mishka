@@ -49,6 +49,13 @@ object RootTproxyApplier {
     private const val CHAIN_DNS_PRE = "mishka_dns_pre"
     private const val CHAIN_DNS_OUT = "mishka_dns_out"
 
+    // xt_comment 前缀：所有 iptables 规则都打此标签，便于 [anyRulesPresent] 精确探测
+    // 以及与第三方代理模块（box_for_magisk / CFMA 等）共存时的诊断
+    internal const val COMMENT_TAG_PREFIX = "mishka:tproxy:"
+
+    /** 生成 `-m comment --comment "mishka:tproxy:<label>"` 片段；追加到 iptables 命令末尾。 */
+    private fun tag(label: String): String = "-m comment --comment \"$COMMENT_TAG_PREFIX$label\""
+
     /**
      * 探测 xt_TPROXY 支持。复用 [RootTetherHijacker.probeTproxySupport]。
      */
@@ -91,8 +98,11 @@ object RootTproxyApplier {
      * exit 0 表示存在、1 表示不存在、其他为 shell/su 错误（保守当作"存在"避免误清）。
      */
     fun anyRulesPresent(): Boolean {
+        // 优先 xt_comment 扫描（精度最高），次选 chain 名，最后 priority anchor
         val script = """
             #!/system/bin/sh
+            iptables -t mangle -S 2>/dev/null | grep -q '$COMMENT_TAG_PREFIX' && exit 0
+            iptables -t nat    -S 2>/dev/null | grep -q '$COMMENT_TAG_PREFIX' && exit 0
             iptables -t mangle -S 2>/dev/null | grep -q '$CHAIN_PRE' && exit 0
             iptables -t mangle -S 2>/dev/null | grep -q '$CHAIN_OUT' && exit 0
             ip rule show 2>/dev/null | grep -q '^$PRIORITY:' && exit 0
@@ -137,33 +147,33 @@ object RootTproxyApplier {
         sb.appendLine()
         sb.appendLine("# === 3. DIVERT chain: ESTABLISHED 流快速通道 (MARK + ACCEPT) ===")
         for (t in TABLES) {
-            sb.appendLine("$t -w -t mangle -A $CHAIN_DIVERT -j MARK --set-xmark $MARK/$MASK")
-            sb.appendLine("$t -w -t mangle -A $CHAIN_DIVERT -j ACCEPT")
+            sb.appendLine("$t -w -t mangle -A $CHAIN_DIVERT -j MARK --set-xmark $MARK/$MASK ${tag("divert-mark")}")
+            sb.appendLine("$t -w -t mangle -A $CHAIN_DIVERT -j ACCEPT ${tag("divert-accept")}")
         }
 
         sb.appendLine()
         sb.appendLine("# === 4. PREROUTING 主链 (intranet RETURN + LOCAL RETURN + DIVERT + TPROXY) ===")
-        appendIntranetReturns(sb, table = "mangle", chain = CHAIN_PRE)
+        appendIntranetReturns(sb, table = "mangle", chain = CHAIN_PRE, tagLabel = "pre-intranet")
         // 本机接口任一 IP 为 dst 的包：RETURN（mihomo API、系统服务、dns.listen 等本地监听都要放行，避免劫持）
-        sb.appendLine("iptables  -w -t mangle -A $CHAIN_PRE -m addrtype --dst-type LOCAL -j RETURN")
-        sb.appendLine("ip6tables -w -t mangle -A $CHAIN_PRE -m addrtype --dst-type LOCAL -j RETURN 2>/dev/null")
+        sb.appendLine("iptables  -w -t mangle -A $CHAIN_PRE -m addrtype --dst-type LOCAL -j RETURN ${tag("pre-local")}")
+        sb.appendLine("ip6tables -w -t mangle -A $CHAIN_PRE -m addrtype --dst-type LOCAL -j RETURN ${tag("pre-local-v6")} 2>/dev/null")
         // DIVERT：已有 mihomo accepted socket 的后续包（ESTABLISHED TCP 或复用 UDP socket）跳过 TPROXY，
         // 仅打 mark 让 fwmark 路由命中 table 2024 投递 socket；避免 TPROXY 重复拦截造成连接中断
         for (t in TABLES) {
-            sb.appendLine("$t -w -t mangle -A $CHAIN_PRE -p tcp -m socket -j $CHAIN_DIVERT")
-            sb.appendLine("$t -w -t mangle -A $CHAIN_PRE -p udp -m socket -j $CHAIN_DIVERT")
+            sb.appendLine("$t -w -t mangle -A $CHAIN_PRE -p tcp -m socket -j $CHAIN_DIVERT ${tag("pre-divert-tcp")}")
+            sb.appendLine("$t -w -t mangle -A $CHAIN_PRE -p udp -m socket -j $CHAIN_DIVERT ${tag("pre-divert-udp")}")
         }
         // lo TPROXY：OUTPUT 打 mark 后经 `local default dev lo` reinject，命中这里 attach mihomo socket
         for (proto in listOf("tcp", "udp")) {
-            sb.appendLine("iptables  -w -t mangle -A $CHAIN_PRE -p $proto -i lo -j TPROXY --on-ip 127.0.0.1 --on-port $TPROXY_PORT --tproxy-mark $MARK/$MASK")
-            sb.appendLine("ip6tables -w -t mangle -A $CHAIN_PRE -p $proto -i lo -j TPROXY --on-ip ::1 --on-port $TPROXY_PORT --tproxy-mark $MARK/$MASK 2>/dev/null")
+            sb.appendLine("iptables  -w -t mangle -A $CHAIN_PRE -p $proto -i lo -j TPROXY --on-ip 127.0.0.1 --on-port $TPROXY_PORT --tproxy-mark $MARK/$MASK ${tag("pre-tproxy-lo-$proto")}")
+            sb.appendLine("ip6tables -w -t mangle -A $CHAIN_PRE -p $proto -i lo -j TPROXY --on-ip ::1 --on-port $TPROXY_PORT --tproxy-mark $MARK/$MASK ${tag("pre-tproxy-lo-$proto-v6")} 2>/dev/null")
         }
         // tether ifaces：热点客户端转发流量直接 TPROXY
         for (iface in tetherIfaces) {
             val esc = RootHelper.escapeShellSingleQuoted(iface)
             for (proto in listOf("tcp", "udp")) {
-                sb.appendLine("iptables  -w -t mangle -A $CHAIN_PRE -p $proto -i $esc -j TPROXY --on-ip 127.0.0.1 --on-port $TPROXY_PORT --tproxy-mark $MARK/$MASK")
-                sb.appendLine("ip6tables -w -t mangle -A $CHAIN_PRE -p $proto -i $esc -j TPROXY --on-ip ::1 --on-port $TPROXY_PORT --tproxy-mark $MARK/$MASK 2>/dev/null")
+                sb.appendLine("iptables  -w -t mangle -A $CHAIN_PRE -p $proto -i $esc -j TPROXY --on-ip 127.0.0.1 --on-port $TPROXY_PORT --tproxy-mark $MARK/$MASK ${tag("pre-tproxy-tether-$proto")}")
+                sb.appendLine("ip6tables -w -t mangle -A $CHAIN_PRE -p $proto -i $esc -j TPROXY --on-ip ::1 --on-port $TPROXY_PORT --tproxy-mark $MARK/$MASK ${tag("pre-tproxy-tether-$proto-v6")} 2>/dev/null")
             }
         }
 
@@ -172,20 +182,20 @@ object RootTproxyApplier {
         for (t in TABLES) {
             // 5a. root 进程放行：mihomo 以 uid=0 (via su) 运行，必须排除否则死循环；
             //      顺带放行所有 root 工具（adbd / shell 等），是 box_for_magisk 系的常见取舍
-            sb.appendLine("$t -w -t mangle -A $CHAIN_OUT -m owner --uid-owner $MIHOMO_BYPASS_UID -j RETURN")
+            sb.appendLine("$t -w -t mangle -A $CHAIN_OUT -m owner --uid-owner $MIHOMO_BYPASS_UID -j RETURN ${tag("out-bypass-root")}")
             // 5b. Mishka 自身 app uid 兜底（非必要但多层防御）
             if (appUid != MIHOMO_BYPASS_UID) {
-                sb.appendLine("$t -w -t mangle -A $CHAIN_OUT -m owner --uid-owner $appUid -j RETURN")
+                sb.appendLine("$t -w -t mangle -A $CHAIN_OUT -m owner --uid-owner $appUid -j RETURN ${tag("out-bypass-self")}")
             }
             // 5c. 本机地址 / 广播 RETURN（curl localhost / mDNS / DHCP 等，不劫持）
-            sb.appendLine("$t -w -t mangle -A $CHAIN_OUT -m addrtype --dst-type LOCAL -j RETURN")
-            sb.appendLine("$t -w -t mangle -A $CHAIN_OUT -m addrtype --dst-type BROADCAST -j RETURN")
+            sb.appendLine("$t -w -t mangle -A $CHAIN_OUT -m addrtype --dst-type LOCAL -j RETURN ${tag("out-local")}")
+            sb.appendLine("$t -w -t mangle -A $CHAIN_OUT -m addrtype --dst-type BROADCAST -j RETURN ${tag("out-broadcast")}")
             // 5d. DNS 交由 nat chain 处理
-            sb.appendLine("$t -w -t mangle -A $CHAIN_OUT -p udp --dport 53 -j RETURN")
-            sb.appendLine("$t -w -t mangle -A $CHAIN_OUT -p tcp --dport 53 -j RETURN")
+            sb.appendLine("$t -w -t mangle -A $CHAIN_OUT -p udp --dport 53 -j RETURN ${tag("out-dns-udp")}")
+            sb.appendLine("$t -w -t mangle -A $CHAIN_OUT -p tcp --dport 53 -j RETURN ${tag("out-dns-tcp")}")
         }
         // 5d. 局域网 RETURN
-        appendIntranetReturns(sb, table = "mangle", chain = CHAIN_OUT)
+        appendIntranetReturns(sb, table = "mangle", chain = CHAIN_OUT, tagLabel = "out-intranet")
 
         // 5d. 按 AppProxyMode 打 mark
         sb.appendLine("# --- AppProxyMode: $mode ---")
@@ -194,7 +204,7 @@ object RootTproxyApplier {
                 // 全局代理，appUid 上面已经 RETURN
                 for (t in TABLES) {
                     for (proto in listOf("tcp", "udp")) {
-                        sb.appendLine("$t -w -t mangle -A $CHAIN_OUT -p $proto -j MARK --set-xmark $MARK/$MASK")
+                        sb.appendLine("$t -w -t mangle -A $CHAIN_OUT -p $proto -j MARK --set-xmark $MARK/$MASK ${tag("out-mark-$proto")}")
                     }
                 }
             }
@@ -205,7 +215,7 @@ object RootTproxyApplier {
                     if (uid == appUid) continue // 避免覆盖 5a 的自绕
                     for (t in TABLES) {
                         for (proto in listOf("tcp", "udp")) {
-                            sb.appendLine("$t -w -t mangle -A $CHAIN_OUT -p $proto -m owner --uid-owner $uid -j MARK --set-xmark $MARK/$MASK")
+                            sb.appendLine("$t -w -t mangle -A $CHAIN_OUT -p $proto -m owner --uid-owner $uid -j MARK --set-xmark $MARK/$MASK ${tag("out-mark-uid-$proto")}")
                         }
                     }
                 }
@@ -215,12 +225,12 @@ object RootTproxyApplier {
                 // 黑名单 UID RETURN，其余全代理
                 for (uid in selectedUids) {
                     for (t in TABLES) {
-                        sb.appendLine("$t -w -t mangle -A $CHAIN_OUT -m owner --uid-owner $uid -j RETURN")
+                        sb.appendLine("$t -w -t mangle -A $CHAIN_OUT -m owner --uid-owner $uid -j RETURN ${tag("out-deny-uid")}")
                     }
                 }
                 for (t in TABLES) {
                     for (proto in listOf("tcp", "udp")) {
-                        sb.appendLine("$t -w -t mangle -A $CHAIN_OUT -p $proto -j MARK --set-xmark $MARK/$MASK")
+                        sb.appendLine("$t -w -t mangle -A $CHAIN_OUT -p $proto -j MARK --set-xmark $MARK/$MASK ${tag("out-mark-$proto")}")
                     }
                 }
             }
@@ -229,29 +239,32 @@ object RootTproxyApplier {
         sb.appendLine()
         sb.appendLine("# === 6. DNS 劫持 (nat REDIRECT to mihomo dns.listen) ===")
         // PREROUTING 仅对 tether 转发流量生效；本机流量不经 PREROUTING nat，不会循环
-        sb.appendLine("iptables  -w -t nat -A $CHAIN_DNS_PRE -p udp --dport 53 -j REDIRECT --to-ports $DNS_PORT")
-        sb.appendLine("iptables  -w -t nat -A $CHAIN_DNS_PRE -p tcp --dport 53 -j REDIRECT --to-ports $DNS_PORT")
-        sb.appendLine("ip6tables -w -t nat -A $CHAIN_DNS_PRE -p udp --dport 53 -j REDIRECT --to-ports $DNS_PORT 2>/dev/null")
-        sb.appendLine("ip6tables -w -t nat -A $CHAIN_DNS_PRE -p tcp --dport 53 -j REDIRECT --to-ports $DNS_PORT 2>/dev/null")
+        sb.appendLine("iptables  -w -t nat -A $CHAIN_DNS_PRE -p udp --dport 53 -j REDIRECT --to-ports $DNS_PORT ${tag("dns-pre-udp")}")
+        sb.appendLine("iptables  -w -t nat -A $CHAIN_DNS_PRE -p tcp --dport 53 -j REDIRECT --to-ports $DNS_PORT ${tag("dns-pre-tcp")}")
+        sb.appendLine("ip6tables -w -t nat -A $CHAIN_DNS_PRE -p udp --dport 53 -j REDIRECT --to-ports $DNS_PORT ${tag("dns-pre-udp-v6")} 2>/dev/null")
+        sb.appendLine("ip6tables -w -t nat -A $CHAIN_DNS_PRE -p tcp --dport 53 -j REDIRECT --to-ports $DNS_PORT ${tag("dns-pre-tcp-v6")} 2>/dev/null")
 
         // OUTPUT 自绕顺序：root 进程（mihomo via su）优先 RETURN，mishka app uid 兜底；
         // 不放行会导致 mihomo 自己解析代理服务器域名时被重定向回自己 → 死循环 → 全网无法解析
-        sb.appendLine("iptables  -w -t nat -A $CHAIN_DNS_OUT -m owner --uid-owner $MIHOMO_BYPASS_UID -j RETURN")
+        sb.appendLine("iptables  -w -t nat -A $CHAIN_DNS_OUT -m owner --uid-owner $MIHOMO_BYPASS_UID -j RETURN ${tag("dns-out-bypass-root")}")
         if (appUid != MIHOMO_BYPASS_UID) {
-            sb.appendLine("iptables  -w -t nat -A $CHAIN_DNS_OUT -m owner --uid-owner $appUid -j RETURN")
+            sb.appendLine("iptables  -w -t nat -A $CHAIN_DNS_OUT -m owner --uid-owner $appUid -j RETURN ${tag("dns-out-bypass-self")}")
         }
-        sb.appendLine("iptables  -w -t nat -A $CHAIN_DNS_OUT -p udp --dport 53 -j REDIRECT --to-ports $DNS_PORT")
-        sb.appendLine("iptables  -w -t nat -A $CHAIN_DNS_OUT -p tcp --dport 53 -j REDIRECT --to-ports $DNS_PORT")
-        sb.appendLine("ip6tables -w -t nat -A $CHAIN_DNS_OUT -m owner --uid-owner $MIHOMO_BYPASS_UID -j RETURN 2>/dev/null")
+        sb.appendLine("iptables  -w -t nat -A $CHAIN_DNS_OUT -p udp --dport 53 -j REDIRECT --to-ports $DNS_PORT ${tag("dns-out-udp")}")
+        sb.appendLine("iptables  -w -t nat -A $CHAIN_DNS_OUT -p tcp --dport 53 -j REDIRECT --to-ports $DNS_PORT ${tag("dns-out-tcp")}")
+        sb.appendLine("ip6tables -w -t nat -A $CHAIN_DNS_OUT -m owner --uid-owner $MIHOMO_BYPASS_UID -j RETURN ${tag("dns-out-bypass-root-v6")} 2>/dev/null")
         if (appUid != MIHOMO_BYPASS_UID) {
-            sb.appendLine("ip6tables -w -t nat -A $CHAIN_DNS_OUT -m owner --uid-owner $appUid -j RETURN 2>/dev/null")
+            sb.appendLine("ip6tables -w -t nat -A $CHAIN_DNS_OUT -m owner --uid-owner $appUid -j RETURN ${tag("dns-out-bypass-self-v6")} 2>/dev/null")
         }
-        sb.appendLine("ip6tables -w -t nat -A $CHAIN_DNS_OUT -p udp --dport 53 -j REDIRECT --to-ports $DNS_PORT 2>/dev/null")
-        sb.appendLine("ip6tables -w -t nat -A $CHAIN_DNS_OUT -p tcp --dport 53 -j REDIRECT --to-ports $DNS_PORT 2>/dev/null")
+        sb.appendLine("ip6tables -w -t nat -A $CHAIN_DNS_OUT -p udp --dport 53 -j REDIRECT --to-ports $DNS_PORT ${tag("dns-out-udp-v6")} 2>/dev/null")
+        sb.appendLine("ip6tables -w -t nat -A $CHAIN_DNS_OUT -p tcp --dport 53 -j REDIRECT --to-ports $DNS_PORT ${tag("dns-out-tcp-v6")} 2>/dev/null")
 
         sb.appendLine()
         sb.appendLine("# === 7. 挂主链 ===")
         // DIVERT 已在 CHAIN_PRE 内部（intranet RETURN 之后、TPROXY 之前），外层只挂 CHAIN_PRE
+        // 顶层 jump 不打 comment：teardown 的 `-D PREROUTING -j <chain>` 需要与 apply 时的
+        // 规则精确匹配，带 comment 的规则需要 `-D` 也带 comment 才能删掉；旧版遗留规则没有
+        // comment，这样设计避免升级场景的跨版本不兼容
         for (t in TABLES) {
             sb.appendLine("$t -w -t mangle -I PREROUTING -j $CHAIN_PRE")
             sb.appendLine("$t -w -t mangle -I OUTPUT -j $CHAIN_OUT")
@@ -312,14 +325,14 @@ object RootTproxyApplier {
      *
      * v4 严格（失败即 bug），v6 best-effort（部分 ROM v6 mangle 可能受限，失败静默）。
      */
-    private fun appendIntranetReturns(sb: StringBuilder, table: String, chain: String) {
+    private fun appendIntranetReturns(sb: StringBuilder, table: String, chain: String, tagLabel: String) {
         for (net in IptablesIntranet.V4) {
-            sb.appendLine("iptables -w -t $table -A $chain -d $net -p udp ! --dport 53 -j RETURN")
-            sb.appendLine("iptables -w -t $table -A $chain -d $net ! -p udp -j RETURN")
+            sb.appendLine("iptables -w -t $table -A $chain -d $net -p udp ! --dport 53 -j RETURN ${tag(tagLabel)}")
+            sb.appendLine("iptables -w -t $table -A $chain -d $net ! -p udp -j RETURN ${tag(tagLabel)}")
         }
         for (net in IptablesIntranet.V6) {
-            sb.appendLine("ip6tables -w -t $table -A $chain -d $net -p udp ! --dport 53 -j RETURN 2>/dev/null")
-            sb.appendLine("ip6tables -w -t $table -A $chain -d $net ! -p udp -j RETURN 2>/dev/null")
+            sb.appendLine("ip6tables -w -t $table -A $chain -d $net -p udp ! --dport 53 -j RETURN ${tag("$tagLabel-v6")} 2>/dev/null")
+            sb.appendLine("ip6tables -w -t $table -A $chain -d $net ! -p udp -j RETURN ${tag("$tagLabel-v6")} 2>/dev/null")
         }
     }
 

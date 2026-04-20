@@ -251,6 +251,7 @@
     <string name="root_tether_scan_scanning">扫描中...</string>
     <string name="root_tether_scan_empty">未检测到活跃热点接口</string>
     <string name="root_tether_scan_result_title">检测到以下接口</string>
+    <string name="root_tether_tproxy_unavailable_warning">当前内核缺少 xt_TPROXY 模块，已降级为兼容路径（吞吐略差，连接仍可用）。如需原生 TPROXY 性能，请更换支持该模块的内核。</string>
     <string name="root_tproxy_tether_note">TPROXY 模式下所有热点流量由内核规则自动代理，无需切换「绕过 / 走代理」。</string>
     <string name="root_tun_jumbo_mtu_title">大 MTU 与 GSO</string>
     <string name="root_tun_jumbo_mtu_summary">大包聚合（mtu=9000、开启 gso）减少每包 syscall，提升吞吐。上游链路丢弃分片时可关闭。</string>
