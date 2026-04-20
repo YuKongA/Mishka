@@ -1,0 +1,58 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24"
+    android:tint="?android:attr/colorControlNormal">
+
+    <!-- 左竖线 -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M4,6h2v12h-2z" />
+
+    <!-- 左上→谷底 斜线 -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M5,6L12,13"
+        android:strokeWidth="2"
+        android:strokeColor="#FFFFFF"
+        android:strokeLineCap="round" />
+
+    <!-- 谷底→右上 斜线 -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M12,13L19,6"
+        android:strokeWidth="2"
+        android:strokeColor="#FFFFFF"
+        android:strokeLineCap="round" />
+
+    <!-- 右竖线 -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M18,6h2v12h-2z" />
+
+    <!-- 节点：左上 -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M5,6m-2,0a2,2 0,1 1,4 0a2,2 0,1 1,-4 0" />
+
+    <!-- 节点：左下 -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M5,18m-2,0a2,2 0,1 1,4 0a2,2 0,1 1,-4 0" />
+
+    <!-- 节点：谷底 -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M12,13m-2,0a2,2 0,1 1,4 0a2,2 0,1 1,-4 0" />
+
+    <!-- 节点：右上 -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M19,6m-2,0a2,2 0,1 1,4 0a2,2 0,1 1,-4 0" />
+
+    <!-- 节点：右下 -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M19,18m-2,0a2,2 0,1 1,4 0a2,2 0,1 1,-4 0" />
+</vector>
