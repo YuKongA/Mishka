@@ -229,6 +229,21 @@
     <string name="vpn_allow_ipv6">允许 IPv6</string>
     <string name="vpn_allow_ipv6_summary">通过 VPN 路由 IPv6 流量</string>
 
+    <!-- ROOT 模式 -->
+    <string name="root_settings_title">ROOT 设置</string>
+    <string name="root_settings_summary">TUN 设备名、热点客户端流量</string>
+    <string name="root_section_device">TUN 设备</string>
+    <string name="root_section_tether">热点</string>
+    <string name="root_tether_mode_title">热点客户端流量</string>
+    <string name="root_tether_mode_bypass">绕过代理</string>
+    <string name="root_tether_mode_proxy">走代理</string>
+    <string name="root_tether_ifaces_title">热点接口名</string>
+    <string name="root_tether_ifaces_hint">每行一条，例如 wlan2</string>
+    <string name="root_tether_scan">检测当前接口</string>
+    <string name="root_tether_scan_scanning">扫描中...</string>
+    <string name="root_tether_scan_empty">未检测到活跃热点接口</string>
+    <string name="root_tether_scan_result_title">检测到以下接口</string>
+
     <!-- Network Settings -->
     <string name="network_settings_title">覆写设置</string>
     <string name="network_proxy_ports">代理端口</string>

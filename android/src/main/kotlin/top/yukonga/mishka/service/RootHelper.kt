@@ -156,6 +156,26 @@ object RootHelper {
     }
 
     /**
+     * 以 root 身份执行 shell 命令，返回 exit code；超时/异常返回 -1。
+     * stderr 合并到 stdout 但不返回，仅用于 exit code 判定（如 `ip rule del` 循环直到非零）。
+     */
+    fun runAsRootReturnCode(command: String, timeoutSeconds: Long = 3): Int {
+        return try {
+            val process = ProcessBuilder("su", "-c", command)
+                .redirectErrorStream(true)
+                .start()
+            val exited = process.waitFor(timeoutSeconds, TimeUnit.SECONDS)
+            if (!exited) {
+                process.destroyForcibly()
+                return -1
+            }
+            process.exitValue()
+        } catch (_: Exception) {
+            -1
+        }
+    }
+
+    /**
      * 清理残留的 mihomo 进程（孤儿进程，非当前 App 子进程），可选带 TUN 清理。
      * 整个流程下沉到单次 su shell 执行，避免 Kotlin 侧 Thread.sleep 轮询 + 多次 su 调用的开销。
      *
@@ -216,7 +236,7 @@ object RootHelper {
      * POSIX shell 单引号转义：外层用单引号包裹，内部单引号替换为 `'\''`。
      * 防止用户可配置的 device name 注入命令（Settings 已有正则约束，此处是 defense in depth）。
      */
-    private fun escapeShellSingleQuoted(s: String): String =
+    internal fun escapeShellSingleQuoted(s: String): String =
         "'" + s.replace("'", "'\\''") + "'"
 
     /**

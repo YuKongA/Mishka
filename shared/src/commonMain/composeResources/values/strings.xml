@@ -229,6 +229,21 @@
     <string name="vpn_allow_ipv6">Allow IPv6</string>
     <string name="vpn_allow_ipv6_summary">Route IPv6 traffic through VPN</string>
 
+    <!-- ROOT Mode -->
+    <string name="root_settings_title">ROOT Settings</string>
+    <string name="root_settings_summary">TUN device name, hotspot client traffic</string>
+    <string name="root_section_device">TUN Device</string>
+    <string name="root_section_tether">Hotspot</string>
+    <string name="root_tether_mode_title">Hotspot client traffic</string>
+    <string name="root_tether_mode_bypass">Bypass proxy</string>
+    <string name="root_tether_mode_proxy">Through proxy</string>
+    <string name="root_tether_ifaces_title">Hotspot interfaces</string>
+    <string name="root_tether_ifaces_hint">One per line, e.g. wlan2</string>
+    <string name="root_tether_scan">Detect current interfaces</string>
+    <string name="root_tether_scan_scanning">Scanning...</string>
+    <string name="root_tether_scan_empty">No active hotspot interface detected</string>
+    <string name="root_tether_scan_result_title">Detected interfaces</string>
+
     <!-- Network Settings -->
     <string name="network_settings_title">Override Settings</string>
     <string name="network_proxy_ports">Proxy Ports</string>

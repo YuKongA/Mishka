@@ -22,6 +22,11 @@ object RuntimeOverrideBuilder {
     private const val FILE_NAME = "override.run.json"
     internal const val DEFAULT_TUN_DEVICE = "Mishka"
 
+    // ROOT 模式 sing-tun 路由常量，与 RootTetherHijacker 对齐
+    // sing-tun 默认值也是 2022 / 9000，此处显式注入避免上游默认值漂移
+    internal const val ROOT_TUN_TABLE = 2022
+    internal const val ROOT_TUN_RULE_INDEX = 9000
+
     private val json = Json {
         encodeDefaults = false
         explicitNulls = false
@@ -39,10 +44,14 @@ object RuntimeOverrideBuilder {
         userOverride: ConfigurationOverride,
         tunFd: Int,
         rootMode: Boolean,
+        tproxyForTether: Boolean = false,
     ): File {
         val merged = userOverride.copy(
             externalController = null,
             secret = null,
+            // ROOT + PROXY + xt_TPROXY 可用时强制开 mihomo tproxy 入站；
+            // 其他场景保留用户 override 里的 tproxyPort（默认 null）
+            tproxyPort = if (tproxyForTether) RootTetherHijacker.TPROXY_PORT else userOverride.tproxyPort,
             tun = buildTunOverride(context, rootMode, tunFd, userOverride.tun),
             profile = ProfileOverride(storeSelected = false, storeFakeIp = true),
         )
@@ -113,6 +122,8 @@ object RuntimeOverrideBuilder {
             dnsHijack = listOf("0.0.0.0:53"),
             includePackage = include,
             excludePackage = exclude,
+            iproute2TableIndex = if (rootMode) ROOT_TUN_TABLE else null,
+            iproute2RuleIndex = if (rootMode) ROOT_TUN_RULE_INDEX else null,
         )
     }
 

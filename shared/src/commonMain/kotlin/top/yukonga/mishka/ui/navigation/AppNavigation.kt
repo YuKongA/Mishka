@@ -63,6 +63,7 @@ import top.yukonga.mishka.ui.screen.settings.FileManagerEditorScreen
 import top.yukonga.mishka.ui.screen.settings.FileManagerScreen
 import top.yukonga.mishka.ui.screen.settings.MetaSettingsScreen
 import top.yukonga.mishka.ui.screen.settings.NetworkSettingsScreen
+import top.yukonga.mishka.ui.screen.settings.RootSettingsScreen
 import top.yukonga.mishka.ui.screen.settings.SettingsScreen
 import top.yukonga.mishka.ui.screen.settings.VpnSettingsScreen
 import top.yukonga.mishka.ui.screen.subscription.SubscriptionAddScreen
@@ -250,6 +251,16 @@ fun AppNavigation(
                     )
                 }
             }
+            entry<Route.RootSettings> {
+                storage?.let {
+                    val homeState = homeViewModel?.uiState?.collectAsState()?.value
+                    RootSettingsScreen(
+                        storage = it,
+                        isProxyRunning = homeState?.isRunning == true || homeState?.isStarting == true,
+                        onBack = { navigator.pop() },
+                    )
+                }
+            }
             entry<Route.NetworkSettings> {
                 overrideSettingsViewModel?.let {
                     NetworkSettingsScreen(
@@ -419,6 +430,7 @@ private fun MainPage(
                 3 -> SettingsScreen(
                     bottomPadding = bottomPadding,
                     onNavigateVpnSettings = { navigator.push(Route.VpnSettings) },
+                    onNavigateRootSettings = { navigator.push(Route.RootSettings) },
                     onNavigateNetworkSettings = { navigator.push(Route.NetworkSettings) },
                     onNavigateMetaSettings = { navigator.push(Route.MetaSettings) },
                     onNavigateExternalControl = { navigator.push(Route.ExternalControl) },

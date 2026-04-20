@@ -41,14 +41,14 @@ Mishka/
 │   │   ├── platform/                 expect 声明（含 Toast）+ ProfileFileManager 接口 + ProxyServiceBridge
 │   │   ├── ui/
 │   │   │   ├── navigation/           AppNavigation（主导航树 + HorizontalPager）
-│   │   │   ├── navigation3/          Route（17 路由）+ Navigator（自定义栈）
+│   │   │   ├── navigation3/          Route + Navigator（自定义栈）
 │   │   │   ├── component/            SearchBar + SearchStatus + MenuPositionProvider + TriStatePreference + NullablePortPreference + ListEditDialog + RestartRequiredHint
 │   │   │   │   └── effect/           BgEffectBackground（OS3 动态渐变着色器背景）
-│   │   │   └── screen/               19 个页面（home/ proxy/ subscription/ settings/ log/ provider/ dns/ connection/）
-│   │   ├── viewmodel/                9 个 ViewModel
+│   │   │   └── screen/               页面（home/ proxy/ subscription/ settings/ log/ provider/ dns/ connection/）
+│   │   ├── viewmodel/                ViewModel
 │   │   └── util/                     FormatUtils + ThrowableExt
 │   ├── commonMain/composeResources/
-│   │   ├── values/strings.xml        英文默认字符串（244 key）
+│   │   ├── values/strings.xml        英文默认字符串
 │   │   └── values-zh-rCN/strings.xml 中文字符串
 │   ├── androidMain/                  actual 实现 + AppDatabaseBuilder
 │   └── desktopMain/                  actual 桩实现 + AppDatabaseBuilder
@@ -56,7 +56,7 @@ Mishka/
 │   ├── kotlin/.../mishka/
 │   │   ├── MainActivity.kt           应用入口
 │   │   ├── MishkaApplication.kt      全局初始化（通知渠道 + GeoIP 提取 + 预测性返回手势 + 旧 root 文件 chown 迁移）
-│   │   └── service/                  17 个服务组件（含 ROOT 模式 + RuntimeOverrideBuilder + MihomoPrefetcher）
+│   │   └── service/                  服务组件（含 ROOT 模式 + RuntimeOverrideBuilder + MihomoPrefetcher）
 │   ├── res/
 │   │   ├── values/strings.xml        Android 层英文字符串（通知/Tile）
 │   │   └── values-zh-rCN/strings.xml Android 层中文字符串
@@ -82,28 +82,25 @@ MainActivity → App → AppNavigation
 
 ### 核心模式
 
-- **通信方案**：mihomo RESTful API + WebSocket（非 JNI），代码全部在 commonMain 跨平台共享
-- **导航**：miuix NavDisplay + 自定义 Navigator（push/pop/popUntil + navigateForResult 结果通信）+ LocalNavigator
+- **通信方案**：mihomo RESTful API + WebSocket（非 JNI），代码在 commonMain 跨平台共享
+- **导航**：miuix NavDisplay + 自定义 Navigator（push/pop/popUntil + navigateForResult）+ LocalNavigator
 - **主页 Tab**：HorizontalPager + MainPagerState + NavigationBar（4 Tab）
-- **TUN 双模式**：VPN 模式（VpnService 创建 TUN fd）和 ROOT 模式（mihomo 自行创建 TUN + auto-route）
-  - VPN 模式：VpnService.establish() → fd → `tun.file-descriptor` + `auto-route: false`，mihomo 工作目录直接用 `imported/{uuid}/`（app UID）
-  - ROOT 模式：`su -c mihomo` → 无 fd → `auto-route: true` + `auto-detect-interface: true`，mihomo 工作目录用独立 `runtime/{uuid}/` 沙箱（启动前 app UID 从 imported/ 拷贝，停止时 `su rm -rf` 清理），imported/ 永远 app UID
-  - ROOT 模式下分应用代理通过 mihomo 的 `include/exclude-package` 实现（VPN 模式用 VpnService API）；两种模式下 Mishka 自身包名必须始终排除（app 内 `ProcessBuilder` 子进程的 HTTP 请求否则会被 auto-route 捕获）
-  - ROOT 进程 app 被杀后仍存活，重启 app 通过持久化的 PID/secret 重连；attach 路径不重建 runtime/ 沙箱
-  - ROOT 不可用时（卸载 Magisk 等）自动回退 VPN 模式
+- **TUN 双模式**：VPN（VpnService 创建 TUN fd）/ ROOT（mihomo 自行创建 TUN + auto-route）
+  - VPN：`tun.file-descriptor` + `auto-route=false`，工作目录 `imported/{uuid}/`（app UID）
+  - ROOT：`auto-route=true` + `auto-detect-interface=true`，工作目录独立 `runtime/{uuid}/` 沙箱（启动前从 imported/ 拷贝，停止时 `su rm -rf`）；imported/ 永远 app UID
+  - 分应用代理：ROOT 走 mihomo `include/exclude-package`；VPN 走 VpnService API；**Mishka 自身包名始终排除**
+  - ROOT 进程 app 被杀后仍存活，重启 app 通过持久化 PID/secret 重连；attach 不重建 runtime/
+  - ROOT 不可用自动回退 VPN
 - **状态桥接**：ProxyServiceBridge（全局 StateFlow + TunMode），Service 写入、ViewModel 读取
 - **进程模型**：单进程（VpnService 和 UI 同进程），ROOT 模式 mihomo 为独立 root 进程
-- **数据持久化**：Room 3.0 KMP（结构化数据）+ PlatformStorage（简单偏好设置）+ StorageKeys（通用 key 常量）+ OverrideJsonStore（`override.user.json` 单文件 + ConfigurationOverride @Serializable）
-- **订阅管理**：Pending → Processing → Imported 三阶段，由 `ProfileProcessor` 编排：snapshot 锁内 prepareProcessing → 锁外 fetch+validate（mihomo -t 子进程，自带 provider 下载）→ 锁内 commitProcessingToImported；processing/ 是单例沙箱，processLock 串行。**协程取消语义**：外层 `runProcess` 可取消，仅 commit 阶段（文件 swap + DB 更新）包 `withContext(NonCancellable)` 保证原子；cleanupProcessing 也走 NonCancellable 保证取消路径能清理。Mutex 不可重入：`updateImported` / `commitPending` 必须在外层 `withProfileLock` 内调且自身不加锁
-- **订阅 HTTP**：Ktor + `HttpTimeout`（connect 30s / request 60s），User-Agent `ClashMetaForAndroid/{version}`（CFMA 兼容订阅服务白名单）；状态码与空 body 检查 → 抛 `ImportError`；不在客户端做 base64/V2Ray 转换，原始 YAML 直接交 mihomo（V2Ray 订阅需用 wrapper config + proxy-providers 引用）
-- **订阅下载走代理**：`SubscriptionProxyResolver` 判"走代理 + 代理 URL"（开关 `SUBSCRIPTION_UPDATE_VIA_PROXY` 默认开 + 代理运行中 + 可解析 mixed-port）；`SubscriptionFetcher` 每次 fetch 重建 HttpClient 按需 `engine { proxy = ProxyBuilder.http(Url(...)) }`，代理失败网络层异常自动 fallback 直连；`MihomoPrefetcher` 子进程注入 `HTTPS_PROXY`/`HTTP_PROXY` env（Go `net/http` 默认读取），走代理时 prefetch 超时 60s / 直连 120s。Mishka 自身包名已在 TUN `exclude-package`，子进程到 127.0.0.1:mixed-port 不被 TUN 回环吞掉
-- **Pipeline 可取消 + Dialog 取消按钮**：`MihomoValidator` / `MihomoPrefetcher` 用 200ms 轮询 + `ensureActive()` 响应协程取消，finally `destroyForcibly` 杀子进程。`ImportProgressDialog` 可选 `onCancel`，底部 TextButton；`onDismissRequest = null` 保留防误触。`SubscriptionViewModel.cancelCurrentUpdate` 先**同步** `clearProgress()` 让 Dialog 立即 `show=false`（StateFlow emit → 重组），再 `currentJob?.cancel()` 让协程后台收尾 —— 避免 NonCancellable commit 段/JVM IO 阻塞让用户感觉"取消无反应"
-- **GeoIP 预制 + 共享**：构建时 DownloadGeoFilesTask 下载 geoip.metadb/geosite.dat/ASN.mmdb 到 assets，启动时提取到 geodata/ 共享目录 + 符号链接（失败则复制）
-- **配置校验**：mihomo -t 进程完整校验（ProcessBuilder，不需要 TUN fd，超时 90s）
-- **国际化**：默认英文 + 中文（zh-rCN），Compose Resources `stringResource()` + Android `getString()`
-  - Compose 层：`shared/src/commonMain/composeResources/values/strings.xml`（244 key）
-  - Android 层：`android/src/main/res/values/strings.xml`（通知/Tile/错误）
-  - 日志消息英文，代码注释中文
+- **数据持久化**：Room 3.0 KMP（结构化数据）+ PlatformStorage（简单偏好）+ StorageKeys（key 常量）+ OverrideJsonStore（`override.user.json` + ConfigurationOverride @Serializable）
+- **订阅管理**：Pending → Processing → Imported 三阶段沙箱，`ProfileProcessor` 编排 snapshot → fetch → validate → prefetch → commit 五阶段；processLock 串行，profileLock 守护 DB 一致性
+- **订阅 HTTP**：Ktor + HttpTimeout（connect 30s / request 60s），UA `ClashMetaForAndroid/{version}`（订阅服务白名单）；状态码 / 空 body 检查 → `ImportError`；不做 base64/V2Ray 转换，原始 YAML 直接交 mihomo
+- **订阅下载走代理**：`SubscriptionProxyResolver` 按「开关 + 代理运行中 + 可解析 mixed-port」返回 proxy URL 或 null；`SubscriptionFetcher` 按需配 proxy，网络层异常自动 fallback 直连；`MihomoPrefetcher` 子进程注入 `HTTPS_PROXY`/`HTTP_PROXY` env
+- **Pipeline 可取消**：子进程 200ms 轮询 + `ensureActive()` 响应取消，finally `destroyForcibly`；`ImportProgressDialog` 可选 `onCancel`；`cancelCurrentUpdate` 先同步 `clearProgress()` 让 UI 立即响应，再 cancel 协程
+- **GeoIP 预制**：构建时 DownloadGeoFilesTask 下载 geoip.metadb/geosite.dat/ASN.mmdb 到 assets，启动时提取到 geodata/ 共享目录 + 符号链接
+- **配置校验**：`mihomo -t -f processing/config.yaml`（不传 `--override-json`，只 parse 不碰网，超时 90s）
+- **国际化**：英文 + 中文（zh-rCN），Compose Resources `stringResource()` + Android `getString()`；日志消息英文，代码注释中文
 
 ## 数据库架构（Room 3.0 KMP）
 
@@ -117,9 +114,9 @@ MainActivity → App → AppNavigation
 
 ### 类型安全与时间语义
 
-- **ProfileType enum**（`File`/`Url`/`External`，对齐 CFMA `Profile.Type`）通过 `ProfileTypeConverter` 透明映射为 TEXT 列
-- **订阅 UUID 完整 36 字符**（`Uuid.random().toString()`，UUID v4 碰撞概率 ~2^-122，不做循环冲突检测）
-- **updatedAt 动态计算**：`ImportedEntity` 无 updatedAt 字段，`SubscriptionRepository.resolveProfile` 走 `ProfileFileManager.getDirectoryLastModified(uuid, pending)` 读 pending→imported 目录 mtime，fallback `imported.createdAt`（对齐 CFMA `ProfileManager.resolveUpdatedAt`）；订阅 commit/update 自然更新文件系统 mtime，无需主动写 DB
+- **ProfileType enum**（`File`/`Url`/`External`）通过 `ProfileTypeConverter` 透明映射为 TEXT 列
+- **订阅 UUID 完整 36 字符**（`Uuid.random().toString()`，UUID v4 不做循环冲突检测）
+- **updatedAt 动态计算**：`ImportedEntity` 无此字段，`resolveProfile` 读 pending→imported 目录 mtime，fallback `imported.createdAt`；订阅 commit/update 自然更新文件 mtime，无需主动写 DB
 
 ### 三阶段流程（ProfileProcessor）
 
@@ -127,17 +124,15 @@ MainActivity → App → AppNavigation
 CREATE → Pending ✓, Imported ∅
   → APPLY（processLock 串行，5 阶段）：
       ① snapshot（profileLock 内）：query Pending + enforceFieldValid + prepareProcessing（清 processing/ + 复制 pending/{uuid}/ → processing/）
-      ② fetch（锁外，**可取消**，仅 Url）：HTTP 下载 → writeProcessingConfig → subscription-userinfo 头解析。Ktor HttpClient 按 `SubscriptionProxyResolver.resolve()` 按需配 proxy；代理失败网络层异常 fallback 直连一次（业务错误 ImportError 不 fallback）
-      ③ validate（锁外，**可取消**）：ensureGeodataAvailable → `mihomo -t -f processing/config.yaml`（不传 --override-json；订阅原文直接校验；`-t` 只 parse 不碰网，providers 也不拉）
-      ③' prefetch（锁外，**可取消**，best-effort）：`mihomo -prefetch -d processing/ -f processing/config.yaml` 并发下载所有 HTTP proxy/rule provider 到 `processing/proxy_providers/` 等原文相对路径下；子进程注入 `HTTPS_PROXY`/`HTTP_PROXY` env 经主 mihomo 出站（走代理超时 60s / 直连 120s）。失败仅记日志不阻塞 commit。目的是规避 mihomo 运行时启动瞬间 TUN/DNS bring-up 窗口内 HTTP 拉取被 TCP/TLS 瞬态错误打断导致代理组 `include-all + filter` 拉空的问题
-      ④ commit（profileLock 内，**`withContext(NonCancellable)` 原子不可取消**）：snapshot 一致性检查 → commitProcessingToImported（清 imported/{uuid}/ + 复制 processing/ → imported/{uuid}/ 保结构把 prefetch 结果一起带过去 + 删 pending/{uuid}/）→ DB 更新。Kotlin `deleteRecursively` 失败（历史 root:root 遗孤）走 `RootHelper.rmRfAsRoot` 兜底。`updateImported` / `commitPending` 不能自己 `profileLock.withLock`（Mutex 不可重入，与外层 withProfileLock 重入会永久死锁）
-  → 失败：cleanupProcessing；pending/{uuid}/ 与 imported/{uuid}/ 都不动，可 retry
+      ② fetch（锁外，可取消，仅 Url）：HTTP 下载 → writeProcessingConfig → subscription-userinfo 头解析；按需配 proxy + 网络层异常 fallback 直连
+      ③ validate（锁外，可取消）：ensureGeodataAvailable → `mihomo -t -f processing/config.yaml`（只 parse 不碰网）
+      ④ prefetch（锁外，可取消，best-effort）：`mihomo -prefetch` 并发下载 HTTP provider 到 `processing/` 相对路径下；失败仅记日志不阻塞 commit
+      ⑤ commit（profileLock 内，`withContext(NonCancellable)` 原子）：snapshot 一致性检查 → commitProcessingToImported（清 imported/{uuid}/ + 复制 processing/ → imported/{uuid}/ + 删 pending/{uuid}/）→ DB 更新
+  → 失败：cleanupProcessing（走 NonCancellable）；pending/ 与 imported/ 都不动，可 retry
   → RELEASE（放弃）：删 Pending DB + 删 pending/{uuid}/
 
-PATCH（编辑已导入）→ Imported ✓, Pending ✓
-  → APPLY → Imported ✓（更新）, Pending ∅
-
-UPDATE（手动/自动更新）→ 等价 APPLY，但 snapshot 取自 Imported（不经过 Pending DB），processing 基准为 imported/{uuid}/config.yaml
+PATCH（编辑已导入）→ Imported ✓, Pending ✓ → APPLY → Imported ✓（更新）, Pending ∅
+UPDATE（手动/自动）→ 等价 APPLY，snapshot 取自 Imported，processing 基准为 imported/{uuid}/config.yaml
 DELETE → Imported + Pending + Selection 三表清理 + imported/{uuid}/ + pending/{uuid}/ 删除
 ```
 
@@ -145,28 +140,18 @@ DELETE → Imported + Pending + Selection 三表清理 + imported/{uuid}/ + pend
 
 ```
 files/mihomo/
-├── config.yaml                 最终运行配置（ConfigGenerator 生成）
-├── geodata/                    共享 GeoIP 文件（启动时从 assets 提取 + 符号链接到各订阅目录）
-│   ├── geoip.metadb
-│   ├── geosite.dat
-│   └── ASN.mmdb
-├── imported/{uuid}/            已验证的稳定配置
-│   ├── config.yaml
-│   ├── Country.mmdb → ../../geodata/Country.mmdb
-│   └── providers/
-├── pending/{uuid}/             编辑中的草稿
-│   ├── config.yaml
-│   └── providers/
-├── processing/                 临时校验沙箱
-└── runtime/{uuid}/             ROOT 模式 mihomo 运行时沙箱（从 imported/ 复制 + provider 缓存）
-    ├── config.yaml
-    ├── Country.mmdb → ../../geodata/Country.mmdb
-    └── providers/
+├── geodata/                    共享 GeoIP（启动时从 assets 提取 + 符号链接到各订阅目录）
+├── imported/{uuid}/            已验证的稳定配置（app UID）
+├── pending/{uuid}/             编辑中的草稿（app UID）
+├── processing/                 临时校验沙箱（单例）
+├── runtime/{uuid}/             ROOT 模式 mihomo 运行时沙箱（从 imported/ 复制 + provider 缓存）
+├── override.user.json          用户设置的 override（ConfigurationOverride）
+└── override.run.json           启动时合并 TUN fd + AppProxy + rootMode 后的运行时 override
 ```
 
 ## 路由清单
 
-`Route.kt` 中定义 17 个路由，均实现 `NavKey`：
+`Route.kt` 中定义的路由，均实现 `NavKey`：
 
 | 路由               | 类型        | 页面                          | 入口               |
 | ------------------ | ----------- | ----------------------------- | ------------------ |
@@ -179,7 +164,8 @@ files/mihomo/
 | Provider           | data object | ProviderScreen                | QuickEntries       |
 | DnsQuery           | data object | DnsQueryScreen                | QuickEntries       |
 | Connection         | data object | ConnectionScreen              | QuickEntries       |
-| VpnSettings        | data object | VpnSettingsScreen             | 设置页             |
+| VpnSettings        | data object | VpnSettingsScreen             | 设置页（仅 VPN 模式）|
+| RootSettings       | data object | RootSettingsScreen            | 设置页（仅 ROOT 模式）|
 | NetworkSettings    | data object | NetworkSettingsScreen         | 设置页             |
 | MetaSettings       | data object | MetaSettingsScreen            | 设置页             |
 | ExternalControl    | data object | ExternalControlScreen         | 设置页             |
@@ -190,27 +176,28 @@ files/mihomo/
 
 ## 页面与 ViewModel
 
-| Screen                       | ViewModel             | 说明                                                            |
-| ---------------------------- | --------------------- | --------------------------------------------------------------- |
-| HomeScreen（6 个子 Section） | HomeViewModel         | 状态/ActionButtons/NetworkInfo/QuickEntries/Latency/BottomCards |
-| ProxyScreen                  | ProxyViewModel        | 代理组 Tab + 节点选择 + 延迟测试 + 选择记忆                     |
-| SubscriptionScreen           | SubscriptionViewModel | 订阅列表 + 增删改 + 全部更新 + 编辑 + 复制（可取消 Pipeline）   |
-| SubscriptionEditScreen       | SubscriptionViewModel | 编辑名称/URL/更新间隔                                           |
-| SettingsScreen               | —                     | 设置入口页（TUN 模式/主题/开机自启）                            |
-| LogScreen                    | LogViewModel          | 实时日志流 + 级别过滤                                           |
-| ConnectionScreen             | ConnectionViewModel   | 活跃连接列表 + 关闭                                             |
-| ProviderScreen               | ProviderViewModel     | Provider 列表 + 刷新                                            |
-| DnsQueryScreen               | DnsQueryViewModel     | DNS 查询（A/AAAA/CNAME/MX/TXT/NS）                              |
-| AppProxyScreen               | AppProxyViewModel     | 应用代理白/黑名单（返回时 applyIfChanged 有变更则 Toast）       |
-| VpnSettingsScreen            | —                     | VPN 设置（系统代理/排除路由等）                                 |
-| NetworkSettingsScreen        | OverrideSettingsVM    | 端口/局域网/IPv6/DNS（external-controller 已移到独立页）        |
-| MetaSettingsScreen           | OverrideSettingsVM    | 统一延迟/Geodata/TCP 并发/嗅探器                                |
-| ExternalControlScreen        | OverrideSettingsVM    | mihomo HTTP API external-controller + API secret 独立配置页     |
-| FileManagerScreen            | SubscriptionViewModel | imported 订阅目录浏览（复用 SubscriptionViewModel.fileManager） |
-| FileManagerEditorScreen      | SubscriptionViewModel | 多行 TextField 编辑 YAML，保存前 mihomo -t 校验，失败回滚       |
-| AboutScreen                  | —                     | 版本信息（OS3 动态背景 + 视差滚动）                             |
-| SubscriptionAddScreen        | —                     | 添加方式选择（文件/URL/QR Code）                                |
-| SubscriptionAddUrlScreen     | SubscriptionViewModel | URL 导入订阅                                                    |
+| Screen                   | ViewModel             | 说明                                                            |
+| ------------------------ | --------------------- | --------------------------------------------------------------- |
+| HomeScreen               | HomeViewModel         | 状态/ActionButtons/NetworkInfo/QuickEntries/Latency/BottomCards |
+| ProxyScreen              | ProxyViewModel        | 代理组 Tab + 节点选择 + 延迟测试 + 选择记忆                     |
+| SubscriptionScreen       | SubscriptionViewModel | 订阅列表 + 增删改 + 全部更新 + 编辑 + 复制（可取消 Pipeline）   |
+| SubscriptionEditScreen   | SubscriptionViewModel | 编辑名称/URL/更新间隔                                           |
+| SettingsScreen           | —                     | 设置入口（TUN 模式/主题/开机自启）                              |
+| LogScreen                | LogViewModel          | 实时日志流 + 级别过滤                                           |
+| ConnectionScreen         | ConnectionViewModel   | 活跃连接列表 + 关闭                                             |
+| ProviderScreen           | ProviderViewModel     | Provider 列表 + 刷新                                            |
+| DnsQueryScreen           | DnsQueryViewModel     | DNS 查询（A/AAAA/CNAME/MX/TXT/NS）                              |
+| AppProxyScreen           | AppProxyViewModel     | 应用代理白/黑名单                                               |
+| VpnSettingsScreen        | —                     | VPN 设置（系统代理/排除路由等），仅 VPN 模式可见                |
+| RootSettingsScreen       | —                     | ROOT 设置（TUN 设备名 + 热点客户端处置），仅 ROOT 模式可见      |
+| NetworkSettingsScreen    | OverrideSettingsVM    | 端口/局域网/IPv6/DNS                                            |
+| MetaSettingsScreen       | OverrideSettingsVM    | 统一延迟/Geodata/TCP 并发/嗅探器                                |
+| ExternalControlScreen    | OverrideSettingsVM    | mihomo HTTP API external-controller + API secret                |
+| FileManagerScreen        | SubscriptionViewModel | imported 订阅目录浏览                                           |
+| FileManagerEditorScreen  | SubscriptionViewModel | 多行 TextField 编辑 YAML，保存前 mihomo -t 校验，失败回滚       |
+| AboutScreen              | —                     | 版本信息（OS3 动态背景 + 视差滚动）                             |
+| SubscriptionAddScreen    | —                     | 添加方式选择（文件/URL/QR Code）                                |
+| SubscriptionAddUrlScreen | SubscriptionViewModel | URL 导入订阅                                                    |
 
 ## 平台抽象（expect/actual）
 
@@ -233,7 +220,8 @@ files/mihomo/
 | -------------------------- | ------------------------------------------------------------------------------------- |
 | MishkaTunService           | VpnService + JNI fork+exec 启动 mihomo                                                |
 | MishkaRootService          | ROOT TUN 模式前台服务（su 启动 mihomo，进程重连）                                     |
-| RootHelper                 | root 检测/启动/终止/存活检查/残留清理 + rmRfAsRoot + chownRecursiveAsRoot             |
+| RootHelper                 | root 检测/启动/终止/存活检查/残留清理 + rmRfAsRoot + chownRecursiveAsRoot + runAsRootReturnCode |
+| RootTetherHijacker         | ROOT 模式热点流量处置（ip rule 导向 main/TUN 表，绕过代理或走代理）                   |
 | DynamicNotificationManager | 动态通知（WebSocket 流量），两个 Service 共用                                         |
 | MishkaTileService          | Quick Settings Tile 一键启停代理（双模式路由）                                        |
 | BootReceiver               | 开机自启（默认 disabled，动态启用）                                                   |
@@ -251,14 +239,16 @@ files/mihomo/
 
 ## 数据模型
 
-`data/model/` 下 12 个 `@Serializable` 数据类：
+`data/model/` 下的 `@Serializable` 数据类：
 
 ConnectionInfo, DelayResult, DnsQuery, LogMessage, MemoryData, MihomoConfig, ProviderInfo, ProxyGroup, ProxyNode, RuleInfo, Subscription, TrafficData
+
+另有 `ProfileType` enum + `ConfigurationOverride` override 数据类。
 
 ## 构建命令
 
 ```bash
-# 编译 mihomo 二进制（必须用 Mishka fork 源码：含 --override-json flag、--prefetch flag、RawTun.AutoDetectInterface json tag 修复、patch_mishka.go DNS fallback）
+# 编译 mihomo 二进制（必须用 Mishka fork 源码：含 --override-json / --prefetch flag、RawTun.AutoDetectInterface json tag、patch_mishka.go DNS fallback）
 cd D:/GitHub/mihomo
 GOOS=android GOARCH=arm64 CGO_ENABLED=0 go build \
   -tags "cmfa,mishka,with_gvisor" -trimpath \
@@ -266,68 +256,84 @@ GOOS=android GOARCH=arm64 CGO_ENABLED=0 go build \
   -o /path/to/Mishka/android/src/main/jniLibs/arm64-v8a/libmihomo.so .
 
 # 构建 APK（assemble 自动触发 downloadGeoFiles 下载 GeoIP 到 assets/）
-./gradlew :android:assembleDebug  # 构建 Android Debug APK
-./gradlew :android:assembleRelease # 构建 Android Release APK
+./gradlew :android:assembleDebug
+./gradlew :android:assembleRelease
 ```
 
-## 设计决策
+## 关键架构约束
 
-- mihomo 二进制放在 jniLibs 中（命名为 libmihomo.so），通过 `jniLibs.useLegacyPackaging = true` 确保解压到 nativeLibraryDir
-- Android 的 ProcessBuilder 会 fork 后关闭所有非标准 fd，需用 JNI fork+exec 绕过（`process_helper.c`），保留 VPN TUN fd 继承
-- 配置校验使用 `mihomo -t -d <workDir>`（ProcessBuilder，不需要 TUN fd，超时 90s），解析 level=error/fatal 提取错误信息
-- 订阅导入完全对齐 CFMA：User-Agent `ClashMetaForAndroid/{version}`（订阅服务白名单匹配）；不在客户端做 base64/V2Ray 转 YAML（CFMA 也没有），用户用 V2Ray 订阅必须自己写 wrapper config 用 `proxy-providers` 引用 —— mihomo `adapter/provider/provider.go:372` `convert.ConvertsV2Ray` 在 provider 加载阶段自动转
-- GeoIP 文件构建时通过 DownloadGeoFilesTask 下载到 assets/，启动时 MishkaApplication.extractGeoFiles() 提取到 geodata/ 共享目录，各订阅通过符号链接（失败则复制）引用
-- Override 注入完全对齐 CFMA 内存方案（但走子进程）：mihomo fork 加 `--override-json <path>` CLI flag + `config.OverrideJSONPath` 全局变量 + `Parse()` 内 `json.Unmarshal` 钩子（见 D:/GitHub/mihomo/config/config.go Parse 和 main.go）。用户设置通过 `ConfigurationOverride` @Serializable 写到 `files/mihomo/override.user.json`；启动时 `RuntimeOverrideBuilder.buildAndWriteForRun` 叠加 TUN fd / AppProxy / rootMode 字段输出到 `files/mihomo/override.run.json`，mihomo 启动时 `--override-json` 读取。secret / external-controller **不进 override.json**，走 mihomo 已有 `--secret` / `--ext-ctl` CLI flag。**Kotlin 侧零 YAML 库依赖**，订阅 YAML 全程不被 Mishka 改写
-- `RawTun.AutoDetectInterface` 在 mihomo 上游漏了 json tag（yaml 有 json 无），fork 已补 `json:"auto-detect-interface"`；否则 ROOT 模式的 `auto-detect-interface: true` 注入会被 Go `encoding/json` 静默丢弃
-- mihomo fork `config/patch_mishka.go`（`//go:build mishka`）对齐 CFMA `patchDns`：订阅 `DNS.Enable=false` 时注入 fake-ip 模式 + 4 组国内外 nameserver（223.5.5.5/119.29.29.29/8.8.4.4/1.0.0.1）+ STUN/Xbox/bilibili 等 fake-ip-filter + `FakeIPRange=28.0.0.0/8`；`ClashForAndroid.AppendSystemDNS=true` 时追加 `system://` nameserver 作为 Android 系统 DNS fallback。Parse 顺序：Unmarshal → override decode → mishkaPatch → ParseRawConfig；非 mishka tag 编译时 `mishkaPatch` 保持 nil，零影响
-- secret 解析优先级（`MishkaTunService` / `MishkaRootService` startProxy）：用户在 ExternalControlScreen 显式设置 > 订阅 `config.yaml` 顶层 `secret:` 字段（`ConfigGenerator.readSubscriptionSecret` 轻量行扫描，不 parse 完整 YAML）> `ConfigGenerator.generateSecret()` 随机 UUID 前 16 字节。externalController 通过 `ConfigurationOverride.resolveExternalController()` 扩展函数统一解析（用户值 > `127.0.0.1:9090`，`0.0.0.0` 自动替换为 `127.0.0.1`）。ROOT attach 分支仍用 storage 持久化的 `existingSecret`，不走用户当前值（防止运行中修改 override 导致 attach secret 漂移）
-- TUN 段组装差异（VPN vs ROOT，由 `RuntimeOverrideBuilder.buildTunOverride` 决定）：VPN 注入 `file-descriptor` + `auto-route=false` + `auto-detect-interface=false` + `inet6-address=[]`（VPN 由 VpnService 处理 v6）；ROOT 注入 `auto-route=true` + `auto-detect-interface=true` + `device` 从 `StorageKeys.ROOT_TUN_DEVICE` 读 + `include/exclude-package`（VPN 模式**不**输出 include/exclude，mihomo TUN fd 路径不读这两字段，分应用代理由 VpnService.Builder.addAllowed/DisallowedApplication 管）。`tun.stack` 按用户值透传（null 不输出 → mihomo 用订阅值或默认 gvisor），`tun.enable` / `dns-hijack=[0.0.0.0:53]` / `profile.store-selected=false`、`store-fake-ip=true` 为硬编码覆盖
-- 导入订阅不自动切换活跃：`SubscriptionViewModel.addSubscription` / `addFromFile` 成功后**不**调 `repository.setActive(sub.id)`；仅首次导入（`importedDao.count() == 1`）由 `SubscriptionRepository.commitProcessingToImported` 自动激活为默认值。用户需要手动在订阅列表里切换活跃配置
-- 订阅管理采用 Pending → Processing → Imported 三阶段（对齐 CFMA `ProfileProcessor.apply`）：fetch+校验在 processing 单例沙箱完成，成功后 swap 进 imported/{uuid}/；失败 imported/ 完全不动，pending/ 保留可 retry。`ProfileProcessor` 用 `processLock` 串行，`SubscriptionRepository.withProfileLock` 守护 DB snapshot 一致性
-- 错误信息防御：所有用户面向异常都走 `Throwable.describe()` 兜底（`message ?: simpleName ?: "Unknown error"`），避免 Ktor `ConnectException()` 等无参异常 `e.message == null` 漏到 UI。`SubscriptionFetcher` 显式检查 `response.status.isSuccess` + 空 body，抛 typed `ImportError`
-- Room 3.0 KMP 跨平台数据库，BundledSQLiteDriver 统一 Android/Desktop，DCL 单例
-- 代理组选择通过 SelectionEntity 持久化，切换订阅时自动恢复 Selector 类型组的选择
-- 后台自动更新通过 AlarmManager + ProfileReceiver + ProfileWorker 前台服务实现，最小间隔 15 分钟。`ProfileWorker.jobs` 使用 `java.util.concurrent.ConcurrentLinkedQueue<Job>`（非 `mutableListOf`），`onStartCommand` 用 `offer` 提交、消费协程用 `while (true) { jobs.poll()?.join() ?: break }`——对齐 CFMA 挂起消费模式（非 `while(isActive) delay(1s)` 轮询），同时 `onStartCommand`（主线程）与 scope 协程（Dispatchers.IO）跨线程访问需要线程安全容器（ArrayList 会竞态）
-- network_security_config.xml 允许 localhost 明文通信（mihomo API 用 HTTP）
-- Activity 声明 `configChanges="uiMode"` 避免系统深浅色切换时重建，防止导航栈丢失
-- 预测性返回手势通过 HiddenApiBypass 反射调用 `ApplicationInfo.setEnableOnBackInvokedCallback`，Android 14+ 可选启用
-- ROOT 模式重连校验：`attachToExisting` 做三重验证（`kill -0` 存活 + `/proc/$pid/cmdline` 含 libmihomo.so + stored secret 通过 `/configs` 带 Bearer 鉴权 2xx），防 PID 复用与 secret 漂移；订阅一致性由 `startProxy` 在 attach 之前比对 persisted vs 请求的 subscriptionId，不一致直接走 cleanup + 全新启动
-- 孤儿 mihomo 清理：`RootHelper.cleanupOrphanedMihomo(tunDevice)` 用**单次 su shell** 完成 pkill + 兜底 `ip link delete <tunDevice>`，Kotlin 侧零 `Thread.sleep`（孤儿非当前 App 子进程，waitpid 不适用，只能 shell 内轮询）。TUN 清理必须同步：sing-tun `tun.New()` 遇已存在设备返回 EEXIST，叠加 TUN init silent failure 会级联。device name 来自用户 storage，`escapeShellSingleQuoted` 单引号 + `'\''` POSIX 转义防命令注入
-- VPN 启动清理触发：`MishkaTunService.startProxy` 在 `hadRootPid || HAS_ROOT` 时调用 cleanupOrphanedMihomo + 清 ROOT 持久化 key（PID/SECRET/ACTIVE_SUBSCRIPTION_ID）。`HAS_ROOT` 分支覆盖两个漏清场景：ROOT 崩溃后 storage 清了但进程仍活；VPN mihomo `setsid()` 脱离 App 进程组、App 崩溃后被 init 收养继续占端口
-- WebSocket 重连：`MihomoWebSocket.webSocketFlow` 传输层加无限重连循环 + 指数退避（1s→30s 封顶）+ `pingIntervalMillis = 20_000` 心跳。Ktor graceful close 时 `for (frame in incoming)` 静默退出不抛异常，消费者 `.catch` 无法感知，无内置重连只能手搓。`CancellationException` 必须显式 rethrow 否则 cancel 被吞导致死循环。连接状态通过 `connectionState: StateFlow<Boolean>` 粗粒度暴露（mihomo API server 单点，4 flow 共享）
-- startForeground 防御：`MishkaTunService` / `MishkaRootService` / `ProfileWorker` 的 onCreate 内 `startForeground()` 必须 `try { ... } catch (e: Exception) { ... }`。真实风险是 API 31+ `ForegroundServiceStartNotAllowedException`（BootReceiver/ProfileReceiver 后台触发）与 API 34+ FGS type 异常，**不是** POST_NOTIFICATIONS 拒绝（仅隐藏通知，FGS 照常运行）。catch 用通用 `Exception` 兜底（各 OEM ROM 抛出类不同）。失败路径：Tun/Root 上报 `ProxyServiceBridge.Error` + `stopSelf()`（让 UI 退出 Starting）；ProfileWorker 仅 `stopSelf()`。**不可降级为普通 Service**（Android 12+ 迅速回收）
-- TUN init silent failure 兜底：mihomo `listener.ReCreateTun` TUN inbound 初始化失败走 `log.Errorln + tunConf.Enable=false` 正常返回，**进程不退出**（其他 inbound 如 mixed-port 继续响应 `/version`）。仅靠进程存活 + API 可达无法检测。检测规则：① `MishkaTunService` 清 O_CLOEXEC (`fcntlInt(F_SETFD)`) 失败必须视为致命（`closeTunFd` + `ProxyState.Error` + `stopSelf`）——fd 未清则 exec 后必然被关；② `MihomoRunner.waitForReady` API ready 后 delay 500ms 再 `scanLogForTunError`，匹配 pattern：`Start TUN listening error` / `configure tun interface` / `create NetworkUpdateMonitor`
-- 配置校验直接跑订阅原文：`mihomo -t -f processing/config.yaml`（不传 `--override-json`）。mihomo `-t` 只做 parse + provider 校验，不 bind 端口也不 init TUN，订阅内 `tun.enable: true` 同样能通过。用户 override 字段由 UI 做边界校验（端口范围、DNS URL 语法）并显示 `RestartRequiredHint` 提示用户重启代理；运行期再合并为 override.run.json 由 mihomo json.Decode。回退预案：若真机 gVisor 在 `-t` 路径触发初始化，可在校验前写极简 `{"tun":{"enable":false}}` override 临时文件
-- Provider 预下载走 mihomo fork 子进程：validate 通过后 `ProfileProcessor` 调 `mihomo -prefetch -d processing/ -f processing/config.yaml`（`MihomoPrefetcher` 包装，超时 120s），mihomo fork `prefetch_mishka.go`（`//go:build mishka`）解析 config 后并发调每个 HTTP proxy/rule provider 的 `Update()` 下载到 `proxy_providers/*` 等订阅原文指定的相对路径，写盘后退出。**best-effort**：单个 provider 失败仅 log.Warnln 吞掉，进程退出 0；Kotlin 侧 Prefetcher 返回 false 也不抛，commit 照常。运行期 mihomo 启动时 `Fetcher.Initial` 对已落盘的 provider 走 `os.Stat` 命中分支直接加载，**跳过 HTTP 拉取**。绕开的具体 bug：mihomo 启动瞬间（t+500ms 左右）TUN/DNS bring-up 窗口内所有 HTTP provider 并发拉取会被 TCP/TLS 瞬态错误（`EOF` / `io: read/write on closed pipe`）打断，`executor.loadProvider:325` 只 log.Errorln 不传播，provider 留空列表 → 代理组 `include-all + filter` 从 0 节点里 filter 出 0 个 = 代理组可见但无节点。prefetch 的 `Config` 对象须显式 `runtime.KeepAlive(cfg)`：`ProxySetProvider` 挂了 finalizer，wrapper 被 GC 就 `ctxCancel()` 让在飞的 HTTP 请求返回 "context canceled"（runtime 的 `updateProxies` 会把 provider 存进全局 tunnel 避免 GC，prefetch 模式不走这路）
-- CMFA embed mode 禁用全部 HTTP 配置 API：mihomo 上游 `patch_android.go`（`//go:build android && cmfa`）init `SetEmbedMode(true)`，`PATCH/PUT /configs` / `POST /restart` / `POST /configs/geo` / `PUT/PATCH /rules` / `POST /upgrade` 全部 404（configs.go:28 / server.go:135 / rules.go:17 / upgrade.go:18）。Mishka fork 未改该文件。Ktor `HttpClient` 默认不对 404 抛异常，`runCatching` 包装会返回"幻觉成功"（UI 以为切换，mihomo 未动）。约束：**不要**添加 `apiClient.patchConfig` / `reloadConfig` / `restart` 方法。所有 mihomo 配置修改（mode/tun.stack/DNS/port/...）走 `OverrideJsonStore.save(ConfigurationOverride)` + `serviceController.restart(subscriptionId)`（Service Intent 重启，非 HTTP）+ `RuntimeOverrideBuilder` 叠加 runtime 字段生成 override.run.json；UI 用 `RestartRequiredHint` Card 统一告知"需重启生效"
-- ROOT 运行时沙箱 `runtime/{uuid}/` 隔离 mihomo 对 imported/ 的 root 写入：mihomo 以 uid=0 启动时会往工作目录写 provider/ruleset 缓存，若工作目录是 imported/{uuid}/ 会让 app UID 后续 `deleteRecursively` / `copyRecursively(overwrite=true)` 抛 `FileAlreadyExistsException`。启停钩子：`MishkaRootService.startProxy` 在 `hasRootAccess` 通过后、`runner.start` 之前调 `ProfileFileOps.prepareRootRuntime(uuid)`（从 imported/ 复制 + 重建 geodata 链接）；stop/restart/`startProcessMonitor` 三条死亡路径在 `runner.stop()` 完成后、`clearPersistedState` 之前从 `ROOT_ACTIVE_SUBSCRIPTION_ID` 读出 uuid 调 `cleanupRootRuntime` 走 `su rm -rf`。VPN 模式启动的孤儿清理分支额外调 `cleanupAllRootRuntime` 擦整个 runtime/。attach 路径**不**重建 runtime/（mihomo 正持有它）。存量用户 imported/ 里可能有旧版 root:root 遗孤，由 `MishkaApplication` 首启后台线程 `su chown -R $APP_UID imported/` 一次性回收，`StorageKeys.MIGRATION_ROOT_RECLAIM_DONE` 打标；`commitProcessingToImported` / `deleteProfileDirs` 的 Kotlin `deleteRecursively` 失败也走 `RootHelper.rmRfAsRoot` 兜底（迁移未及时完成或无 su 时的自救）
-- mihomo 子进程（`mihomo -t` / `-prefetch`）的 stdout 消费必须放到独立 daemon 线程：主协程里 `process.inputStream.bufferedReader().useLines { ... }` 会阻塞到进程自然 EOF，随后的 `process.waitFor(TIMEOUT)` 形同虚设 —— 进程内部某个 HTTP fetch 无 deadline 卡住 → stdout 不刷新 → useLines 永远 block → 超时不生效。`MihomoValidator` / `MihomoPrefetcher` 的标准 pattern：进程 start 后单独 `Thread(..., "mihomo-xxx-reader").apply { isDaemon = true; start() }` 去 useLines，主协程 `waitFor(timeout)` + 超时 `destroyForcibly()` + `readerThread.join(1000)`，stdout 聚合用 `synchronized(sb)` 防竞态。**不要**回退成"先 useLines 再 waitFor"的顺序
-- Mishka 自身包名始终不走 TUN/VPN：app 内 `ProcessBuilder` 子进程（如 `mihomo -prefetch`）的 HTTP 请求若被 auto-route 捕获，会经当前活跃代理节点出站，节点慢/坏时会永久阻塞整个 app，表现为弹窗无限期卡住。ROOT 模式 `RuntimeOverrideBuilder.buildTunOverride` 三种 `AppProxyMode` 都必须把 `context.packageName` 从 `includePackage` 剔除或塞进 `excludePackage`（`AllowAll` → `exclude=[self]`；`DenySelected` → `exclude = user + self` 去重；`AllowSelected` → `include` 过滤掉 self）。VPN 模式 `MishkaTunService` 的 `AllowSelected` 分支绝不能 `addAllowedApplication(packageName)`（这会让 Mishka 自身走 VPN）——过滤 self 后逐个 addAllowed；过滤后空列表则退化到 `addDisallowedApplication(self)`（addAllowed/addDisallowed 互斥，空 allow 会让 VPN 捕获全部流量）
-- 订阅 Pipeline 协程取消语义：`ProfileProcessor.runProcess` 外层 `withContext(Dispatchers.Default)` 可取消，仅阶段 4 commit 包 `withContext(NonCancellable)` 保证"文件 swap + DB 更新"原子（否则 `commitProcessingToImported` 已把 imported/{uuid}/ 换成新版但 `updateImported` 还没跑 就会让 DB 的 upload/download/total 字段和磁盘对不上）。catch 块里的 `cleanupProcessing` 也走 NonCancellable，保证取消路径能清沙箱。`MihomoValidator` / `MihomoPrefetcher` 用 **200ms 轮询 `isAlive` + `coroutineContext.ensureActive()`** 替代裸 `waitFor(timeout)`，协程 cancel 时 finally 立即 `destroyForcibly()` 杀子进程 —— 不用 `waitFor(timeout)` 是因为它把进程状态轮询和超时耦合死，协程取消信号吃不进。`SubscriptionViewModel.cancelCurrentUpdate` 必须**同步**调 `clearProgress()` 清 UI state 让 Dialog 立即 `show=false`（StateFlow emit → Compose 重组），然后才 `currentJob?.cancel()` —— 协程取消是异步的，如果阻塞在 NonCancellable commit 段或 Java IO，等 finally 触发 clearProgress 会让用户感觉按钮无反应；按钮点了 Dialog 还在转就是失败体验
-- 订阅下载经 mihomo 代理 + fallback：`SubscriptionProxyResolver.resolve()` 按 `SUBSCRIPTION_UPDATE_VIA_PROXY` 开关（默认 true）+ `ProxyServiceBridge.state == Running` + mixed-port 可解析（先 `OverrideJsonStore.load().mixedPort`，次 `apiClient.getConfig().mixedPort`）三个条件决定走代理 URL 还是 null。**不 assume 默认端口**（7890 只是 CFMA 惯例，瞎猜会让请求去到不存在的端口彻底卡死）。`SubscriptionFetcher` 每次 fetch 重建 HttpClient 按需 `engine { proxy = ProxyBuilder.http(Url(proxyUrl)) }`，代理请求抛**网络层异常**（`connection closed` / timeout / TLS / socket 等）自动 fallback 直连一次；`ImportError`（业务错误 HTTP 4xx/5xx / 空 body）和 `CancellationException` 不 fallback（业务错误 fallback 没意义、取消必须传播）。`MihomoPrefetcher` 通过 `pb.environment()["HTTPS_PROXY"] = proxyUrl` + `HTTP_PROXY` 注入给子进程，Go `net/http.DefaultTransport` 默认读取；走代理超时降到 60s（代理链路应更快），直连保持 120s。mihomo 自身包名已在 TUN `exclude-package` / `addDisallowedApplication` 里，subprocess 发到 127.0.0.1:mixed-port 的 HTTP proxy 请求不被 TUN 回环吞掉，能干净被主 mihomo 接收作 HTTP CONNECT/forward 按规则出站
-- Kotlin coroutines Mutex 不可重入：同一协程两次 `withLock` 会永久挂起。`SubscriptionRepository.updateImported` / `commitPending` 等被 `ProfileProcessor` 在 `repo.withProfileLock { ... }` 里调用的方法**不能**自己加 `profileLock.withLock`，KDoc 必须显式标"必须在 withProfileLock 内调用"。直接被 ViewModel 调用的方法（`create` / `patch` / `release` / `clone` / `delete`）保留自身 `withLock`。这个规则适用于任何 `Mutex` —— 真实事故：`updateImported` 自加锁 + `ProfileProcessor` commit 外层持锁 → update 路径永远死锁（mihomo -prefetch 已 exit=0，Dialog 卡在最后 provider 名），import 路径正常（走的 `commitPending` 声明了需外层持锁、内部不加锁）
-- 订阅 Pipeline 统一入口：`SubscriptionViewModel.runPipeline(op, errorKey) { block }` helper 统一 6 个入口（add / addFromFile / fetchSubscription / editSubscription / duplicateSubscription / updateAllSubscriptions 除外，批量因进度语义不同独立实现）的 boilerplate：`isBusy` 防并发 + `ProfileOperation` 标记 + state 初始化 + `try { block() } catch(CancellationException) { clearProgress; throw } catch(Throwable) { error = getString(errorKey, describe) } finally { currentJob = null }`。`CancellationException` **必须**显式 rethrow 不能被 `catch(Throwable)` 吞成 error message（会把用户主动取消显示成"更新失败: JobCancellationException"）。`ProfileOperation` enum（Import/Update/Edit/Duplicate）驱动 `ImportProgressDialog` 标题：列表单条刷新 → Update → "更新配置"；批量走独立 `updateAll` 分支保持"正在更新订阅"；其他 → "导入配置"
+不读代码看不出来的约束。违反会直接踩坑。详细 why 见 memory 文件。
+
+**Override 注入**：所有 override 走 `--override-json` CLI flag + JSON 文件，Kotlin 侧零 YAML 改写。用户设置 `OverrideJsonStore.save()` → `override.user.json`，启动时 `RuntimeOverrideBuilder` 叠加 TUN fd / AppProxy / rootMode → `override.run.json`。`secret` / `external-controller` 走 `--secret` / `--ext-ctl` CLI flag 不进 JSON。详见 `feedback_override_architecture.md`。
+
+**硬编码覆盖订阅**：`tun.enable=true` / `tun.dns-hijack=[0.0.0.0:53]` / `profile.store-selected=false` / `profile.store-fake-ip=true`；透传（null 不输出）：`tun.stack`、`tun.device`（VPN）
+
+**VPN/ROOT TUN 段差异**：VPN 注入 `file-descriptor` + `auto-route=false`；ROOT 注入 `auto-route=true` + `auto-detect-interface=true` + `include/exclude-package`（VPN 不输出 include/exclude，由 VpnService.Builder 管）
+
+**secret 优先级**：用户设置 > 订阅 `config.yaml` 顶层 `secret:`（`ConfigGenerator.readSubscriptionSecret` 轻量行扫描）> 随机 UUID 前 16 字节；ROOT attach 分支走 storage 持久化的 `existingSecret`
+
+**CMFA embed mode 禁 HTTP 配置 API**：`PATCH/PUT /configs` / `POST /restart` / `POST /configs/geo` / `PUT/PATCH /rules` / `POST /upgrade` 全部 404。**绝不添加** `patchConfig`/`restart` 方法，所有配置修改走 `OverrideJsonStore.save()` + `serviceController.restart()`，UI 用 `RestartRequiredHint` Card 提示。详见 `feedback_override_architecture.md`。
+
+**mihomo 子进程规则**：Provider 预下载只走 `mihomo -prefetch`，stdout 必须独立 daemon 线程读（否则 `waitFor(timeout)` 失效），200ms 轮询 + `ensureActive()` 响应取消。详见 `feedback_mihomo_subprocess.md`。
+
+**Mishka 自身包名必须绕过 TUN/VPN**：`ProcessBuilder` 子进程 HTTP 被代理捕获会永久阻塞；ROOT 三种 AppProxyMode 都把 `packageName` 从 include 剔除或塞进 exclude，VPN `AllowSelected` 分支先过滤 self 再 addAllowed，过滤后空列表退化到 `addDisallowedApplication(self)`。详见 `feedback_mihomo_subprocess.md`。
+
+**协程锁规则**：`kotlinx.coroutines.sync.Mutex` **不可重入**。`updateImported`/`commitPending`/`queryImported`/`queryPending` 被 `ProfileProcessor` 在 `withProfileLock { ... }` 内调用，**不能自己加** `profileLock.withLock`；`create`/`patch`/`release`/`clone`/`delete` 直接被 ViewModel 调用，**保留自身** `profileLock.withLock`。详见 `feedback_mutex_not_reentrant.md`。
+
+**Pipeline 协程取消语义**：外层 `runProcess` 可取消，仅 commit 阶段包 `withContext(NonCancellable)` 保证文件 swap + DB 更新原子；catch 块 `cleanupProcessing` 也走 NonCancellable。`cancelCurrentUpdate` 先同步 `clearProgress()` 让 Dialog 立即消失，再 `currentJob?.cancel()` 让协程后台收尾
+
+**ROOT runtime/ 沙箱**：ROOT mihomo 工作目录是独立 `runtime/{uuid}/`（从 imported/ 复制），不碰 imported/。启停钩子：`startProxy` 新鲜启动前 `prepareRootRuntime`；stop/restart/进程监控三条死亡路径都在 `clearPersistedState` 之前 `cleanupRootRuntime`；attach 分支**不重建** runtime/。存量旧 root:root 遗孤由 `MishkaApplication` 后台线程一次性 `su chown -R $APP_UID imported/` 迁移（`StorageKeys.MIGRATION_ROOT_RECLAIM_DONE` 打标）
+
+**订阅导入不自动切换活跃**：`addSubscription`/`addFromFile` 成功后**不**调 `setActive(sub.id)`；仅首次导入（`importedDao.count() == 1`）由 `commitProcessingToImported` 自动激活
+
+**JNI fork+exec**：Android `ProcessBuilder` fork 后强制关闭非标准 fd（无论 O_CLOEXEC），VPN 模式必须用 JNI `fork()+exec()`（`process_helper.c`）保留 TUN fd 继承
+
+**TUN init silent failure 兜底**：mihomo `ReCreateTun` 失败仅 log 不退出。检测规则：① `MishkaTunService` 清 O_CLOEXEC 失败必须视为致命（`closeTunFd` + `ProxyState.Error` + `stopSelf`）② `MihomoRunner.waitForReady` API ready 后 delay 500ms 扫日志匹配 `Start TUN listening error` / `configure tun interface` / `create NetworkUpdateMonitor`
+
+**WebSocket 重连**：Ktor `for (frame in incoming)` graceful close 静默退出。`MihomoWebSocket.webSocketFlow` 自实现无限重连 + 指数退避（1s→30s）+ 20s 心跳；`CancellationException` 必须 rethrow；`connectionState: StateFlow<Boolean>` 粗粒度暴露
+
+**startForeground 防御**：Tun/Root/ProfileWorker 的 onCreate 均 `try { startForeground() } catch(Exception)`。真实风险是 API 31+ `ForegroundServiceStartNotAllowedException` 和 API 34+ FGS type 异常（非 POST_NOTIFICATIONS 拒绝）。失败路径：Tun/Root 上报 `ProxyServiceBridge.Error` + `stopSelf()`；ProfileWorker 仅 `stopSelf()`。**不降级为普通 Service**
+
+**ProfileWorker.jobs**：用 `ConcurrentLinkedQueue<Job>` + `while (true) { jobs.poll()?.join() ?: break }`（非 `mutableListOf` + `while(isActive) delay(1s)` 轮询；onStartCommand 主线程 + scope 协程 IO 跨线程访问需线程安全容器）
+
+**孤儿 mihomo 清理**：`RootHelper.cleanupOrphanedMihomo(tunDevice)` 单次 su shell 完成 pkill + `ip link delete <tunDevice>`（防 sing-tun EEXIST）；device name 走 `escapeShellSingleQuoted` POSIX 转义。VPN 启动在 `hadRootPid || HAS_ROOT` 时触发，清 ROOT 持久化 key + 兜底 `cleanupAllRootRuntime`
+
+**ROOT 模式重连校验**：`attachToExisting` 三重验证（`kill -0` 存活 + `/proc/$pid/cmdline` 含 libmihomo.so + stored secret 通过 `/configs` Bearer 鉴权 2xx）；订阅一致性由 `startProxy` 在 attach 前比对 persisted vs 请求 subscriptionId，不一致走 cleanup + 全新启动
+
+**ROOT 模式热点处置**：sing-tun `auto_route` 的 catch-all ip rule（priority 9002：`NOT iif lo lookup 2022`）不区分本机 vs 转发流量，热点客户端包 iif=wlan2/ap0 也命中被导进 TUN，但 mihomo 对非本机源 IP 处理不稳（黑洞/高丢包）。`RootTetherHijacker` 在 sing-tun 之前插队两种处置模式：
+
+- **BYPASS（默认）**：`ip rule priority 8000/8002` 去程 + 回程均 action=`goto 9010`（sing-tun 自己的 nop marker，ruleStart+10）。去程越过 catch-all 后命中 Android 原生 iif forward rule（`iif <tether> lookup <upstream>`，priority ~21000）→ 走 wlan0/rmnet。回程 goto 过去命中 local_network/main 里的 `<subnet> dev <tether>` 连接路由。
+- **PROXY**：内核态 TPROXY 透明代理——mihomo 启用 `tproxy-port: 7895` 入站监听（IP_TRANSPARENT socket），`iptables -t mangle -A PREROUTING -i <tether> -j mishka_tether` 把热点 TCP+UDP 劫持到 `--on-port 7895 --tproxy-mark 0x01000000/0x01000000`；`ip rule fwmark 0x01000000/0x01000000 lookup 2024 priority 7999` + `ip route add local default dev lo table 2024` 让带 mark 的包在 PREROUTING 里被判定为本机投递、命中 tproxy listener。**完全绕开 sing-tun userspace TCP stack**，延迟/吞吐接近 BYPASS。常量值（0x01000000 bit 24 / table 2024 / priority 7999）对齐 box_for_magisk 一类成熟 Magisk 模块的验证过的取值，避开 Android Netd 低 16 位 mark。
+- **PROXY 降级**：`xt_TPROXY` 内核模块不可用时（部分裁剪 ROM），退回到"ip rule 去程+回程对称 `lookup 2022`"——流量双向进 sing-tun，性能次于 TPROXY 但连接可用。`RootTetherHijacker.probeTproxySupport()` 在 `MishkaRootService.startProxy` 里 runtime 探测；结果驱动 `RuntimeOverrideBuilder.buildAndWriteForRun(tproxyForTether = ...)` 决定是否写 `tproxy-port`。
+- **attach 路径约束**：mihomo 进程启动时 tproxy-port 是否监听已锁死；app 被杀期间用户若改过 tether mode，attach 上去规则会与 mihomo 实际状态错位。`StorageKeys.ROOT_TETHER_MODE_ACTIVE` 在 start 成功后写入当时的 mode 快照，`startProxy` attach 前比对 `ROOT_TETHER_MODE` 与 `ROOT_TETHER_MODE_ACTIVE`——不一致则拒绝 attach，走 fresh restart。
+- **不能** 用 `lookup main`——Android main 表无 default route（default 分散在各 upstream 独立表）。
+- 回程规则靠 `NetworkInterface.getByName(iface)` 读 InterfaceAddress + prefix length 算 CIDR（BYPASS / PROXY-fallback 都要）；接口未就绪（热点后开）会 WARN skip，用户需 restart 代理触发重新 apply。
+- `ip rule add iif <name>` 对不存在接口内核按名注册，接口出现自动生效；`ip rule add to <subnet>` 则需 apply 时接口已有地址。
+- 生命周期：startProxy（含 attach）后 apply；stop/restart/死亡三路径 teardown（NonCancellable）。`teardown()` 清 BYPASS+fallback 的 8000/8001/8002/8003 priority 规则 + TPROXY 路径的 mangle chain `mishka_tether` + fwmark rule (7999) + route table 2024，两类都跑保证任意前置状态都能清干净。TUN table/rule index 固定写入 `override.run.json`（2022/9000）锁定 goto 目标 = 9010。
+- **不做本机 TPROXY**：sing-tun TUN 继续负责本机流量分应用代理 / DNS 劫持；全 TPROXY（对齐 box_for_magisk）需要重写 AppProxy（uid-owner）、DNS（nat REDIRECT）、fake-ip 交互、IPv6 DNS 防泄漏等一整条链，属独立重构范围。
+
+**错误兜底**：用户面向异常走 `Throwable.describe()`（`message ?: simpleName ?: "Unknown error"`），避免 Ktor `ConnectException()` 等无参异常漏到 UI 显示 "null"；`SubscriptionFetcher` 显式检查 `response.status.isSuccess` + 空 body 抛 typed `ImportError`
+
+**其他**：`Activity configChanges=uiMode` 防深浅色切换重建；预测性返回手势走 HiddenApiBypass 反射 `setEnableOnBackInvokedCallback`（Android 14+ 可选）；`network_security_config.xml` 允许 localhost 明文（mihomo API HTTP）；`jniLibs.useLegacyPackaging = true` 确保 libmihomo.so 解压到 nativeLibraryDir
 
 ## UI 规范
 
 - 所有 UI 组件使用 miuix（Card、TopAppBar、NavigationBar、SmallTitle、TextButton 等）
 - 返回按钮使用 MiuixIcons.Back
-- 首页状态卡片参考 KernelSU（CheckCircleOutline 170dp，offset(38,45)）
-- 深色模式：StatusCard 背景 #1A3825，按钮使用 isDark 条件色
 - 底栏图标：Sidebar / Tune / UploadCloud / Settings
 - Badge：`clip(miuixShape(3.dp))` + 9.sp Bold Monospace
 - 操作 IconButton：`minHeight/minWidth = 35.dp, backgroundColor = secondaryContainer`
 - **页面骨架**：Scaffold + TopAppBar(scrollBehavior) + LazyColumn
   - LazyColumn 必须加 `.scrollEndHaptic().overScrollVertical().nestedScroll(scrollBehavior.nestedScrollConnection)`
-  - `contentPadding = PaddingValues(top = innerPadding.calculateTopPadding())` —— 仅设 top，不设 bottom
-  - 首个 item（非 RestartRequiredHint 场景）用 `item { Spacer(Modifier.height(12.dp)) }` 顶部呼吸
-  - 末尾 item 统一 `item { Spacer(Modifier.height(24.dp).navigationBarsPadding()) }` 吸收导航栏 + 24dp 留白
-  - Screen 签名**不要 `bottomPadding: Dp` 参数**（旧惯例已弃用，参 AppProxy/FileManager/ExternalControl）
-- **Card 间距**：水平 12.dp，每项统一 `padding(horizontal = 12.dp).padding(bottom = 12.dp)`；不使用 `Arrangement.spacedBy`（间距由每项 padding 承担）
-- **TextField 表单**：不包 Card，直接 `padding(horizontal = 12.dp).padding(bottom = 12.dp)`（参 SubscriptionEditScreen / FileManagerEditorScreen）
-- **Edit Dialog 按钮顺序**：`not_modified | cancel | confirm`（三按钮等宽 weight(1f) + `spacedBy(8.dp)`）；confirm 用 `ButtonDefaults.textButtonColorsPrimary()`，reset（`not_modified`）回调中调用 `showToast(dialog_reset_done)`
-- **用户反馈**：`platform.showToast(message, long = false)` —— 轻量操作结果提示（重置/应用成功等），Android 走系统 Toast 主线程派发，Desktop 空实现
-- **i18n**：所有面向用户的字符串必须使用 `stringResource(Res.string.xxx)`（Compose）或 `getString(R.string.xxx)`（Android Service），禁止硬编码
-  - 新增字符串需同时添加到 `values/strings.xml`（英文）和 `values-zh-rCN/strings.xml`（中文）
-  - key 命名：`{页面}_{描述}`，通用按钮用 `common_` 前缀
-  - 日志消息用英文，代码注释保留中文
+  - `contentPadding = PaddingValues(top = innerPadding.calculateTopPadding())`——仅设 top，不设 bottom
+  - 首个 item（非 RestartRequiredHint）用 `item { Spacer(Modifier.height(12.dp)) }` 顶部呼吸
+  - 末尾 item 统一 `item { Spacer(Modifier.height(24.dp).navigationBarsPadding()) }` 吸收导航栏 + 留白
+  - Screen 签名**不要 `bottomPadding: Dp` 参数**
+- **Card 间距**：水平 12.dp，每项统一 `padding(horizontal = 12.dp).padding(bottom = 12.dp)`；不使用 `Arrangement.spacedBy`
+- **TextField 表单**：不包 Card，直接 `padding(horizontal = 12.dp).padding(bottom = 12.dp)`
+- **Edit Dialog 按钮顺序**：`not_modified | cancel | confirm`（三按钮 weight(1f) + `spacedBy(8.dp)`），confirm 用 `ButtonDefaults.textButtonColorsPrimary()`
+- **用户反馈**：`platform.showToast(message, long = false)`——轻量操作结果提示
+- **i18n**：所有用户字符串走 `stringResource(Res.string.xxx)` 或 `getString(R.string.xxx)`，禁止硬编码
+  - 新增字符串同时加到 `values/strings.xml` + `values-zh-rCN/strings.xml`
+  - key 命名：`{页面}_{描述}`，通用按钮 `common_` 前缀
+  - 日志消息英文，代码注释中文

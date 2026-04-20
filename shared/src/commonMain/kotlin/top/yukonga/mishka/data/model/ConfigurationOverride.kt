@@ -74,6 +74,8 @@ data class TunOverride(
     @SerialName("dns-hijack") var dnsHijack: List<String>? = null,
     @SerialName("include-package") var includePackage: List<String>? = null,
     @SerialName("exclude-package") var excludePackage: List<String>? = null,
+    @SerialName("iproute2-table-index") var iproute2TableIndex: Int? = null,
+    @SerialName("iproute2-rule-index") var iproute2RuleIndex: Int? = null,
 )
 
 @Serializable

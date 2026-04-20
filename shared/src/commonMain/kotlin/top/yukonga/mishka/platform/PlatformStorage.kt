@@ -37,6 +37,10 @@ object StorageKeys {
 
     // ROOT 设置
     const val ROOT_TUN_DEVICE = "root_tun_device"
+    const val ROOT_TETHER_MODE = "root_tether_mode"
+    const val ROOT_TETHER_IFACES = "root_tether_ifaces"
+    // 启动时生效的 tether mode 快照；attach 路径用它判断 app 被杀期间用户是否改过模式
+    const val ROOT_TETHER_MODE_ACTIVE = "root_tether_mode_active"
 
     // 通用设置
     const val DARK_MODE = "dark_mode"
