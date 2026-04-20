@@ -28,6 +28,8 @@ import mishka.shared.generated.resources.common_back
 import mishka.shared.generated.resources.common_cancel
 import mishka.shared.generated.resources.common_confirm
 import mishka.shared.generated.resources.network_input_value
+import mishka.shared.generated.resources.root_attach_force_reapply_summary
+import mishka.shared.generated.resources.root_attach_force_reapply_title
 import mishka.shared.generated.resources.root_section_device
 import mishka.shared.generated.resources.root_section_tether
 import mishka.shared.generated.resources.root_settings_title
@@ -36,6 +38,8 @@ import mishka.shared.generated.resources.root_tether_mode_bypass
 import mishka.shared.generated.resources.root_tether_mode_proxy
 import mishka.shared.generated.resources.root_tether_mode_title
 import mishka.shared.generated.resources.root_tproxy_tether_note
+import mishka.shared.generated.resources.root_tun_jumbo_mtu_summary
+import mishka.shared.generated.resources.root_tun_jumbo_mtu_title
 import mishka.shared.generated.resources.settings_tun_device
 import org.jetbrains.compose.resources.stringResource
 import top.yukonga.mishka.platform.PlatformStorage
@@ -58,6 +62,7 @@ import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Back
 import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.preference.OverlayDropdownPreference
+import top.yukonga.miuix.kmp.preference.SwitchPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.overScrollVertical
 import top.yukonga.miuix.kmp.utils.scrollEndHaptic
@@ -84,6 +89,14 @@ fun RootSettingsScreen(
     }
     var showTunDeviceDialog by remember { mutableStateOf(false) }
     val tunDeviceTextState = rememberTextFieldState()
+
+    var jumboMtu by remember {
+        mutableStateOf(storage.getString(StorageKeys.ROOT_TUN_JUMBO_MTU, "true") == "true")
+    }
+
+    var forceReapply by remember {
+        mutableStateOf(storage.getString(StorageKeys.ROOT_ATTACH_FORCE_REAPPLY, "false") == "true")
+    }
 
     val bypassLabel = stringResource(Res.string.root_tether_mode_bypass)
     val proxyLabel = stringResource(Res.string.root_tether_mode_proxy)
@@ -144,6 +157,15 @@ fun RootSettingsScreen(
                         },
                         enabled = !isProxyRunning,
                     )
+                    SwitchPreference(
+                        title = stringResource(Res.string.root_tun_jumbo_mtu_title),
+                        summary = stringResource(Res.string.root_tun_jumbo_mtu_summary),
+                        checked = jumboMtu,
+                        onCheckedChange = {
+                            jumboMtu = it
+                            storage.putString(StorageKeys.ROOT_TUN_JUMBO_MTU, it.toString())
+                        },
+                    )
                 }
             }
             item { SmallTitle(text = stringResource(Res.string.root_section_tether)) }
@@ -178,6 +200,15 @@ fun RootSettingsScreen(
                         title = stringResource(Res.string.root_tether_ifaces_title),
                         summary = tetherInterfaceSummary(tetherIfaces),
                         onClick = { showTetherDialog = true },
+                    )
+                    SwitchPreference(
+                        title = stringResource(Res.string.root_attach_force_reapply_title),
+                        summary = stringResource(Res.string.root_attach_force_reapply_summary),
+                        checked = forceReapply,
+                        onCheckedChange = {
+                            forceReapply = it
+                            storage.putString(StorageKeys.ROOT_ATTACH_FORCE_REAPPLY, it.toString())
+                        },
                     )
                 }
             }

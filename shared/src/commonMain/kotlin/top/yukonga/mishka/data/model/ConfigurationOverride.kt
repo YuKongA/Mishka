@@ -77,6 +77,9 @@ data class TunOverride(
     @SerialName("exclude-package") var excludePackage: List<String>? = null,
     @SerialName("iproute2-table-index") var iproute2TableIndex: Int? = null,
     @SerialName("iproute2-rule-index") var iproute2RuleIndex: Int? = null,
+    @SerialName("mtu") var mtu: Int? = null,
+    @SerialName("gso") var gso: Boolean? = null,
+    @SerialName("gso-max-size") var gsoMaxSize: Int? = null,
 )
 
 @Serializable

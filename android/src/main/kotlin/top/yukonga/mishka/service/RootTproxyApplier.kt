@@ -49,19 +49,6 @@ object RootTproxyApplier {
     private const val CHAIN_DNS_PRE = "mishka_dns_pre"
     private const val CHAIN_DNS_OUT = "mishka_dns_out"
 
-    // ========== 局域网 / 保留网段（同三家模块，用于 RETURN） ==========
-    private val INTRANET_V4 = listOf(
-        "0.0.0.0/8", "10.0.0.0/8", "100.64.0.0/10", "127.0.0.0/8",
-        "169.254.0.0/16", "172.16.0.0/12", "192.0.0.0/24", "192.0.2.0/24",
-        "192.88.99.0/24", "192.168.0.0/16", "198.51.100.0/24", "203.0.113.0/24",
-        "224.0.0.0/4", "240.0.0.0/4", "255.255.255.255/32",
-    )
-    private val INTRANET_V6 = listOf(
-        "::/128", "::1/128", "::ffff:0:0/96", "100::/64", "64:ff9b::/96",
-        "2001::/32", "2001:10::/28", "2001:20::/28", "2001:db8::/32",
-        "2002::/16", "fc00::/7", "fe80::/10", "ff00::/8",
-    )
-
     /**
      * 探测 xt_TPROXY 支持。复用 [RootTetherHijacker.probeTproxySupport]。
      */
@@ -94,6 +81,25 @@ object RootTproxyApplier {
         Log.i(TAG, "teardown")
         val code = RootHelper.runRootScriptHeredoc(buildTeardownScript(), timeoutSeconds = 15)
         Log.i(TAG, "teardown finished code=$code")
+    }
+
+    /**
+     * Attach 路径快速自检：本类的任一显著 anchor 是否仍存在。
+     * anchor 选 `mishka_tproxy_pre` / `mishka_tproxy_out` chain 与 priority 7999 ip rule —— 任一
+     * 存在即视为规则未被清掉，attach 可 skip re-apply。任一 anchor 缺失即视为需要 re-apply。
+     *
+     * exit 0 表示存在、1 表示不存在、其他为 shell/su 错误（保守当作"存在"避免误清）。
+     */
+    fun anyRulesPresent(): Boolean {
+        val script = """
+            #!/system/bin/sh
+            iptables -t mangle -S 2>/dev/null | grep -q '$CHAIN_PRE' && exit 0
+            iptables -t mangle -S 2>/dev/null | grep -q '$CHAIN_OUT' && exit 0
+            ip rule show 2>/dev/null | grep -q '^$PRIORITY:' && exit 0
+            exit 1
+        """.trimIndent()
+        val code = RootHelper.runRootScriptHeredoc(script, timeoutSeconds = 3)
+        return code != 1
     }
 
     // ========================================================================
@@ -307,11 +313,11 @@ object RootTproxyApplier {
      * v4 严格（失败即 bug），v6 best-effort（部分 ROM v6 mangle 可能受限，失败静默）。
      */
     private fun appendIntranetReturns(sb: StringBuilder, table: String, chain: String) {
-        for (net in INTRANET_V4) {
+        for (net in IptablesIntranet.V4) {
             sb.appendLine("iptables -w -t $table -A $chain -d $net -p udp ! --dport 53 -j RETURN")
             sb.appendLine("iptables -w -t $table -A $chain -d $net ! -p udp -j RETURN")
         }
-        for (net in INTRANET_V6) {
+        for (net in IptablesIntranet.V6) {
             sb.appendLine("ip6tables -w -t $table -A $chain -d $net -p udp ! --dport 53 -j RETURN 2>/dev/null")
             sb.appendLine("ip6tables -w -t $table -A $chain -d $net ! -p udp -j RETURN 2>/dev/null")
         }

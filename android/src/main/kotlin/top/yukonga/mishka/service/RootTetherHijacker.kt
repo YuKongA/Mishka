@@ -1,6 +1,7 @@
 package top.yukonga.mishka.service
 
 import android.util.Log
+import top.yukonga.mishka.service.RootTetherHijacker.verifyClean
 import java.net.Inet4Address
 import java.net.Inet6Address
 import java.net.NetworkInterface
@@ -61,6 +62,10 @@ object RootTetherHijacker {
     // 自定义 mangle chain 名
     private const val CHAIN_NAME = "mishka_tether"
 
+    // DIVERT 子 chain：已建立连接（socket 已 attach 到 mihomo listener）的后续包走这里
+    // 仅打 fwmark + ACCEPT，跳过后面的 TPROXY 目标，避免每包重复 socket lookup
+    private const val CHAIN_DIVERT_NAME = "mishka_tether_divert"
+
     const val DEFAULT_IFACES = "wlan1,wlan2"
 
     enum class Mode(val storageValue: String) {
@@ -120,9 +125,15 @@ object RootTetherHijacker {
         applyIpRuleAction(interfaces, action = "goto $BYPASS_GOTO_TARGET", label = "bypass")
 
     /**
-     * PROXY + TPROXY：mangle PREROUTING -i <tether> -j CHAIN，CHAIN 对 TCP+UDP 打 fwmark
-     * 并 TPROXY 到 mihomo tproxy-port；fwmark 命中专用 route table（含 `local default dev lo`）
-     * 触发本机投递，kernel 在 PREROUTING 里就把 socket 查找指向了 IP_TRANSPARENT listener。
+     * PROXY + TPROXY：mangle PREROUTING -i <tether> -j CHAIN，CHAIN 分两路处置：
+     *
+     * - **已建立连接的快速通道**：`-m socket` 命中已 attach mihomo listener 的包
+     *   跳转到 DIVERT 子 chain（仅打 fwmark + ACCEPT）。fwmark 再经本 chain 末段的
+     *   fwmark ip rule 命中 `table FWMARK_TABLE`，`local default dev lo` 把包判定
+     *   为本机投递，内核直接把包送到已有 socket，不再做 TPROXY 目标的完整 socket
+     *   lookup。长连吞吐 / 延迟抖动显著改善（对齐 RootTproxyApplier 本机路径思路）。
+     * - **新连接**：对 TCP+UDP 走 `-j TPROXY` 到 mihomo tproxy-port（IP_TRANSPARENT
+     *   socket），首个包建立 socket 后续包即走上面的 DIVERT 快速通道。
      *
      * `ip route add local default dev lo table <X>` 是 TPROXY 套路的命门 —— 没有这条
      * 带 fwmark 的包找不到接收 socket，直接被丢。
@@ -131,43 +142,90 @@ object RootTetherHijacker {
         // 幂等：清理残留（旧版升级路径 / 上次异常退出）
         teardownTproxy()
 
-        // 1. 专用 mangle chain
-        for (cmd in listOf("iptables", "ip6tables")) {
-            runWithOutput("$cmd -t mangle -N $CHAIN_NAME")
-        }
-        val onIp4 = "127.0.0.1"
-        val onIp6 = "::1"
-        runWithOutput(
-            "iptables -t mangle -A $CHAIN_NAME -p tcp -j TPROXY " +
-                "--on-ip $onIp4 --on-port $TPROXY_PORT --tproxy-mark $TPROXY_MARK/$TPROXY_MASK"
-        )
-        runWithOutput(
-            "iptables -t mangle -A $CHAIN_NAME -p udp -j TPROXY " +
-                "--on-ip $onIp4 --on-port $TPROXY_PORT --tproxy-mark $TPROXY_MARK/$TPROXY_MASK"
-        )
-        runWithOutput(
-            "ip6tables -t mangle -A $CHAIN_NAME -p tcp -j TPROXY " +
-                "--on-ip $onIp6 --on-port $TPROXY_PORT --tproxy-mark $TPROXY_MARK/$TPROXY_MASK"
-        )
-        runWithOutput(
-            "ip6tables -t mangle -A $CHAIN_NAME -p udp -j TPROXY " +
-                "--on-ip $onIp6 --on-port $TPROXY_PORT --tproxy-mark $TPROXY_MARK/$TPROXY_MASK"
-        )
+        // 整体 apply 走 heredoc 单次 su 调用：CIDR RETURN 规则 ~60 条，per-cmd 模式
+        // 每条 ~50-100ms 会让 apply 慢 3-6s；heredoc 单次 fork 全部完成。
+        val script = buildApplyTproxyScript(interfaces)
+        val code = RootHelper.runRootScriptHeredoc(script, timeoutSeconds = 15)
+        Log.i(TAG, "applyTproxy finished code=$code ifaces=$interfaces")
+    }
 
-        // 2. 每个热点接口挂 PREROUTING → 跳 CHAIN
+    private fun buildApplyTproxyScript(interfaces: List<String>): String {
+        val sb = StringBuilder()
+        sb.appendLine("#!/system/bin/sh")
+        sb.appendLine("set +e")
+
+        // 1. 专用 mangle chain（主链 + DIVERT 子链）
+        sb.appendLine("# === 1. create chains ===")
+        for (bin in listOf("iptables", "ip6tables")) {
+            sb.appendLine("$bin -w -t mangle -N $CHAIN_NAME 2>/dev/null")
+            sb.appendLine("$bin -w -t mangle -N $CHAIN_DIVERT_NAME 2>/dev/null")
+        }
+
+        // 2. DIVERT 子链：ESTABLISHED 流快速通道（MARK + ACCEPT 终止本链匹配）
+        sb.appendLine("# === 2. DIVERT chain (fast path for ESTABLISHED) ===")
+        for (bin in listOf("iptables", "ip6tables")) {
+            sb.appendLine("$bin -w -t mangle -A $CHAIN_DIVERT_NAME -j MARK --set-xmark $TPROXY_MARK/$TPROXY_MASK")
+            sb.appendLine("$bin -w -t mangle -A $CHAIN_DIVERT_NAME -j ACCEPT")
+        }
+
+        // 3a. 主链头部：丢弃 conntrack INVALID 包（协议栈异常 / 序列号乱跳 / 校验失败），
+        //     避免无效包浪费下游 -m socket 查询与 TPROXY 目标匹配
+        sb.appendLine("# === 3a. drop INVALID ===")
+        for (bin in listOf("iptables", "ip6tables")) {
+            sb.appendLine("$bin -w -t mangle -A $CHAIN_NAME -m conntrack --ctstate INVALID -j DROP 2>/dev/null")
+        }
+
+        // 3. 主链头部：intranet RETURN（除 UDP/53 外）
+        //    热点客户端访问局域网（ARP/DHCP/mDNS/AirDrop/SMB/192.168.x.x gateway 等）
+        //    直接跳出，不进 DIVERT / TPROXY。DNS 留给 TPROXY 让 mihomo 处理 fake-ip。
+        sb.appendLine("# === 3. intranet RETURN (except UDP/53) ===")
+        for (net in IptablesIntranet.V4) {
+            sb.appendLine("iptables -w -t mangle -A $CHAIN_NAME -d $net -p udp ! --dport 53 -j RETURN")
+            sb.appendLine("iptables -w -t mangle -A $CHAIN_NAME -d $net ! -p udp -j RETURN")
+        }
+        for (net in IptablesIntranet.V6) {
+            sb.appendLine("ip6tables -w -t mangle -A $CHAIN_NAME -d $net -p udp ! --dport 53 -j RETURN 2>/dev/null")
+            sb.appendLine("ip6tables -w -t mangle -A $CHAIN_NAME -d $net ! -p udp -j RETURN 2>/dev/null")
+        }
+
+        // 4. 已有 socket → DIVERT（跳过 TPROXY 重拦截）
+        sb.appendLine("# === 4. established socket → DIVERT ===")
+        for (bin in listOf("iptables", "ip6tables")) {
+            sb.appendLine("$bin -w -t mangle -A $CHAIN_NAME -p tcp -m socket -j $CHAIN_DIVERT_NAME")
+            sb.appendLine("$bin -w -t mangle -A $CHAIN_NAME -p udp -m socket -j $CHAIN_DIVERT_NAME")
+        }
+
+        // 5. 新连接 → TPROXY 到 mihomo tproxy-port
+        sb.appendLine("# === 5. new flows → TPROXY ===")
+        for (proto in listOf("tcp", "udp")) {
+            sb.appendLine(
+                "iptables -w -t mangle -A $CHAIN_NAME -p $proto -j TPROXY " +
+                        "--on-ip 127.0.0.1 --on-port $TPROXY_PORT --tproxy-mark $TPROXY_MARK/$TPROXY_MASK"
+            )
+            sb.appendLine(
+                "ip6tables -w -t mangle -A $CHAIN_NAME -p $proto -j TPROXY " +
+                        "--on-ip ::1 --on-port $TPROXY_PORT --tproxy-mark $TPROXY_MARK/$TPROXY_MASK 2>/dev/null"
+            )
+        }
+
+        // 6. 每个热点接口挂 PREROUTING → 跳 CHAIN
+        sb.appendLine("# === 6. attach PREROUTING per tether iface ===")
         for (iface in interfaces) {
-            val escaped = RootHelper.escapeShellSingleQuoted(iface)
-            val v4 = runWithOutput("iptables -t mangle -A PREROUTING -i $escaped -j $CHAIN_NAME")
-            val v6 = runWithOutput("ip6tables -t mangle -A PREROUTING -i $escaped -j $CHAIN_NAME")
-            Log.i(TAG, "tproxy iif=$iface v4[code=${v4.code}, out=${v4.output.oneLine()}] v6[code=${v6.code}, out=${v6.output.oneLine()}]")
+            val esc = RootHelper.escapeShellSingleQuoted(iface)
+            sb.appendLine("iptables -w -t mangle -A PREROUTING -i $esc -j $CHAIN_NAME")
+            sb.appendLine("ip6tables -w -t mangle -A PREROUTING -i $esc -j $CHAIN_NAME 2>/dev/null")
         }
 
-        // 3. 策略路由：fwmark → 专用表；表里声明整个地址空间为 local → 内核在 PREROUTING
-        //    重新查路由时会把包判定为"本机投递"，从而触发 TPROXY socket 匹配
-        runWithOutput("ip rule add fwmark $TPROXY_MARK/$TPROXY_MASK lookup $FWMARK_TABLE priority $PRIORITY_FWMARK")
-        runWithOutput("ip -6 rule add fwmark $TPROXY_MARK/$TPROXY_MASK lookup $FWMARK_TABLE priority $PRIORITY_FWMARK")
-        runWithOutput("ip route add local default dev lo table $FWMARK_TABLE")
-        runWithOutput("ip -6 route add local default dev lo table $FWMARK_TABLE")
+        // 7. 策略路由：fwmark → 专用表；表里声明整个地址空间为 local → 内核在 PREROUTING
+        //    重新查路由时会把包判定为"本机投递"，从而触发 TPROXY socket 匹配 / DIVERT 命中 socket
+        sb.appendLine("# === 7. fwmark policy routing ===")
+        sb.appendLine("ip rule add fwmark $TPROXY_MARK/$TPROXY_MASK lookup $FWMARK_TABLE priority $PRIORITY_FWMARK 2>/dev/null")
+        sb.appendLine("ip -6 rule add fwmark $TPROXY_MARK/$TPROXY_MASK lookup $FWMARK_TABLE priority $PRIORITY_FWMARK 2>/dev/null")
+        sb.appendLine("ip route add local default dev lo table $FWMARK_TABLE 2>/dev/null")
+        sb.appendLine("ip -6 route add local default dev lo table $FWMARK_TABLE 2>/dev/null")
+
+        sb.appendLine("exit 0")
+        return sb.toString()
     }
 
     /**
@@ -258,11 +316,58 @@ object RootTetherHijacker {
     /**
      * 全路径清理：BYPASS ip rule + fallback ip rule + TPROXY chain & 策略路由。
      * 两类都跑，保证从任意前置状态清理干净（例如从旧版 PROXY 升级、xt_TPROXY 时有时无）。
+     *
+     * 清理后 [verifyClean] 扫关键锚点，若仍残留重试一次。仍残留则 Log.w 记录供诊断
+     * （不阻止 stop 流程；与第三方模块共存被引用时内核会拒绝删，属预期）。
      */
     fun teardown() {
         Log.i(TAG, "Tearing down tether rules")
+        runTeardownPass()
+        val report = verifyClean()
+        if (report.residual.isEmpty()) {
+            Log.i(TAG, "teardown verified clean")
+            return
+        }
+        Log.w(TAG, "teardown residual after first pass (${report.residual.size}): ${report.residual}, retrying")
+        runTeardownPass()
+        val retryReport = verifyClean()
+        if (retryReport.residual.isEmpty()) {
+            Log.i(TAG, "teardown verified clean after retry")
+        } else {
+            Log.w(
+                TAG,
+                "teardown residual after retry (${retryReport.residual.size}): ${retryReport.residual} — manual intervention may be needed"
+            )
+        }
+    }
+
+    private fun runTeardownPass() {
         teardownIpRulesByPriority()
         teardownTproxy()
+    }
+
+    private data class TeardownReport(val residual: List<String>)
+
+    /** 扫关键锚点：5 个 ip rule priority + 2 个 iptables chain + 专用 route table */
+    private fun verifyClean(): TeardownReport {
+        val residual = mutableListOf<String>()
+        val v4Rules = runWithOutput("ip rule show").output
+        val v6Rules = runWithOutput("ip -6 rule show").output
+        for (pri in listOf(PRIORITY_V4, PRIORITY_V6, PRIORITY_RETURN_V4, PRIORITY_RETURN_V6, PRIORITY_FWMARK)) {
+            // `ip rule show` 行格式 "<pri>:\tfrom all ..."，前缀 `<pri>:` 精确匹配
+            if (v4Rules.lineSequence().any { it.startsWith("$pri:") }) residual += "v4 ip rule priority $pri"
+            if (v6Rules.lineSequence().any { it.startsWith("$pri:") }) residual += "v6 ip rule priority $pri"
+        }
+        for (bin in listOf("iptables", "ip6tables")) {
+            val mangle = runWithOutput("$bin -t mangle -S").output
+            if (mangle.contains(CHAIN_NAME)) residual += "$bin mangle chain $CHAIN_NAME present"
+            if (mangle.contains(CHAIN_DIVERT_NAME)) residual += "$bin mangle chain $CHAIN_DIVERT_NAME present"
+        }
+        val t4 = runWithOutput("ip route show table $FWMARK_TABLE").output
+        val t6 = runWithOutput("ip -6 route show table $FWMARK_TABLE").output
+        if (t4.isNotBlank()) residual += "v4 route table $FWMARK_TABLE non-empty"
+        if (t6.isNotBlank()) residual += "v6 route table $FWMARK_TABLE non-empty"
+        return TeardownReport(residual)
     }
 
     /** 清理 BYPASS 和 PROXY-fallback 共用的 8000-8003 priority ip rule。 */
@@ -278,7 +383,8 @@ object RootTetherHijacker {
 
     /** 清理 TPROXY 相关 iptables chain、fwmark ip rule、专用 route table。 */
     private fun teardownTproxy() {
-        // 先拆 PREROUTING jump 再 flush/delete chain —— 被引用的 chain 不能 -X
+        // 先拆 PREROUTING jump，再 flush CHAIN_NAME（其内部 `-j DIVERT` 规则一并清除），
+        // 然后才能 -X DIVERT。被引用的 chain 不能直接 -X。
         // apply 时规则是 `-A PREROUTING -i <iface> -j mishka_tether`，teardown 必须精确匹配
         // （iptables -D 不接受模糊匹配），所以列出所有引用 CHAIN_NAME 的 PREROUTING 规则
         // 把原文 `-A PREROUTING ...` 改为 `-D PREROUTING ...` 逐条执行
@@ -286,6 +392,8 @@ object RootTetherHijacker {
             deletePreroutingJumpsReferencing(bin, CHAIN_NAME)
             runWithOutput("$bin -t mangle -F $CHAIN_NAME")
             runWithOutput("$bin -t mangle -X $CHAIN_NAME")
+            runWithOutput("$bin -t mangle -F $CHAIN_DIVERT_NAME")
+            runWithOutput("$bin -t mangle -X $CHAIN_DIVERT_NAME")
         }
         // fwmark ip rule
         drainRulesByPriority(v6 = false, priority = PRIORITY_FWMARK)
@@ -323,6 +431,24 @@ object RootTetherHijacker {
 
     fun parseInterfaces(raw: String): List<String> =
         raw.split(',').map { it.trim() }.filter { it.isNotEmpty() }.distinct()
+
+    /**
+     * Attach 路径快速自检：本类的任一显著 anchor 是否仍存在。
+     * - BYPASS / PROXY-fallback：ip rule priority 8000 存在
+     * - PROXY-TPROXY：ip rule priority 7999 存在 或 `mishka_tether` chain 存在
+     *
+     * app 被杀期间若 iptables 被第三方模块清过（或系统重启），任一 anchor 缺失即视为"规则
+     * 已丢"，attach 路径应当 re-apply；全部存在则 skip 重建，避免不必要的 teardown+apply。
+     */
+    fun anyRulesPresent(): Boolean {
+        val v4Rules = runWithOutput("ip rule show").output
+        if (v4Rules.lineSequence().any { it.startsWith("$PRIORITY_V4:") || it.startsWith("$PRIORITY_FWMARK:") }) {
+            return true
+        }
+        val mangle4 = runWithOutput("iptables -t mangle -S").output
+        if (mangle4.contains(CHAIN_NAME)) return true
+        return false
+    }
 
     /** 启动代理后 dump 一次完整路由状态，便于诊断"规则加了但没生效"类问题。 */
     private fun dumpState() {

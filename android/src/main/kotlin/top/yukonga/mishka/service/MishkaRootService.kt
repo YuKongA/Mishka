@@ -171,15 +171,25 @@ class MishkaRootService : Service() {
                 if (runner.attachToExisting(existingPid, existingSecret, ec, subscriptionId)) {
                     val existingStartTime = storage.getString(StorageKeys.ROOT_START_TIME, "").toLongOrNull() ?: Clock.System.now().toEpochMilliseconds()
                     Log.i(TAG, "Reconnected to existing mihomo: pid=$existingPid submode=${submode.storageValue}")
-                    // App 进程重启后内存态丢失：重新 probe + apply 幂等规则
+                    // App 进程重启后内存态丢失：规则默认仍在（mihomo 进程一直活着，iptables
+                    // 在内核里也一直活着），无需重建。但系统重启 / 与其他代理模块共存被清过
+                    // 时规则会丢；attach 分支先 probe anyRulesPresent()，缺失才 re-apply。
+                    // ROOT_ATTACH_FORCE_REAPPLY=true 可强制 re-apply，诊断用。
                     when (submode) {
                         Submode.Tun -> {
                             val activeMode = RootTetherHijacker.Mode.from(tetherModeActive.ifEmpty { tetherModeRequested })
                             val tproxySupported = activeMode == RootTetherHijacker.Mode.PROXY &&
                                 RootTetherHijacker.probeTproxySupport()
-                            applyTetherRulesActive(storage, tproxySupported)
+                            if (shouldReapplyOnAttach(storage, RootTetherHijacker::anyRulesPresent)) {
+                                applyTetherRulesActive(storage, tproxySupported)
+                            }
                         }
-                        Submode.Tproxy -> applyTproxyRules(storage)
+
+                        Submode.Tproxy -> {
+                            if (shouldReapplyOnAttach(storage, RootTproxyApplier::anyRulesPresent)) {
+                                applyTproxyRules(storage)
+                            }
+                        }
                     }
                     ProxyServiceBridge.updateState(ProxyServiceStatus(ProxyState.Running, secret = existingSecret, externalController = ec, tunMode = tunMode, startTime = existingStartTime, mihomoPid = runner.pid))
                     dynamicNotification.startOrFallbackStatic(storage, existingSecret, ec, tunMode)
@@ -324,6 +334,25 @@ class MishkaRootService : Service() {
             AppListProvider(this@MishkaRootService).resolveUids(packages)
         }
         RootTproxyApplier.apply(appUid, selectedUids, proxyMode, ifaces)
+    }
+
+    /**
+     * Attach 路径：决定是否 re-apply 规则。默认行为——先 probe 规则是否存在，present 跳过。
+     * ROOT_ATTACH_FORCE_REAPPLY=true 时强制 re-apply（诊断开关）。
+     */
+    private fun shouldReapplyOnAttach(storage: PlatformStorage, probe: () -> Boolean): Boolean {
+        val force = storage.getString(StorageKeys.ROOT_ATTACH_FORCE_REAPPLY, "false") == "true"
+        if (force) {
+            Log.i(TAG, "attach: force re-apply (ROOT_ATTACH_FORCE_REAPPLY=true)")
+            return true
+        }
+        val present = probe()
+        if (present) {
+            Log.i(TAG, "attach: probe found existing rules, skip re-apply")
+        } else {
+            Log.i(TAG, "attach: probe found rules missing, will re-apply")
+        }
+        return !present
     }
 
     /**

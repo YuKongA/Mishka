@@ -252,6 +252,10 @@
     <string name="root_tether_scan_empty">No active hotspot interface detected</string>
     <string name="root_tether_scan_result_title">Detected interfaces</string>
     <string name="root_tproxy_tether_note">TPROXY mode proxies all hotspot traffic via kernel rules; no Bypass/Through toggle needed.</string>
+    <string name="root_tun_jumbo_mtu_title">Jumbo MTU &amp; GSO</string>
+    <string name="root_tun_jumbo_mtu_summary">Large-packet aggregation (mtu=9000, gso=on) reduces per-packet syscalls for throughput. Disable if the upstream link drops fragmented traffic.</string>
+    <string name="root_attach_force_reapply_title">Force re-apply on reconnect</string>
+    <string name="root_attach_force_reapply_summary">Diagnostic: re-apply iptables rules every time the app reattaches to a running mihomo. Leave off unless tether rules disappear after reconnect.</string>
 
     <!-- Network Settings -->
     <string name="network_settings_title">Override Settings</string>

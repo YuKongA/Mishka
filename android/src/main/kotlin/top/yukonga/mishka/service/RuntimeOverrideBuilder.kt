@@ -69,6 +69,12 @@ object RuntimeOverrideBuilder {
             // → mihomo 出站全部 `network unreachable`。iptables 改用 `-m owner --uid-owner 0`
             // 放行 mihomo（它以 root 运行），副作用是所有 root 进程都不经 TPROXY，但用户 app 正常代理
             routingMark = userOverride.routingMark,
+            // tcp-concurrent：代理侧并发拨号，显著降低首包延迟，多客户端并发场景尤其有效；
+            // find-process-mode=off：ROOT TUN 分应用已由 sing-tun include/exclude-package 的 uidrange
+            // 处理，mihomo 运行期遍历 /proc 查进程纯属冗余；VPN 模式 AppProxy 走 VpnService 同理。
+            // 用户显式设置优先：仅在未设置时注入默认值
+            tcpConcurrent = userOverride.tcpConcurrent ?: true,
+            findProcessMode = userOverride.findProcessMode ?: "off",
             dns = buildDnsOverride(tunMode, userOverride.dns),
             tun = buildTunOverride(context, tunMode, tunFd, userOverride.tun),
             profile = ProfileOverride(storeSelected = false, storeFakeIp = true),
@@ -150,6 +156,14 @@ object RuntimeOverrideBuilder {
         val device = userTun?.device
             ?: if (isRootTun) storage.getString(StorageKeys.ROOT_TUN_DEVICE, DEFAULT_TUN_DEVICE) else null
 
+        // sing-tun userspace TUN 性能：mtu=9000 + gso + gso-max-size=65535 让大包聚合
+        // 减少每包 read syscall；仅 ROOT TUN 场景注入（VPN 的 MTU 由 VpnService.Builder 系统管）。
+        // 用户 override 的同名字段优先级最高，允许极端 ROM 下手动回退。
+        val jumbo = storage.getString(StorageKeys.ROOT_TUN_JUMBO_MTU, "true") == "true"
+        val rootTunMtu: Int? = if (isRootTun) (if (jumbo) 9000 else 1500) else null
+        val rootTunGso: Boolean? = if (isRootTun) jumbo else null
+        val rootTunGsoMax: Int? = if (isRootTun && jumbo) 65535 else null
+
         return TunOverride(
             enable = true,
             device = device,
@@ -163,6 +177,9 @@ object RuntimeOverrideBuilder {
             excludePackage = exclude,
             iproute2TableIndex = if (isRootTun) ROOT_TUN_TABLE else null,
             iproute2RuleIndex = if (isRootTun) ROOT_TUN_RULE_INDEX else null,
+            mtu = userTun?.mtu ?: rootTunMtu,
+            gso = userTun?.gso ?: rootTunGso,
+            gsoMaxSize = userTun?.gsoMaxSize ?: rootTunGsoMax,
         )
     }
 
