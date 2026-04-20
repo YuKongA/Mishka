@@ -17,6 +17,7 @@ data class ConfigurationOverride(
     @SerialName("redir-port") var redirPort: Int? = null,
     @SerialName("tproxy-port") var tproxyPort: Int? = null,
     @SerialName("mixed-port") var mixedPort: Int? = null,
+    @SerialName("routing-mark") var routingMark: Int? = null,
     @SerialName("allow-lan") var allowLan: Boolean? = null,
     @SerialName("ipv6") var ipv6: Boolean? = null,
     @SerialName("bind-address") var bindAddress: String? = null,

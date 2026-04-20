@@ -22,6 +22,7 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import mishka.shared.generated.resources.Res
 import mishka.shared.generated.resources.common_back
 import mishka.shared.generated.resources.common_cancel
@@ -34,6 +35,7 @@ import mishka.shared.generated.resources.root_tether_ifaces_title
 import mishka.shared.generated.resources.root_tether_mode_bypass
 import mishka.shared.generated.resources.root_tether_mode_proxy
 import mishka.shared.generated.resources.root_tether_mode_title
+import mishka.shared.generated.resources.root_tproxy_tether_note
 import mishka.shared.generated.resources.settings_tun_device
 import org.jetbrains.compose.resources.stringResource
 import top.yukonga.mishka.platform.PlatformStorage
@@ -48,6 +50,7 @@ import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.SmallTitle
+import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.basic.TopAppBar
@@ -90,6 +93,10 @@ fun RootSettingsScreen(
         mutableStateOf(storage.getString(StorageKeys.ROOT_TETHER_IFACES, DEFAULT_TETHER_IFACES))
     }
     var showTetherDialog by remember { mutableStateOf(false) }
+
+    // 读一次 submode：TPROXY 下隐藏 tether mode 下拉，显示说明文案
+    // （用户改 TUN_MODE 必须先停代理，不需要热更新）
+    val isTproxy = storage.getString(StorageKeys.TUN_MODE, "vpn") == "root_tproxy"
 
     Scaffold(
         topBar = {
@@ -144,19 +151,29 @@ fun RootSettingsScreen(
                 Card(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp).padding(bottom = 12.dp),
                 ) {
-                    val tetherItems = listOf(bypassLabel, proxyLabel)
-                    val selectedIndex = tetherModeValues.indexOf(tetherMode).coerceAtLeast(0)
-                    OverlayDropdownPreference(
-                        title = stringResource(Res.string.root_tether_mode_title),
-                        summary = tetherItems[selectedIndex],
-                        items = tetherItems,
-                        selectedIndex = selectedIndex,
-                        onSelectedIndexChange = { index ->
-                            val value = tetherModeValues[index]
-                            tetherMode = value
-                            storage.putString(StorageKeys.ROOT_TETHER_MODE, value)
-                        },
-                    )
+                    if (isTproxy) {
+                        // TPROXY 模式：整条链路都由 iptables 透明代理，不需要 BYPASS/PROXY 切换
+                        Text(
+                            text = stringResource(Res.string.root_tproxy_tether_note),
+                            fontSize = 13.sp,
+                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                        )
+                    } else {
+                        val tetherItems = listOf(bypassLabel, proxyLabel)
+                        val selectedIndex = tetherModeValues.indexOf(tetherMode).coerceAtLeast(0)
+                        OverlayDropdownPreference(
+                            title = stringResource(Res.string.root_tether_mode_title),
+                            summary = tetherItems[selectedIndex],
+                            items = tetherItems,
+                            selectedIndex = selectedIndex,
+                            onSelectedIndexChange = { index ->
+                                val value = tetherModeValues[index]
+                                tetherMode = value
+                                storage.putString(StorageKeys.ROOT_TETHER_MODE, value)
+                            },
+                        )
+                    }
                     ArrowPreference(
                         title = stringResource(Res.string.root_tether_ifaces_title),
                         summary = tetherInterfaceSummary(tetherIfaces),

@@ -279,13 +279,11 @@ object RootTetherHijacker {
     /** 清理 TPROXY 相关 iptables chain、fwmark ip rule、专用 route table。 */
     private fun teardownTproxy() {
         // 先拆 PREROUTING jump 再 flush/delete chain —— 被引用的 chain 不能 -X
+        // apply 时规则是 `-A PREROUTING -i <iface> -j mishka_tether`，teardown 必须精确匹配
+        // （iptables -D 不接受模糊匹配），所以列出所有引用 CHAIN_NAME 的 PREROUTING 规则
+        // 把原文 `-A PREROUTING ...` 改为 `-D PREROUTING ...` 逐条执行
         for (bin in listOf("iptables", "ip6tables")) {
-            var n = 0
-            while (n < 32) {
-                val r = runWithOutput("$bin -t mangle -D PREROUTING -j $CHAIN_NAME")
-                if (r.code != 0) break
-                n++
-            }
+            deletePreroutingJumpsReferencing(bin, CHAIN_NAME)
             runWithOutput("$bin -t mangle -F $CHAIN_NAME")
             runWithOutput("$bin -t mangle -X $CHAIN_NAME")
         }
@@ -295,6 +293,21 @@ object RootTetherHijacker {
         // 专用 route table
         runWithOutput("ip route flush table $FWMARK_TABLE")
         runWithOutput("ip -6 route flush table $FWMARK_TABLE")
+    }
+
+    /**
+     * 列出 `<bin> -t mangle -S PREROUTING` 的所有行，对每条引用 `jumpTarget` 的 `-A PREROUTING`
+     * 把前缀改成 `-D PREROUTING` 再执行。与 apply 端的 `-A` 参数一一对应，天然精确匹配；
+     * 一次扫描即可删干净（iptables -S 返回的每条规则都是独立的 `-A`，转 `-D` 后精确删除）。
+     */
+    private fun deletePreroutingJumpsReferencing(bin: String, jumpTarget: String) {
+        val list = runWithOutput("$bin -t mangle -S PREROUTING")
+        if (list.code != 0) return
+        list.output.lines()
+            .filter { it.startsWith("-A PREROUTING") && it.contains("-j $jumpTarget") }
+            .forEach { line ->
+                runWithOutput("$bin -t mangle ${line.replaceFirst("-A PREROUTING", "-D PREROUTING")}")
+            }
     }
 
     private fun drainRulesByPriority(v6: Boolean, priority: Int): Int {

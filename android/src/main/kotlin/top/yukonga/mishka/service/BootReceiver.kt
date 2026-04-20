@@ -24,7 +24,9 @@ class BootReceiver : BroadcastReceiver() {
                 if (wasRunning) {
                     val subscriptionId = storage.getString(StorageKeys.ACTIVE_PROFILE_UUID, "")
                         .ifEmpty { null }
-                    val isRoot = storage.getString(StorageKeys.TUN_MODE, "vpn") == "root"
+                    val mode = storage.getString(StorageKeys.TUN_MODE, "vpn")
+                    // legacy "root" 兼容：视为 root_tun
+                    val isRoot = mode == "root_tun" || mode == "root_tproxy" || mode == "root"
                     if (isRoot) {
                         MishkaRootService.start(context, subscriptionId)
                     } else {

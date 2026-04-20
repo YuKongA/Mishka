@@ -78,7 +78,11 @@ class DynamicNotificationManager(
             val profileName = storage.getString(StorageKeys.ACTIVE_PROFILE_NAME, "Mishka")
             start(secret, profileName, externalController)
         } else {
-            val mode = if (tunMode == TunMode.Root) "Root" else "VpnService"
+            val mode = when (tunMode) {
+                TunMode.RootTun -> "Root TUN"
+                TunMode.RootTproxy -> "Root TPROXY"
+                TunMode.Vpn -> "VpnService"
+            }
             val notification = NotificationHelper.buildRunningNotification(context, mode)
             context.getSystemService(NotificationManager::class.java)
                 ?.notify(NotificationHelper.NOTIFICATION_ID_VPN, notification)

@@ -35,6 +35,8 @@
     <string name="home_stopped">Stopped</string>
     <string name="home_mode">Mode</string>
     <string name="home_tun">TUN</string>
+    <string name="home_inbound">Inbound</string>
+    <string name="home_inbound_tproxy">TPROXY:%1$d</string>
     <string name="home_switch_mode">Switch Mode</string>
     <string name="home_switch_tun_stack">Switch TUN Stack</string>
     <string name="home_uptime_seconds">%1$ds</string>
@@ -188,9 +190,15 @@
     <string name="settings_title">Settings</string>
     <string name="settings_network">Network</string>
     <string name="settings_general">General</string>
-    <string name="settings_tun_mode">TUN Mode</string>
-    <string name="settings_tun_vpn_summary">VPN (via VpnService)</string>
-    <string name="settings_tun_root_summary">ROOT (requires root)</string>
+    <string name="settings_tun_mode">Tunnel Mode</string>
+    <string name="settings_tun_vpn_summary">via VpnService</string>
+    <string name="settings_tun_root_tun_summary">owns TUN device</string>
+    <string name="settings_tun_root_tproxy_summary">iptables TPROXY</string>
+    <string name="settings_tun_mode_vpn">VPN</string>
+    <string name="settings_tun_mode_root_tun">ROOT TUN</string>
+    <string name="settings_tun_mode_root_tproxy">ROOT TPROXY</string>
+    <string name="settings_root_tproxy_settings">ROOT TPROXY Settings</string>
+    <string name="settings_root_tproxy_summary">Tether interfaces, per-app proxy (uid-owner)</string>
     <string name="settings_vpn_settings">VPN Settings</string>
     <string name="settings_vpn_summary">Bypass private network, DNS hijacking, IPv6</string>
     <string name="settings_tun_device">TUN Device Name</string>
@@ -243,6 +251,7 @@
     <string name="root_tether_scan_scanning">Scanning...</string>
     <string name="root_tether_scan_empty">No active hotspot interface detected</string>
     <string name="root_tether_scan_result_title">Detected interfaces</string>
+    <string name="root_tproxy_tether_note">TPROXY mode proxies all hotspot traffic via kernel rules; no Bypass/Through toggle needed.</string>
 
     <!-- Network Settings -->
     <string name="network_settings_title">Override Settings</string>

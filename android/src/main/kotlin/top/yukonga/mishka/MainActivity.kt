@@ -182,8 +182,11 @@ class MainActivity : ComponentActivity() {
             val hasRoot = RootHelper.hasRootAccess()
             storage.putString(StorageKeys.HAS_ROOT, if (hasRoot) "true" else "false")
             // ROOT 不可用时自动回退到 VPN 模式，防止卡在错误状态
-            if (!hasRoot && storage.getString(StorageKeys.TUN_MODE, "vpn") == "root") {
-                storage.putString(StorageKeys.TUN_MODE, "vpn")
+            if (!hasRoot) {
+                val current = storage.getString(StorageKeys.TUN_MODE, "vpn")
+                if (current == "root" || current == "root_tun" || current == "root_tproxy") {
+                    storage.putString(StorageKeys.TUN_MODE, "vpn")
+                }
             }
             hasRootState.value = hasRoot
         }

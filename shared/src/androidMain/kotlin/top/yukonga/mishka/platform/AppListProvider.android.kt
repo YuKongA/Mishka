@@ -8,6 +8,18 @@ import kotlinx.coroutines.withContext
 
 actual class AppListProvider actual constructor(private val context: PlatformContext) {
 
+    actual suspend fun resolveUids(packageNames: Set<String>): Set<Int> = withContext(Dispatchers.IO) {
+        if (packageNames.isEmpty()) return@withContext emptySet()
+        val pm = context.packageManager
+        packageNames.mapNotNullTo(mutableSetOf()) { pkg ->
+            try {
+                pm.getApplicationInfo(pkg, 0).uid
+            } catch (_: PackageManager.NameNotFoundException) {
+                null
+            }
+        }
+    }
+
     actual suspend fun getInstalledApps(): List<AppInfo> = withContext(Dispatchers.IO) {
         val pm = context.packageManager
         val selfPackage = context.packageName

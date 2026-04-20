@@ -10,7 +10,7 @@ enum class ProxyState {
     Error,
 }
 
-enum class TunMode { Vpn, Root }
+enum class TunMode { Vpn, RootTun, RootTproxy }
 
 data class ProxyServiceStatus(
     val state: ProxyState = ProxyState.Stopped,

@@ -41,6 +41,8 @@ object StorageKeys {
     const val ROOT_TETHER_IFACES = "root_tether_ifaces"
     // 启动时生效的 tether mode 快照；attach 路径用它判断 app 被杀期间用户是否改过模式
     const val ROOT_TETHER_MODE_ACTIVE = "root_tether_mode_active"
+    // 启动时生效的 ROOT submode 快照（"tun"/"tproxy"）；attach 路径按此与当前 TUN_MODE 比对
+    const val ROOT_SUBMODE_ACTIVE = "root_submode_active"
 
     // 通用设置
     const val DARK_MODE = "dark_mode"

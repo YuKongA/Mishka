@@ -33,6 +33,8 @@ import androidx.compose.ui.unit.sp
 import mishka.shared.generated.resources.Res
 import mishka.shared.generated.resources.common_cancel
 import mishka.shared.generated.resources.common_confirm
+import mishka.shared.generated.resources.home_inbound
+import mishka.shared.generated.resources.home_inbound_tproxy
 import mishka.shared.generated.resources.home_mode
 import mishka.shared.generated.resources.home_running
 import mishka.shared.generated.resources.home_starting
@@ -40,7 +42,9 @@ import mishka.shared.generated.resources.home_stopped
 import mishka.shared.generated.resources.home_stopping
 import mishka.shared.generated.resources.home_switch_mode
 import mishka.shared.generated.resources.home_switch_tun_stack
+import mishka.shared.generated.resources.home_tun
 import org.jetbrains.compose.resources.stringResource
+import top.yukonga.mishka.platform.TunMode
 import top.yukonga.mishka.viewmodel.HomeUiState
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Card
@@ -190,19 +194,22 @@ private fun StatusContent(
                 )
             }
             Spacer(Modifier.height(12.dp))
+            // RootTproxy 下 tun.enable=false，stack 无意义：展示 Inbound=TPROXY:port 静态信息
+            val isTproxy = state.tunMode == TunMode.RootTproxy
+            val inboundTproxyLabel = stringResource(Res.string.home_inbound_tproxy, TPROXY_INBOUND_PORT)
             Card(
                 modifier = Modifier.fillMaxWidth().weight(1f),
                 insideMargin = PaddingValues(16.dp),
-                onClick = { if (isRunning) showTunStackDialog = true },
-                pressFeedbackType = PressFeedbackType.Sink,
+                onClick = { if (isRunning && !isTproxy) showTunStackDialog = true },
+                pressFeedbackType = if (isTproxy) PressFeedbackType.None else PressFeedbackType.Sink,
             ) {
                 Text(
-                    text = "TUN",
+                    text = if (isTproxy) stringResource(Res.string.home_inbound) else stringResource(Res.string.home_tun),
                     fontSize = 13.sp,
                     color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                 )
                 Text(
-                    text = tunStackLabel(state.tunStack),
+                    text = if (isTproxy) inboundTproxyLabel else tunStackLabel(state.tunStack),
                     fontSize = 20.sp,
                     fontWeight = FontWeight.Bold,
                     color = MiuixTheme.colorScheme.onSurface,
@@ -233,6 +240,9 @@ private fun StatusContent(
         onDismiss = { showTunStackDialog = false },
     )
 }
+
+// ROOT TPROXY 模式 mihomo tproxy-port（与 RootTproxyApplier.TPROXY_PORT 对齐，UI 仅展示用）
+private const val TPROXY_INBOUND_PORT: Int = 7895
 
 private fun modeLabel(mode: String): String = when (mode.lowercase()) {
     "rule" -> "Rule"

@@ -261,6 +261,38 @@ object RootHelper {
     }
 
     /**
+     * 以 root 身份通过 stdin 批量执行 shell 脚本。适合 TPROXY apply/teardown 这类
+     * 一次写入几十条 iptables/ip rule 命令的场景，避免逐条 `su -c` 的进程启动开销。
+     *
+     * @param script shell 脚本全文（应含 shebang 或至少用 POSIX sh 语法，失败容错靠脚本内 `|| true`）
+     * @param timeoutSeconds 整体执行超时；超时时强制 destroy 子进程
+     * @return 脚本执行 exit code；超时或异常返回 -1
+     */
+    fun runRootScriptHeredoc(script: String, timeoutSeconds: Long = 15): Int {
+        return try {
+            val process = ProcessBuilder("su")
+                .redirectErrorStream(true)
+                .start()
+            process.outputStream.bufferedWriter().use { it.write(script); it.flush() }
+            val output = process.inputStream.bufferedReader().readText()
+            val exited = process.waitFor(timeoutSeconds, TimeUnit.SECONDS)
+            if (!exited) {
+                process.destroyForcibly()
+                Log.e(TAG, "runRootScriptHeredoc timed out\noutput:\n$output")
+                return -1
+            }
+            val code = process.exitValue()
+            if (code != 0 && output.isNotBlank()) {
+                Log.w(TAG, "runRootScriptHeredoc code=$code output:\n${output.take(2000)}")
+            }
+            code
+        } catch (e: Exception) {
+            Log.w(TAG, "runRootScriptHeredoc failed: ${e.message}")
+            -1
+        }
+    }
+
+    /**
      * 以 root 身份 chown -R 指定路径到 uid:gid（Android 应用数据目录 uid==gid）。
      * 用于一次性迁移旧版本 mihomo 以 root 权限直写入 imported/ 产生的 root:root 文件。
      */

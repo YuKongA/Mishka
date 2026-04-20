@@ -17,6 +17,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import mishka.shared.generated.resources.Res
 import mishka.shared.generated.resources.external_control_title
+import mishka.shared.generated.resources.root_settings_summary
+import mishka.shared.generated.resources.root_settings_title
 import mishka.shared.generated.resources.settings_about
 import mishka.shared.generated.resources.settings_app_proxy
 import mishka.shared.generated.resources.settings_app_proxy_summary
@@ -42,10 +44,12 @@ import mishka.shared.generated.resources.settings_theme_light
 import mishka.shared.generated.resources.settings_theme_mode
 import mishka.shared.generated.resources.settings_theme_system
 import mishka.shared.generated.resources.settings_title
-import mishka.shared.generated.resources.root_settings_title
-import mishka.shared.generated.resources.root_settings_summary
 import mishka.shared.generated.resources.settings_tun_mode
-import mishka.shared.generated.resources.settings_tun_root_summary
+import mishka.shared.generated.resources.settings_tun_mode_root_tproxy
+import mishka.shared.generated.resources.settings_tun_mode_root_tun
+import mishka.shared.generated.resources.settings_tun_mode_vpn
+import mishka.shared.generated.resources.settings_tun_root_tproxy_summary
+import mishka.shared.generated.resources.settings_tun_root_tun_summary
 import mishka.shared.generated.resources.settings_tun_vpn_summary
 import mishka.shared.generated.resources.settings_vpn_settings
 import mishka.shared.generated.resources.settings_vpn_summary
@@ -99,14 +103,25 @@ fun SettingsScreen(
         mutableStateOf(storage?.getString(StorageKeys.SUBSCRIPTION_UPDATE_VIA_PROXY, "true") != "false")
     }
     var tunModeIndex by remember {
-        mutableIntStateOf(if (storage?.getString(StorageKeys.TUN_MODE, "vpn") == "root") 1 else 0)
+        // 兼容旧值："root" 视为 RootTun
+        mutableIntStateOf(
+            when (storage?.getString(StorageKeys.TUN_MODE, "vpn")) {
+                "root_tun", "root" -> 1
+                "root_tproxy" -> 2
+                else -> 0
+            }
+        )
     }
 
     val themeSystemStr = stringResource(Res.string.settings_theme_system)
     val themeLightStr = stringResource(Res.string.settings_theme_light)
     val themeDarkStr = stringResource(Res.string.settings_theme_dark)
     val themeItems = listOf(themeSystemStr, themeLightStr, themeDarkStr)
-    val tunModeItems = listOf("VPN", "ROOT")
+    val tunModeItems = listOf(
+        stringResource(Res.string.settings_tun_mode_vpn),
+        stringResource(Res.string.settings_tun_mode_root_tun),
+        stringResource(Res.string.settings_tun_mode_root_tproxy),
+    )
 
     Scaffold(
         modifier = modifier,
@@ -141,11 +156,19 @@ fun SettingsScreen(
                     if (hasRootPermission) {
                         OverlayDropdownPreference(
                             title = stringResource(Res.string.settings_tun_mode),
-                            summary = if (tunModeIndex == 0) stringResource(Res.string.settings_tun_vpn_summary) else stringResource(Res.string.settings_tun_root_summary),
+                            summary = when (tunModeIndex) {
+                                1 -> stringResource(Res.string.settings_tun_root_tun_summary)
+                                2 -> stringResource(Res.string.settings_tun_root_tproxy_summary)
+                                else -> stringResource(Res.string.settings_tun_vpn_summary)
+                            },
                             items = tunModeItems,
                             selectedIndex = tunModeIndex,
                             onSelectedIndexChange = { index ->
-                                val mode = if (index == 1) "root" else "vpn"
+                                val mode = when (index) {
+                                    1 -> "root_tun"
+                                    2 -> "root_tproxy"
+                                    else -> "vpn"
+                                }
                                 storage?.putString(StorageKeys.TUN_MODE, mode)
                                 tunModeIndex = index
                             },
@@ -159,7 +182,7 @@ fun SettingsScreen(
                             onClick = onNavigateVpnSettings,
                         )
                     }
-                    if (tunModeIndex == 1) {
+                    if (tunModeIndex == 1 || tunModeIndex == 2) {
                         ArrowPreference(
                             title = stringResource(Res.string.root_settings_title),
                             summary = stringResource(Res.string.root_settings_summary),

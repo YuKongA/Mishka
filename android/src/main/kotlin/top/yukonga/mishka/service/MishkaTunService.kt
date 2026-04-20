@@ -280,7 +280,7 @@ class MishkaTunService : VpnService() {
                 context = this@MishkaTunService,
                 userOverride = userOverride,
                 tunFd = fd,
-                rootMode = false,
+                tunMode = TunMode.Vpn,
             )
 
             // 3. 启动 mihomo 核心

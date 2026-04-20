@@ -21,6 +21,7 @@ import top.yukonga.mishka.platform.PlatformStorage
 import top.yukonga.mishka.platform.PlatformSystemInfo
 import top.yukonga.mishka.platform.ProxyServiceController
 import top.yukonga.mishka.platform.ProxyState
+import top.yukonga.mishka.platform.TunMode
 import top.yukonga.mishka.util.FormatUtils
 import kotlin.time.Clock
 
@@ -32,6 +33,7 @@ data class HomeUiState(
     val isStopping: Boolean = false,
     val mode: String = "--",
     val tunStack: String = "",
+    val tunMode: TunMode = TunMode.Vpn,
     val ipv6: Boolean = false,
     val config: MihomoConfig? = null,
     val subscription: SubscriptionInfo? = null,
@@ -105,10 +107,10 @@ class HomeViewModel(
             serviceController.status.collect { status ->
                 when (status.state) {
                     ProxyState.Starting -> {
-                        _uiState.value = _uiState.value.copy(isStarting = true, isStopping = false)
+                        _uiState.value = _uiState.value.copy(isStarting = true, isStopping = false, tunMode = status.tunMode)
                     }
                     ProxyState.Running -> {
-                        _uiState.value = _uiState.value.copy(isStarting = false, isRunning = true)
+                        _uiState.value = _uiState.value.copy(isStarting = false, isRunning = true, tunMode = status.tunMode)
                         val client = MihomoApiClient(baseUrl = "http://${status.externalController}", secret = status.secret)
                         val ws = MihomoWebSocket(client)
                         repository = MihomoRepository(client, ws)
@@ -256,6 +258,8 @@ class HomeViewModel(
     }
 
     fun switchTunStack(stack: String) {
+        // TPROXY 模式 tun.enable=false，切 stack 无意义（且不应触发 restart）
+        if (_uiState.value.tunMode == TunMode.RootTproxy) return
         val current = overrideStore.load()
         val nextTun = (current.tun ?: TunOverride()).copy(stack = stack)
         overrideStore.save(current.copy(tun = nextTun))

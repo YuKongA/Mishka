@@ -53,12 +53,13 @@ class MishkaTileService : TileService() {
         if (currentState.state == ProxyState.Running) {
             // 停止时根据当前运行模式路由
             when (currentState.tunMode) {
-                TunMode.Root -> MishkaRootService.stop(applicationContext)
+                TunMode.RootTun, TunMode.RootTproxy -> MishkaRootService.stop(applicationContext)
                 TunMode.Vpn -> MishkaTunService.stop(applicationContext)
             }
         } else {
-            // 启动时读取设置中的模式
-            val isRoot = PlatformStorage(applicationContext).getString(StorageKeys.TUN_MODE, "vpn") == "root"
+            // 启动时读取设置中的模式；legacy "root" 兼容映射为 root_tun
+            val mode = PlatformStorage(applicationContext).getString(StorageKeys.TUN_MODE, "vpn")
+            val isRoot = mode == "root_tun" || mode == "root_tproxy" || mode == "root"
             if (isRoot) {
                 MishkaRootService.start(applicationContext)
             } else {

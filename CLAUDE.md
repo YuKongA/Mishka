@@ -85,12 +85,14 @@ MainActivity → App → AppNavigation
 - **通信方案**：mihomo RESTful API + WebSocket（非 JNI），代码在 commonMain 跨平台共享
 - **导航**：miuix NavDisplay + 自定义 Navigator（push/pop/popUntil + navigateForResult）+ LocalNavigator
 - **主页 Tab**：HorizontalPager + MainPagerState + NavigationBar（4 Tab）
-- **TUN 双模式**：VPN（VpnService 创建 TUN fd）/ ROOT（mihomo 自行创建 TUN + auto-route）
-  - VPN：`tun.file-descriptor` + `auto-route=false`，工作目录 `imported/{uuid}/`（app UID）
-  - ROOT：`auto-route=true` + `auto-detect-interface=true`，工作目录独立 `runtime/{uuid}/` 沙箱（启动前从 imported/ 拷贝，停止时 `su rm -rf`）；imported/ 永远 app UID
-  - 分应用代理：ROOT 走 mihomo `include/exclude-package`；VPN 走 VpnService API；**Mishka 自身包名始终排除**
-  - ROOT 进程 app 被杀后仍存活，重启 app 通过持久化 PID/secret 重连；attach 不重建 runtime/
-  - ROOT 不可用自动回退 VPN
+- **隧道三模式**：VPN / ROOT TUN / ROOT TPROXY（`TunMode { Vpn, RootTun, RootTproxy }`；旧 storage 值 `"root"` 自动迁移为 `"root_tun"`）
+  - **VPN**：VpnService 创建 TUN fd，mihomo 写 `tun.file-descriptor` + `auto-route=false`，工作目录 `imported/{uuid}/`（app UID）
+  - **ROOT TUN**：mihomo 以 root 自建 TUN，`auto-route=true` + `auto-detect-interface=true`，工作目录独立 `runtime/{uuid}/` 沙箱（启动前从 imported/ 拷贝，停止时 `su rm -rf`）；imported/ 永远 app UID
+  - **ROOT TPROXY**：**`tun.enable=false`**，mihomo 用 `tproxy-port=7895` 入站 + `dns.listen=0.0.0.0:1053`；`RootTproxyApplier` 装 `mangle PREROUTING/OUTPUT` + `nat PREROUTING/OUTPUT` + `ip rule fwmark 0x1000000 lookup 2024` + `ip route add local default dev lo table 2024`，透明劫持本机与热点流量；分应用代理改走 iptables `-m owner --uid-owner`
+  - **分应用代理**：VPN 走 VpnService API；ROOT TUN 走 mihomo `include/exclude-package`（sing-tun 翻译为 uidrange）；ROOT TPROXY 走 iptables `uid-owner`（`AppListProvider.resolveUids` 把包名解析为 UID）；**Mishka 自身始终排除**（VPN: disallowed；ROOT TUN: include 过滤 + exclude 叠加；ROOT TPROXY: `-m owner --uid-owner 0 RETURN` 放行 root 含 mihomo + `-m owner --uid-owner $APP_UID RETURN` 兜底；**不**用 `routing-mark`/SO_MARK 自绕——Android Netd 用 fwmark 低 16 位编码 netId，任何自定义 SO_MARK 都会让路由命中 legacy_system 表无默认路由，导致 mihomo 出站 `network unreachable`，box_for_magisk / Surfing / box4magisk 三家同款教训）
+  - **ROOT 两子模式共享** MishkaRootService，Intent 通过 `EXTRA_SUBMODE = "tun"/"tproxy"` 区分；attach 路径比对 `ROOT_SUBMODE_ACTIVE` 与请求 submode，不一致 fresh restart
+  - ROOT 进程 app 被杀后仍存活，重启 app 通过持久化 PID/secret 重连
+  - ROOT 不可用自动回退 VPN（MainActivity 探测失败后回写 `TUN_MODE=vpn`）
 - **状态桥接**：ProxyServiceBridge（全局 StateFlow + TunMode），Service 写入、ViewModel 读取
 - **进程模型**：单进程（VpnService 和 UI 同进程），ROOT 模式 mihomo 为独立 root 进程
 - **数据持久化**：Room 3.0 KMP（结构化数据）+ PlatformStorage（简单偏好）+ StorageKeys（key 常量）+ OverrideJsonStore（`override.user.json` + ConfigurationOverride @Serializable）
@@ -153,26 +155,26 @@ files/mihomo/
 
 `Route.kt` 中定义的路由，均实现 `NavKey`：
 
-| 路由               | 类型        | 页面                          | 入口               |
-| ------------------ | ----------- | ----------------------------- | ------------------ |
-| Main               | data object | 主页（HorizontalPager 4 Tab） | 根路由             |
-| Subscription       | data object | SubscriptionScreen            | 主页 Tab 2 导航    |
-| SubscriptionAdd    | data object | SubscriptionAddScreen         | 订阅页             |
-| SubscriptionAddUrl | data class  | SubscriptionAddUrlScreen      | 添加订阅页         |
-| SubscriptionEdit   | data class  | SubscriptionEditScreen        | 订阅项编辑按钮     |
-| Log                | data object | LogScreen                     | QuickEntries       |
-| Provider           | data object | ProviderScreen                | QuickEntries       |
-| DnsQuery           | data object | DnsQueryScreen                | QuickEntries       |
-| Connection         | data object | ConnectionScreen              | QuickEntries       |
-| VpnSettings        | data object | VpnSettingsScreen             | 设置页（仅 VPN 模式）|
-| RootSettings       | data object | RootSettingsScreen            | 设置页（仅 ROOT 模式）|
-| NetworkSettings    | data object | NetworkSettingsScreen         | 设置页             |
-| MetaSettings       | data object | MetaSettingsScreen            | 设置页             |
-| ExternalControl    | data object | ExternalControlScreen         | 设置页             |
-| AppProxy           | data object | AppProxyScreen                | 设置页             |
-| FileManager        | data object | FileManagerScreen             | 设置页             |
-| FileManagerEditor  | data class  | FileManagerEditorScreen       | FileManager 点击项 |
-| About              | data object | AboutScreen                   | 设置页             |
+| 路由               | 类型        | 页面                          | 入口                   |
+| ------------------ | ----------- | ----------------------------- | ---------------------- |
+| Main               | data object | 主页（HorizontalPager 4 Tab） | 根路由                 |
+| Subscription       | data object | SubscriptionScreen            | 主页 Tab 2 导航        |
+| SubscriptionAdd    | data object | SubscriptionAddScreen         | 订阅页                 |
+| SubscriptionAddUrl | data class  | SubscriptionAddUrlScreen      | 添加订阅页             |
+| SubscriptionEdit   | data class  | SubscriptionEditScreen        | 订阅项编辑按钮         |
+| Log                | data object | LogScreen                     | QuickEntries           |
+| Provider           | data object | ProviderScreen                | QuickEntries           |
+| DnsQuery           | data object | DnsQueryScreen                | QuickEntries           |
+| Connection         | data object | ConnectionScreen              | QuickEntries           |
+| VpnSettings        | data object | VpnSettingsScreen             | 设置页（仅 VPN 模式）  |
+| RootSettings       | data object | RootSettingsScreen            | 设置页（仅 ROOT 模式） |
+| NetworkSettings    | data object | NetworkSettingsScreen         | 设置页                 |
+| MetaSettings       | data object | MetaSettingsScreen            | 设置页                 |
+| ExternalControl    | data object | ExternalControlScreen         | 设置页                 |
+| AppProxy           | data object | AppProxyScreen                | 设置页                 |
+| FileManager        | data object | FileManagerScreen             | 设置页                 |
+| FileManagerEditor  | data class  | FileManagerEditorScreen       | FileManager 点击项     |
+| About              | data object | AboutScreen                   | 设置页                 |
 
 ## 页面与 ViewModel
 
@@ -216,26 +218,27 @@ files/mihomo/
 
 ## Android 服务层
 
-| 组件                       | 用途                                                                                  |
-| -------------------------- | ------------------------------------------------------------------------------------- |
-| MishkaTunService           | VpnService + JNI fork+exec 启动 mihomo                                                |
-| MishkaRootService          | ROOT TUN 模式前台服务（su 启动 mihomo，进程重连）                                     |
-| RootHelper                 | root 检测/启动/终止/存活检查/残留清理 + rmRfAsRoot + chownRecursiveAsRoot + runAsRootReturnCode |
-| RootTetherHijacker         | ROOT 模式热点流量处置（ip rule 导向 main/TUN 表，绕过代理或走代理）                   |
-| DynamicNotificationManager | 动态通知（WebSocket 流量），两个 Service 共用                                         |
-| MishkaTileService          | Quick Settings Tile 一键启停代理（双模式路由）                                        |
-| BootReceiver               | 开机自启（默认 disabled，动态启用）                                                   |
-| ConfigGenerator            | mihomo 工作目录/secret 生成工具（getWorkDir/getConfigFile/generateSecret）            |
-| RuntimeOverrideBuilder     | 运行时 override.run.json 装配（ConfigurationOverride + TUN fd + rootMode + AppProxy） |
-| ProfileFileOps             | 订阅目录管理（imported/pending/processing/runtime + GeoIP + ROOT 沙箱）               |
-| AndroidProfileFileManager  | ProfileFileManager 接口的 Android 实现                                                |
-| MihomoRunner               | mihomo 进程管理（VPN: JNI fork+exec / ROOT: su）                                      |
-| MihomoValidator            | mihomo -t 配置校验（ProcessBuilder，超时 90s，200ms 轮询响应协程取消）                |
-| MihomoPrefetcher           | mihomo -prefetch provider 预下载（HTTPS_PROXY env，代理 60s/直连 120s，可取消）       |
-| ProcessHelper              | JNI 包装（nativeForkExec/nativeKill/nativeWaitpid）                                   |
-| NotificationHelper         | 三层通知渠道（VPN/更新进度/更新结果）                                                 |
-| ProfileReceiver            | AlarmManager 调度自动更新                                                             |
-| ProfileWorker              | 前台服务执行后台配置更新                                                              |
+| 组件                       | 用途                                                                                                                                                         |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| MishkaTunService           | VpnService + JNI fork+exec 启动 mihomo                                                                                                                       |
+| MishkaRootService          | ROOT 模式前台服务（ROOT TUN + ROOT TPROXY 两 submode 共享；EXTRA_SUBMODE 分支）                                                                              |
+| RootTproxyApplier          | ROOT TPROXY 规则装配（mangle/nat chains + fwmark ip rule + local default dev lo，iptables + uid-owner 分应用）                                               |
+| RootHelper                 | root 检测/启动/终止/存活检查/残留清理 + rmRfAsRoot + chownRecursiveAsRoot + runAsRootReturnCode                                                              |
+| RootTetherHijacker         | ROOT 模式热点流量处置（ip rule 导向 main/TUN 表，绕过代理或走代理）                                                                                          |
+| DynamicNotificationManager | 动态通知（WebSocket 流量），两个 Service 共用                                                                                                                |
+| MishkaTileService          | Quick Settings Tile 一键启停代理（双模式路由）                                                                                                               |
+| BootReceiver               | 开机自启（默认 disabled，动态启用）                                                                                                                          |
+| ConfigGenerator            | mihomo 工作目录/secret 生成工具（getWorkDir/getConfigFile/generateSecret）                                                                                   |
+| RuntimeOverrideBuilder     | 运行时 override.run.json 装配（按 Submode = Vpn/RootTun/RootTproxy 分支：TUN fd / auto-route+include/exclude-package / tproxy-port+routing-mark+dns.listen） |
+| ProfileFileOps             | 订阅目录管理（imported/pending/processing/runtime + GeoIP + ROOT 沙箱）                                                                                      |
+| AndroidProfileFileManager  | ProfileFileManager 接口的 Android 实现                                                                                                                       |
+| MihomoRunner               | mihomo 进程管理（VPN: JNI fork+exec / ROOT: su）                                                                                                             |
+| MihomoValidator            | mihomo -t 配置校验（ProcessBuilder，超时 90s，200ms 轮询响应协程取消）                                                                                       |
+| MihomoPrefetcher           | mihomo -prefetch provider 预下载（HTTPS_PROXY env，代理 60s/直连 120s，可取消）                                                                              |
+| ProcessHelper              | JNI 包装（nativeForkExec/nativeKill/nativeWaitpid）                                                                                                          |
+| NotificationHelper         | 三层通知渠道（VPN/更新进度/更新结果）                                                                                                                        |
+| ProfileReceiver            | AlarmManager 调度自动更新                                                                                                                                    |
+| ProfileWorker              | 前台服务执行后台配置更新                                                                                                                                     |
 
 ## 数据模型
 
@@ -266,9 +269,13 @@ GOOS=android GOARCH=arm64 CGO_ENABLED=0 go build \
 
 **Override 注入**：所有 override 走 `--override-json` CLI flag + JSON 文件，Kotlin 侧零 YAML 改写。用户设置 `OverrideJsonStore.save()` → `override.user.json`，启动时 `RuntimeOverrideBuilder` 叠加 TUN fd / AppProxy / rootMode → `override.run.json`。`secret` / `external-controller` 走 `--secret` / `--ext-ctl` CLI flag 不进 JSON。详见 `feedback_override_architecture.md`。
 
-**硬编码覆盖订阅**：`tun.enable=true` / `tun.dns-hijack=[0.0.0.0:53]` / `profile.store-selected=false` / `profile.store-fake-ip=true`；透传（null 不输出）：`tun.stack`、`tun.device`（VPN）
+**硬编码覆盖订阅（按 submode 分）**：`profile.store-selected=false` / `profile.store-fake-ip=true` 三模式共用。
 
-**VPN/ROOT TUN 段差异**：VPN 注入 `file-descriptor` + `auto-route=false`；ROOT 注入 `auto-route=true` + `auto-detect-interface=true` + `include/exclude-package`（VPN 不输出 include/exclude，由 VpnService.Builder 管）
+- **VPN**：`tun.enable=true` + `tun.file-descriptor=fd` + `tun.dns-hijack=[0.0.0.0:53]`，`auto-route=false`；透传 `tun.stack`、`tun.device`
+- **ROOT TUN**：`tun.enable=true` + `auto-route=true` + `auto-detect-interface=true` + `iproute2-table-index=2022` + `iproute2-rule-index=9000` + `tun.dns-hijack=[0.0.0.0:53]` + `include/exclude-package`（按 AppProxyMode）
+- **ROOT TPROXY**：`tun.enable=false`、`tproxy-port=7895`、`dns.listen=0.0.0.0:1053`；**不写** `routing-mark`（Android Netd 冲突，见下）、**不写** `include/exclude-package`（AppProxy 走 iptables uid-owner）；`dns.enhanced-mode` 透传用户设置
+
+**三模式段差异**：VPN 注入 `file-descriptor` + `auto-route=false`；ROOT TUN 注入 `auto-route=true` + `auto-detect-interface=true` + `include/exclude-package`；ROOT TPROXY 仅 `tun.enable=false`，所有分应用/DNS/路由逻辑交 `RootTproxyApplier`（iptables + uid-owner 放行 root）
 
 **secret 优先级**：用户设置 > 订阅 `config.yaml` 顶层 `secret:`（`ConfigGenerator.readSubscriptionSecret` 轻量行扫描）> 随机 UUID 前 16 字节；ROOT attach 分支走 storage 持久化的 `existingSecret`
 
