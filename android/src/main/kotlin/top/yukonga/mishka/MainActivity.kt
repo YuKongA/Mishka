@@ -134,7 +134,7 @@ class MainActivity : ComponentActivity() {
             database = database,
             storage = storage,
             fileManager = fileManager,
-            userAgent = "ClashMetaForAndroid/${misc.VersionInfo.VERSION_NAME}",
+            userAgent = "ClashMetaForAndroid/v2.11.27", // 固定 User-Agent 以支持某些订阅服务的白名单
         )
 
         proxyViewModel = ProxyViewModel(
