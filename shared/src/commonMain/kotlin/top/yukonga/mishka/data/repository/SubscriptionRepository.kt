@@ -184,6 +184,7 @@ class SubscriptionRepository(
 
     /**
      * 更新已导入订阅的信息（手动/自动更新后调用）。
+     * 必须在 withProfileLock 内调用 —— Mutex 不可重入，自身加锁会与外层 commit 快照锁死锁。
      */
     suspend fun updateImported(
         uuid: String,
@@ -192,8 +193,8 @@ class SubscriptionRepository(
         download: Long? = null,
         total: Long? = null,
         expire: Long? = null,
-    ) = profileLock.withLock {
-        val existing = importedDao.queryByUUID(uuid) ?: return@withLock
+    ) {
+        val existing = importedDao.queryByUUID(uuid) ?: return
         importedDao.update(
             existing.copy(
                 name = name ?: existing.name,

@@ -3,9 +3,11 @@ package top.yukonga.mishka.service
 import android.content.Context
 import android.util.Log
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import java.io.File
-import java.util.concurrent.TimeUnit
+import kotlin.coroutines.coroutineContext
 
 /**
  * 使用 mihomo -t 进行完整配置校验。
@@ -15,6 +17,7 @@ object MihomoValidator {
 
     private const val TAG = "MihomoValidator"
     private const val TIMEOUT_MS = 90_000L
+    private const val POLL_INTERVAL_MS = 200L
 
     /**
      * 对指定工作目录运行 mihomo -t 校验配置。
@@ -58,7 +61,7 @@ object MihomoValidator {
             return@withContext "mihomo -t failed: ${e.message ?: e.javaClass.simpleName}"
         }
 
-        // 独立线程消费 stdout：读在主协程会阻塞到 EOF，让 waitFor(timeout) 失效
+        // 独立线程消费 stdout：读在主协程会阻塞到 EOF，让后面的轮询循环形同虚设
         val outputBuilder = StringBuilder()
         val readerThread = Thread({
             try {
@@ -77,25 +80,27 @@ object MihomoValidator {
             start()
         }
 
-        return@withContext try {
-            val exited = process.waitFor(TIMEOUT_MS, TimeUnit.MILLISECONDS)
-            if (!exited) {
-                process.destroyForcibly()
-                readerThread.join(1000)
-                Log.e(TAG, "mihomo -t timed out, output so far:\n${snapshotOutput(outputBuilder)}")
-                "mihomo -t timed out"
-            } else {
-                readerThread.join(1000)
-                val output = snapshotOutput(outputBuilder)
-                val exitCode = process.exitValue()
-                Log.i(TAG, "mihomo -t exit=$exitCode, output:\n$output")
-                if (exitCode == 0) null else parseErrorMessage(output)
+        try {
+            val deadline = System.currentTimeMillis() + TIMEOUT_MS
+            while (true) {
+                coroutineContext.ensureActive()
+                if (!process.isAlive) break
+                if (System.currentTimeMillis() > deadline) {
+                    Log.e(TAG, "mihomo -t timed out, output so far:\n${snapshotOutput(outputBuilder)}")
+                    return@withContext "mihomo -t timed out"
+                }
+                delay(POLL_INTERVAL_MS)
             }
-        } catch (e: InterruptedException) {
-            process.destroyForcibly()
-            readerThread.join(500)
-            Thread.currentThread().interrupt()
-            "mihomo -t interrupted"
+            readerThread.join(1000)
+            val output = snapshotOutput(outputBuilder)
+            val exitCode = process.exitValue()
+            Log.i(TAG, "mihomo -t exit=$exitCode, output:\n$output")
+            return@withContext if (exitCode == 0) null else parseErrorMessage(output)
+        } finally {
+            if (process.isAlive) {
+                process.destroyForcibly()
+                readerThread.join(500)
+            }
         }
     }
 

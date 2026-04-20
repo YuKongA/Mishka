@@ -3,9 +3,11 @@ package top.yukonga.mishka.service
 import android.content.Context
 import android.util.Log
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import java.io.File
-import java.util.concurrent.TimeUnit
+import kotlin.coroutines.coroutineContext
 
 /**
  * 使用 mihomo -prefetch 预下载所有 HTTP provider 到本地磁盘。
@@ -20,17 +22,23 @@ import java.util.concurrent.TimeUnit
 object MihomoPrefetcher {
 
     private const val TAG = "MihomoPrefetcher"
-    private const val TIMEOUT_MS = 120_000L
+    private const val TIMEOUT_DIRECT_MS = 120_000L
+    private const val TIMEOUT_PROXY_MS = 60_000L
+    private const val POLL_INTERVAL_MS = 200L
 
     /**
      * 对工作目录下的 config.yaml 做 provider 预下载。
      *
-     * @return true 表示子进程正常完成；false 表示进程未找到 / 启动失败 / 超时
+     * @param proxyUrl 非空时设置 `HTTPS_PROXY` / `HTTP_PROXY` 环境变量；走代理时超时缩短至 60s
+     *                 （代理链路本应比直连更快，60s 仍没完大概率是节点链路问题，
+     *                  宁可提前放弃让 mihomo 运行期的 pullLoop 兜底重试）。
+     * @return true 表示子进程正常完成；false 表示进程未找到 / 启动失败 / 超时 / 非 0 退出
      */
     suspend fun prefetch(
         context: Context,
         workDir: String,
         configFileName: String = "config.yaml",
+        proxyUrl: String? = null,
         onProgress: ((String) -> Unit)? = null,
     ): Boolean = withContext(Dispatchers.IO) {
         val binary = MihomoValidator.getMihomoBinary(context)
@@ -46,23 +54,32 @@ object MihomoPrefetcher {
             return@withContext false
         }
 
+        val pb = ProcessBuilder(
+            binary.absolutePath,
+            "-prefetch",
+            "-d", workDir,
+            "-f", configFile.absolutePath,
+        )
+            .directory(File(workDir))
+            .redirectErrorStream(true)
+
+        if (proxyUrl != null) {
+            // Go 的 net/http.DefaultTransport 读取这两个环境变量作为 HTTP proxy。
+            pb.environment()["HTTPS_PROXY"] = proxyUrl
+            pb.environment()["HTTP_PROXY"] = proxyUrl
+        }
+
         val process = try {
-            ProcessBuilder(
-                binary.absolutePath,
-                "-prefetch",
-                "-d", workDir,
-                "-f", configFile.absolutePath,
-            )
-                .directory(File(workDir))
-                .redirectErrorStream(true)
-                .start()
+            pb.start()
         } catch (e: Exception) {
             Log.e(TAG, "mihomo -prefetch failed to start", e)
             return@withContext false
         }
 
+        val timeoutMs = if (proxyUrl != null) TIMEOUT_PROXY_MS else TIMEOUT_DIRECT_MS
+
         // stdout 消费必须独立线程：provider HTTP 读无 deadline 时 mihomo 会长时间不刷新输出，
-        // 在主协程里 readLine 会阻塞到进程自然 EOF，让后面的 waitFor(timeout) 形同虚设。
+        // 在主协程里 readLine 会阻塞到进程自然 EOF，让后面的轮询循环形同虚设。
         val outputBuilder = StringBuilder()
         val readerThread = Thread({
             try {
@@ -82,24 +99,26 @@ object MihomoPrefetcher {
             start()
         }
 
-        return@withContext try {
-            val exited = process.waitFor(TIMEOUT_MS, TimeUnit.MILLISECONDS)
-            if (!exited) {
-                process.destroyForcibly()
-                readerThread.join(1000)
-                Log.w(TAG, "mihomo -prefetch timed out after ${TIMEOUT_MS}ms, output so far:\n${snapshotOutput(outputBuilder)}")
-                false
-            } else {
-                readerThread.join(1000)
-                val exitCode = process.exitValue()
-                Log.i(TAG, "mihomo -prefetch exit=$exitCode, output:\n${snapshotOutput(outputBuilder)}")
-                exitCode == 0
+        try {
+            val deadline = System.currentTimeMillis() + timeoutMs
+            while (true) {
+                coroutineContext.ensureActive()
+                if (!process.isAlive) break
+                if (System.currentTimeMillis() > deadline) {
+                    Log.w(TAG, "mihomo -prefetch timed out after ${timeoutMs}ms (proxy=${proxyUrl != null}), output so far:\n${snapshotOutput(outputBuilder)}")
+                    return@withContext false
+                }
+                delay(POLL_INTERVAL_MS)
             }
-        } catch (e: InterruptedException) {
-            process.destroyForcibly()
-            readerThread.join(500)
-            Thread.currentThread().interrupt()
-            false
+            readerThread.join(1000)
+            val exitCode = process.exitValue()
+            Log.i(TAG, "mihomo -prefetch exit=$exitCode (proxy=${proxyUrl != null}), output:\n${snapshotOutput(outputBuilder)}")
+            return@withContext exitCode == 0
+        } finally {
+            if (process.isAlive) {
+                process.destroyForcibly()
+                readerThread.join(500)
+            }
         }
     }
 

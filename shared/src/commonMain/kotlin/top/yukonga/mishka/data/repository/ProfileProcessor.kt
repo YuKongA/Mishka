@@ -5,6 +5,11 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import mishka.shared.generated.resources.Res
+import mishka.shared.generated.resources.subscription_downloading
+import mishka.shared.generated.resources.subscription_prefetching
+import mishka.shared.generated.resources.subscription_validating
+import org.jetbrains.compose.resources.getString
 import top.yukonga.mishka.data.model.ProfileType
 import top.yukonga.mishka.data.model.Subscription
 import top.yukonga.mishka.platform.ProfileFileManager
@@ -26,11 +31,16 @@ class ConfigValidationException(message: String) : Exception(message)
 /**
  * 订阅处理器：snapshot → prepareProcessing → fetch → providers → validate → commit-swap。
  * processLock 串行所有处理流程，SubscriptionRepository.profileLock 保护 DB snapshot 一致性。
+ *
+ * 协程取消语义：整个 runProcess 可取消（用户点击 Dialog "取消"），仅最终的 commit 阶段
+ * 包在 NonCancellable 内 —— 文件 swap + DB 更新必须原子，否则会出现 imported/{uuid}/
+ * 已替换但 DB 记录未更新的撕裂态。
  */
 class ProfileProcessor(
     private val repo: SubscriptionRepository,
     private val fileManager: ProfileFileManager,
     private val fetcher: SubscriptionFetcher,
+    private val proxyResolver: SubscriptionProxyResolver,
 ) {
 
     private val processLock = Mutex()
@@ -49,7 +59,7 @@ class ProfileProcessor(
         uuid: String,
         isUpdate: Boolean,
         onProgress: (ImportProgress) -> Unit,
-    ) = withContext(NonCancellable + Dispatchers.Default) {
+    ) = withContext(Dispatchers.Default) {
         processLock.withLock {
             // 阶段 1: 快照 + 准备 processing/
             val (snapshot, workDir) = repo.withProfileLock {
@@ -81,7 +91,7 @@ class ProfileProcessor(
 
                 // 阶段 2: fetch（仅 Url 类型；File 类型已由 savePendingConfig 在 create 时写入 pending）
                 if (snapshot.type == ProfileType.Url) {
-                    onProgress(ImportProgress("下载配置..."))
+                    onProgress(ImportProgress(getString(Res.string.subscription_downloading)))
                     val result = fetcher.fetch(snapshot.toSubscription())
                     fileManager.writeProcessingConfig(workDir, result.configContent)
                     upload = result.subscription.upload
@@ -93,7 +103,7 @@ class ProfileProcessor(
 
                 // 阶段 3: 校验（mihomo -t 只做 parse，不碰网）
                 fileManager.ensureGeodataAvailable(workDir)
-                onProgress(ImportProgress("验证配置..."))
+                onProgress(ImportProgress(getString(Res.string.subscription_validating)))
                 val err = fileManager.validate(workDir, "config.yaml") {
                     onProgress(ImportProgress(it))
                 }
@@ -102,38 +112,43 @@ class ProfileProcessor(
                 // 阶段 3': 预下载 providers 到 processing/（best-effort，失败不阻塞 commit）。
                 // 目的是规避 mihomo 启动瞬间（TUN/DNS bring-up 窗口）并发 HTTP provider 拉取
                 // 被 TCP/TLS 瞬态错误打断导致代理组 include-all+filter 拉空的问题。
-                onProgress(ImportProgress("下载 providers..."))
-                fileManager.prefetch(workDir, "config.yaml") {
+                onProgress(ImportProgress(getString(Res.string.subscription_prefetching)))
+                val proxyUrl = proxyResolver.resolve()
+                fileManager.prefetch(workDir, "config.yaml", proxyUrl) {
                     onProgress(ImportProgress(it))
                 }
 
-                // 阶段 4: 提交（snapshot 一致性检查 + 文件 swap + DB 更新）
-                repo.withProfileLock {
-                    if (isUpdate) {
-                        val current = repo.queryImported(uuid)
-                            ?: throw IllegalArgumentException("Imported profile $uuid disappeared during update")
-                        check(current.uuid == snapshot.uuid)
-                        fileManager.commitProcessingToImported(uuid)
-                        fileManager.collectGeodata(fileManager.getImportedDir(uuid))
-                        repo.updateImported(
-                            uuid = uuid,
-                            name = if (resolvedName != snapshot.name) resolvedName else null,
-                            upload = upload,
-                            download = download,
-                            total = total,
-                            expire = expire,
-                        )
-                    } else {
-                        val currentPending = repo.queryPending(uuid)
-                            ?: throw IllegalArgumentException("Pending profile $uuid disappeared during commit")
-                        check(currentPending.uuid == snapshot.uuid)
-                        fileManager.commitProcessingToImported(uuid)
-                        fileManager.collectGeodata(fileManager.getImportedDir(uuid))
-                        repo.commitPending(uuid, upload, download, total, expire)
+                // 阶段 4: 提交（snapshot 一致性检查 + 文件 swap + DB 更新，原子不可取消）
+                withContext(NonCancellable) {
+                    repo.withProfileLock {
+                        if (isUpdate) {
+                            val current = repo.queryImported(uuid)
+                                ?: throw IllegalArgumentException("Imported profile $uuid disappeared during update")
+                            check(current.uuid == snapshot.uuid)
+                            fileManager.commitProcessingToImported(uuid)
+                            fileManager.collectGeodata(fileManager.getImportedDir(uuid))
+                            repo.updateImported(
+                                uuid = uuid,
+                                name = if (resolvedName != snapshot.name) resolvedName else null,
+                                upload = upload,
+                                download = download,
+                                total = total,
+                                expire = expire,
+                            )
+                        } else {
+                            val currentPending = repo.queryPending(uuid)
+                                ?: throw IllegalArgumentException("Pending profile $uuid disappeared during commit")
+                            check(currentPending.uuid == snapshot.uuid)
+                            fileManager.commitProcessingToImported(uuid)
+                            fileManager.collectGeodata(fileManager.getImportedDir(uuid))
+                            repo.commitPending(uuid, upload, download, total, expire)
+                        }
                     }
                 }
             } catch (t: Throwable) {
-                fileManager.cleanupProcessing()
+                // 失败或被取消：清理 processing 沙箱。CancellationException 也走这里，
+                // cleanup 完再 throw 让取消继续传播。
+                withContext(NonCancellable) { fileManager.cleanupProcessing() }
                 throw t
             }
         }

@@ -126,6 +126,8 @@
     <string name="subscription_updating_progress">%1$s (%2$d / %3$d)</string>
     <string name="subscription_downloading">Downloading config...</string>
     <string name="subscription_validating">Validating config...</string>
+    <string name="subscription_prefetching">Prefetching providers...</string>
+    <string name="subscription_update_config">Update Config</string>
     <string name="subscription_file_only_no_update">File-imported config cannot be updated online</string>
 
     <!-- Subscription import errors -->
@@ -201,6 +203,8 @@
     <string name="settings_app_proxy_summary">Select apps to proxy</string>
     <string name="settings_dynamic_notification">Dynamic Notification</string>
     <string name="settings_dynamic_notification_summary">Show real-time speed and traffic in notification</string>
+    <string name="settings_subscription_via_proxy">Update via proxy</string>
+    <string name="settings_subscription_via_proxy_summary">Use proxy when updating subscriptions</string>
     <string name="settings_auto_restart">Auto Restart</string>
     <string name="settings_auto_restart_summary">Automatically restore proxy after boot or app update</string>
     <string name="settings_theme_mode">Theme Mode</string>
@@ -299,11 +303,10 @@
     <!-- External Control -->
     <string name="external_control_title">External Controller</string>
     <string name="external_control_ip">API Address</string>
-    <string name="external_control_controller_hint">Bind address for the mihomo HTTP API (e.g. 127.0.0.1:9090). Takes effect after restarting the proxy.</string>
+    <string name="external_control_controller_hint">Bind address for the HTTP API (e.g. 127.0.0.1:9090). 0.0.0.0 will be automatically overwritten with 127.0.0.1.</string>
     <string name="external_control_secret">API Secret</string>
     <string name="external_control_secret_hint">Bearer token for the HTTP API. When empty, falls back to the secret defined in the subscription config, or a random one if the subscription does not set it.</string>
-    <string name="settings_external_control">External Controller</string>
-    <string name="settings_external_control_summary">Override the mihomo HTTP API bind address</string>
+    <string name="settings_external_control_summary">Overwrite external controller configuration</string>
 
     <!-- File Manager -->
     <string name="file_manager_title">File Manager</string>

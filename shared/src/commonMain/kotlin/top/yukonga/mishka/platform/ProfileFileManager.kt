@@ -36,10 +36,14 @@ interface ProfileFileManager {
     /**
      * 使用 mihomo -prefetch 预下载所有 HTTP provider 到 workDir。best-effort：
      * 失败时返回 false，不抛异常——运行期 mihomo pullLoop 仍会兜底重试。
+     *
+     * @param proxyUrl 非空时作为 `HTTPS_PROXY`/`HTTP_PROXY` 环境变量传给 mihomo 子进程，
+     *                 让 provider 下载走本地 mihomo 代理；null 走直连。
      */
     suspend fun prefetch(
         workDir: String,
         configFileName: String = "config.yaml",
+        proxyUrl: String? = null,
         onProgress: ((String) -> Unit)? = null,
     ): Boolean
 

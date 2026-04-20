@@ -136,5 +136,6 @@ fun SubscriptionAddScreen(
     ImportProgressDialog(
         show = uiState.isLoading,
         step = uiState.importProgress?.step ?: stringResource(Res.string.common_processing),
+        onCancel = { viewModel.cancelCurrentUpdate() },
     )
 }

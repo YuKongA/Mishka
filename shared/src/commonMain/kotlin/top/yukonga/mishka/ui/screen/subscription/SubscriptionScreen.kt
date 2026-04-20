@@ -45,6 +45,8 @@ import mishka.shared.generated.resources.subscription_no_traffic
 import mishka.shared.generated.resources.subscription_tap_add
 import mishka.shared.generated.resources.subscription_title
 import mishka.shared.generated.resources.subscription_update_all
+import mishka.shared.generated.resources.subscription_import_config
+import mishka.shared.generated.resources.subscription_update_config
 import mishka.shared.generated.resources.subscription_updated_at
 import mishka.shared.generated.resources.subscription_updating_progress
 import mishka.shared.generated.resources.subscription_updating_title
@@ -53,6 +55,7 @@ import org.jetbrains.compose.resources.stringResource
 import top.yukonga.mishka.data.model.Subscription
 import top.yukonga.mishka.util.FormatUtils
 import top.yukonga.mishka.util.formatEpochMillisAsLocal
+import top.yukonga.mishka.viewmodel.ProfileOperation
 import top.yukonga.mishka.viewmodel.SubscriptionViewModel
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
@@ -205,7 +208,7 @@ fun SubscriptionScreen(
     }
 
     // 批量更新优先展示（含 currentName + (done/total) + step）；
-    // 单条刷新退化为 ImportProgressDialog 默认态（标题"导入配置"）。
+    // 单条走 importProgress，标题由 operation 区分（列表页触发的是 Update）。
     val updateAll = uiState.updateAll
     if (updateAll != null) {
         val progressText = stringResource(
@@ -223,11 +226,18 @@ fun SubscriptionScreen(
             show = true,
             step = step,
             title = stringResource(Res.string.subscription_updating_title),
+            onCancel = { viewModel.cancelCurrentUpdate() },
         )
     } else {
+        val title = when (uiState.operation) {
+            ProfileOperation.Update -> stringResource(Res.string.subscription_update_config)
+            else -> stringResource(Res.string.subscription_import_config)
+        }
         ImportProgressDialog(
             show = uiState.importProgress != null,
             step = uiState.importProgress?.step ?: stringResource(Res.string.common_processing),
+            title = title,
+            onCancel = { viewModel.cancelCurrentUpdate() },
         )
     }
 }

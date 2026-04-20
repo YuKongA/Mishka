@@ -4,8 +4,10 @@ import android.app.NotificationManager
 import android.app.Service
 import android.content.Intent
 import android.content.pm.ServiceInfo
+import android.os.Build
 import android.os.IBinder
 import android.util.Log
+import androidx.annotation.RequiresApi
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -15,8 +17,10 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import top.yukonga.mishka.R
 import top.yukonga.mishka.data.database.getAppDatabase
+import top.yukonga.mishka.data.repository.OverrideJsonStore
 import top.yukonga.mishka.data.repository.ProfileProcessor
 import top.yukonga.mishka.data.repository.SubscriptionFetcher
+import top.yukonga.mishka.data.repository.SubscriptionProxyResolver
 import top.yukonga.mishka.data.repository.SubscriptionRepository
 import top.yukonga.mishka.platform.PlatformStorage
 import top.yukonga.mishka.util.describe
@@ -98,8 +102,13 @@ class ProfileWorker : Service() {
             fileManager = fileManager,
             scope = scope,
         )
-        val fetcher = SubscriptionFetcher(userAgent = "ClashMetaForAndroid/${misc.VersionInfo.VERSION_NAME}")
-        val processor = ProfileProcessor(repo, fileManager, fetcher)
+        val overrideStore = OverrideJsonStore(fileManager)
+        val proxyResolver = SubscriptionProxyResolver(storage, overrideStore)
+        val fetcher = SubscriptionFetcher(
+            userAgent = "ClashMetaForAndroid/${misc.VersionInfo.VERSION_NAME}",
+            proxyUrlProvider = { proxyResolver.resolve() },
+        )
+        val processor = ProfileProcessor(repo, fileManager, fetcher, proxyResolver)
 
         try {
             notificationManager.notify(
@@ -121,7 +130,6 @@ class ProfileWorker : Service() {
                 this, imported.name, e.describe().ifBlank { getString(R.string.notification_unknown_error) }
             )
         } finally {
-            fetcher.close()
             notificationManager.cancel(statusId)
         }
     }

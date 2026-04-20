@@ -126,6 +126,8 @@
     <string name="subscription_updating_progress">%1$s (%2$d / %3$d)</string>
     <string name="subscription_downloading">下载配置...</string>
     <string name="subscription_validating">验证配置...</string>
+    <string name="subscription_prefetching">预下载 providers...</string>
+    <string name="subscription_update_config">更新配置</string>
     <string name="subscription_file_only_no_update">该配置为文件导入，无法在线更新</string>
 
     <!-- 订阅导入错误 -->
@@ -201,6 +203,8 @@
     <string name="settings_app_proxy_summary">选择需要代理的应用</string>
     <string name="settings_dynamic_notification">动态通知</string>
     <string name="settings_dynamic_notification_summary">在通知栏显示实时网速和流量</string>
+    <string name="settings_subscription_via_proxy">通过代理更新</string>
+    <string name="settings_subscription_via_proxy_summary">更新订阅时使用代理</string>
     <string name="settings_auto_restart">自动重启</string>
     <string name="settings_auto_restart_summary">开机或应用升级后自动恢复代理</string>
     <string name="settings_theme_mode">主题模式</string>
@@ -299,11 +303,10 @@
     <!-- External Control -->
     <string name="external_control_title">外部控制器</string>
     <string name="external_control_ip">API 地址</string>
-    <string name="external_control_controller_hint">HTTP API 的监听地址（例如 127.0.0.1:9090）。重启代理后生效。</string>
+    <string name="external_control_controller_hint">HTTP API 的监听地址（例如 127.0.0.1:9090）。0.0.0.0 将被自动覆写为 127.0.0.1。</string>
     <string name="external_control_secret">API 密钥</string>
     <string name="external_control_secret_hint">HTTP API 的 Bearer 鉴权令牌。留空时优先使用订阅配置中的 secret；若订阅未设置则随机生成。</string>
-    <string name="settings_external_control">外部控制器</string>
-    <string name="settings_external_control_summary">覆写 mihomo HTTP API 绑定地址</string>
+    <string name="settings_external_control_summary">覆写外部控制器配置</string>
 
     <!-- File Manager -->
     <string name="file_manager_title">文件管理</string>

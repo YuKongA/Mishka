@@ -22,6 +22,7 @@ object StorageKeys {
     // 订阅
     const val ACTIVE_PROFILE_UUID = "active_profile_uuid"
     const val ACTIVE_PROFILE_NAME = "active_profile_name"
+    const val SUBSCRIPTION_UPDATE_VIA_PROXY = "subscription_update_via_proxy"
 
     // VPN 设置
     const val VPN_BYPASS_PRIVATE_NETWORK = "vpn_bypass_private_network"

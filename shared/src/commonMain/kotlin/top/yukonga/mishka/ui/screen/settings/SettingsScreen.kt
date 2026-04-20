@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.dp
 import mishka.shared.generated.resources.Res
 import mishka.shared.generated.resources.common_cancel
 import mishka.shared.generated.resources.common_confirm
+import mishka.shared.generated.resources.external_control_title
 import mishka.shared.generated.resources.network_input_value
 import mishka.shared.generated.resources.settings_about
 import mishka.shared.generated.resources.settings_app_proxy
@@ -31,7 +32,6 @@ import mishka.shared.generated.resources.settings_auto_restart
 import mishka.shared.generated.resources.settings_auto_restart_summary
 import mishka.shared.generated.resources.settings_dynamic_notification
 import mishka.shared.generated.resources.settings_dynamic_notification_summary
-import mishka.shared.generated.resources.settings_external_control
 import mishka.shared.generated.resources.settings_external_control_summary
 import mishka.shared.generated.resources.settings_file_manager
 import mishka.shared.generated.resources.settings_file_manager_summary
@@ -43,6 +43,8 @@ import mishka.shared.generated.resources.settings_override_settings
 import mishka.shared.generated.resources.settings_override_summary
 import mishka.shared.generated.resources.settings_predictive_back
 import mishka.shared.generated.resources.settings_predictive_back_summary
+import mishka.shared.generated.resources.settings_subscription_via_proxy
+import mishka.shared.generated.resources.settings_subscription_via_proxy_summary
 import mishka.shared.generated.resources.settings_theme_dark
 import mishka.shared.generated.resources.settings_theme_light
 import mishka.shared.generated.resources.settings_theme_mode
@@ -102,6 +104,9 @@ fun SettingsScreen(
     }
     var isDynamicNotificationEnabled by remember {
         mutableStateOf(storage?.getString(StorageKeys.DYNAMIC_NOTIFICATION, "true") != "false")
+    }
+    var isUpdateViaProxyEnabled by remember {
+        mutableStateOf(storage?.getString(StorageKeys.SUBSCRIPTION_UPDATE_VIA_PROXY, "true") != "false")
     }
     var tunModeIndex by remember {
         mutableIntStateOf(if (storage?.getString(StorageKeys.TUN_MODE, "vpn") == "root") 1 else 0)
@@ -191,7 +196,7 @@ fun SettingsScreen(
                         onClick = onNavigateMetaSettings,
                     )
                     ArrowPreference(
-                        title = stringResource(Res.string.settings_external_control),
+                        title = stringResource(Res.string.external_control_title),
                         summary = stringResource(Res.string.settings_external_control_summary),
                         onClick = onNavigateExternalControl,
                     )
@@ -225,6 +230,15 @@ fun SettingsScreen(
                             storage?.putString(StorageKeys.DYNAMIC_NOTIFICATION, if (checked) "true" else "false")
                             isDynamicNotificationEnabled = checked
                             ProxyServiceBridge.requestNotificationRefresh()
+                        },
+                    )
+                    SwitchPreference(
+                        title = stringResource(Res.string.settings_subscription_via_proxy),
+                        summary = stringResource(Res.string.settings_subscription_via_proxy_summary),
+                        checked = isUpdateViaProxyEnabled,
+                        onCheckedChange = { checked ->
+                            storage?.putString(StorageKeys.SUBSCRIPTION_UPDATE_VIA_PROXY, if (checked) "true" else "false")
+                            isUpdateViaProxyEnabled = checked
                         },
                     )
                     if (bootStartManager != null) {
