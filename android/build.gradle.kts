@@ -74,6 +74,7 @@ android {
     packaging {
         jniLibs {
             useLegacyPackaging = true
+            excludes += "lib/*/libandroidx.graphics.path.so"
         }
     }
     splits {
