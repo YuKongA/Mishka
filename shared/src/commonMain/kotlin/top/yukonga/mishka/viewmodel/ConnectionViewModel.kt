@@ -1,7 +1,11 @@
 package top.yukonga.mishka.viewmodel
 
+import androidx.compose.runtime.Immutable
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.collections.immutable.ImmutableList
+import kotlinx.collections.immutable.persistentListOf
+import kotlinx.collections.immutable.toPersistentList
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -10,8 +14,9 @@ import kotlinx.coroutines.launch
 import top.yukonga.mishka.data.model.ConnectionInfo
 import top.yukonga.mishka.data.repository.MihomoRepository
 
+@Immutable
 data class ConnectionUiState(
-    val connections: List<ConnectionInfo> = emptyList(),
+    val connections: ImmutableList<ConnectionInfo> = persistentListOf(),
     val downloadTotal: Long = 0,
     val uploadTotal: Long = 0,
     val searchQuery: String = "",
@@ -53,7 +58,7 @@ class ConnectionViewModel : ViewModel() {
         connectionJob = viewModelScope.launch {
             repo.connectionsFlow().collect { response ->
                 _uiState.value = _uiState.value.copy(
-                    connections = response.connections,
+                    connections = response.connections.toPersistentList(),
                     downloadTotal = response.downloadTotal,
                     uploadTotal = response.uploadTotal,
                 )
@@ -65,7 +70,7 @@ class ConnectionViewModel : ViewModel() {
         _uiState.value = _uiState.value.copy(searchQuery = query)
     }
 
-    fun filteredConnections(searchQuery: String = _uiState.value.searchQuery): List<ConnectionInfo> {
+    fun filteredConnections(searchQuery: String = _uiState.value.searchQuery): ImmutableList<ConnectionInfo> {
         val query = searchQuery.lowercase()
         if (query.isBlank()) return _uiState.value.connections
         return _uiState.value.connections.filter { conn ->
@@ -74,7 +79,7 @@ class ConnectionViewModel : ViewModel() {
                 conn.rule.lowercase().contains(query) ||
                 conn.metadata.destinationIP.contains(query) ||
                 conn.chains.any { it.lowercase().contains(query) }
-        }
+        }.toPersistentList()
     }
 
     fun closeConnection(id: String) {

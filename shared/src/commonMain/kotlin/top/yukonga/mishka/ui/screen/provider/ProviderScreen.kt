@@ -16,18 +16,16 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -39,6 +37,7 @@ import mishka.shared.generated.resources.provider_title
 import mishka.shared.generated.resources.provider_update
 import mishka.shared.generated.resources.subscription_update_all
 import org.jetbrains.compose.resources.stringResource
+import top.yukonga.mishka.ui.theme.StatusColors
 import top.yukonga.mishka.util.formatIsoTimeAsLocalShort
 import top.yukonga.mishka.viewmodel.ProviderItemUi
 import top.yukonga.mishka.viewmodel.ProviderViewModel
@@ -61,9 +60,8 @@ import top.yukonga.miuix.kmp.utils.scrollEndHaptic
 fun ProviderScreen(
     viewModel: ProviderViewModel,
     onBack: () -> Unit = {},
-    bottomPadding: Dp = 0.dp,
 ) {
-    val uiState by viewModel.uiState.collectAsState()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val scrollBehavior = MiuixScrollBehavior()
 
     Scaffold(
@@ -104,7 +102,6 @@ fun ProviderScreen(
                 .nestedScroll(scrollBehavior.nestedScrollConnection),
             contentPadding = PaddingValues(
                 top = innerPadding.calculateTopPadding(),
-                bottom = bottomPadding,
             ),
         ) {
             if (uiState.error.isNotEmpty()) {
@@ -118,7 +115,7 @@ fun ProviderScreen(
                     ) {
                         Text(
                             text = uiState.error,
-                            color = Color(0xFFE53935),
+                            color = StatusColors.danger,
                         )
                     }
                 }

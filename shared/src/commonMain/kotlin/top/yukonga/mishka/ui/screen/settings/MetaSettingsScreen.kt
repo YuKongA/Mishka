@@ -10,7 +10,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -47,7 +47,7 @@ import top.yukonga.mishka.platform.showToast
 import top.yukonga.mishka.ui.component.ListEditDialog
 import top.yukonga.mishka.ui.component.RestartRequiredHint
 import top.yukonga.mishka.ui.component.TriStatePreference
-import top.yukonga.mishka.viewmodel.OverrideSettingsViewModel
+import top.yukonga.mishka.viewmodel.MetaSettingsViewModel
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
@@ -65,10 +65,10 @@ import top.yukonga.miuix.kmp.utils.scrollEndHaptic
 
 @Composable
 fun MetaSettingsScreen(
-    viewModel: OverrideSettingsViewModel,
+    viewModel: MetaSettingsViewModel,
     onBack: () -> Unit = {},
 ) {
-    val uiState by viewModel.state.collectAsState()
+    val uiState by viewModel.state.collectAsStateWithLifecycle()
     val scrollBehavior = MiuixScrollBehavior()
     val resetDoneMsg = stringResource(Res.string.dialog_reset_done)
 
@@ -77,12 +77,7 @@ fun MetaSettingsScreen(
     }
 
     fun updateSniffer(transform: (SnifferOverride) -> SnifferOverride) {
-        viewModel.update { state ->
-            val current = state.sniffer ?: SnifferOverride()
-            val next = transform(current)
-            val allNull = next == SnifferOverride()
-            state.copy(sniffer = if (allNull) null else next)
-        }
+        viewModel.updateSniffer(transform)
     }
 
     var showListDialog by remember { mutableStateOf(false) }

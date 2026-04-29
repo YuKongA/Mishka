@@ -1,6 +1,8 @@
 package top.yukonga.mishka.ui.component
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Modifier
 import mishka.shared.generated.resources.Res
 import mishka.shared.generated.resources.common_disabled
 import mishka.shared.generated.resources.common_enabled
@@ -19,9 +21,15 @@ fun TriStatePreference(
     title: String,
     value: Boolean?,
     onValueChange: (Boolean?) -> Unit,
+    modifier: Modifier = Modifier,
     enabled: Boolean = true,
 ) {
-    val items = listOf(stringResource(Res.string.common_not_modified), stringResource(Res.string.common_enabled), stringResource(Res.string.common_disabled))
+    val notModified = stringResource(Res.string.common_not_modified)
+    val enabledLabel = stringResource(Res.string.common_enabled)
+    val disabledLabel = stringResource(Res.string.common_disabled)
+    val items = remember(notModified, enabledLabel, disabledLabel) {
+        listOf(notModified, enabledLabel, disabledLabel)
+    }
     val selectedIndex = when (value) {
         null -> 0
         true -> 1
@@ -30,6 +38,7 @@ fun TriStatePreference(
 
     OverlayDropdownPreference(
         title = title,
+        modifier = modifier,
         summary = items[selectedIndex],
         items = items,
         selectedIndex = selectedIndex,

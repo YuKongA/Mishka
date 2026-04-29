@@ -12,7 +12,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -40,7 +40,7 @@ import mishka.shared.generated.resources.network_input_value
 import org.jetbrains.compose.resources.stringResource
 import top.yukonga.mishka.platform.showToast
 import top.yukonga.mishka.ui.component.RestartRequiredHint
-import top.yukonga.mishka.viewmodel.OverrideSettingsViewModel
+import top.yukonga.mishka.viewmodel.ExternalControlViewModel
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Icon
@@ -61,10 +61,10 @@ import top.yukonga.miuix.kmp.window.WindowDialog
 
 @Composable
 fun ExternalControlScreen(
-    viewModel: OverrideSettingsViewModel,
+    viewModel: ExternalControlViewModel,
     onBack: () -> Unit = {},
 ) {
-    val uiState by viewModel.state.collectAsState()
+    val uiState by viewModel.state.collectAsStateWithLifecycle()
     val scrollBehavior = MiuixScrollBehavior()
     val resetDoneMsg = stringResource(Res.string.dialog_reset_done)
     val notModifiedStr = stringResource(Res.string.common_not_modified)
@@ -187,7 +187,7 @@ fun ExternalControlScreen(
                 text = stringResource(Res.string.common_not_modified),
                 modifier = Modifier.weight(1f),
                 onClick = {
-                    viewModel.update { it.copy(externalController = null) }
+                    viewModel.setExternalController(null)
                     showToast(resetDoneMsg)
                     showEditDialog = false
                 },
@@ -203,7 +203,7 @@ fun ExternalControlScreen(
                 colors = ButtonDefaults.textButtonColorsPrimary(),
                 onClick = {
                     val value = controllerTextState.text.toString().trim().takeIf { it.isNotEmpty() }
-                    viewModel.update { it.copy(externalController = value) }
+                    viewModel.setExternalController(value)
                     showEditDialog = false
                 },
             )
@@ -229,7 +229,7 @@ fun ExternalControlScreen(
                 text = stringResource(Res.string.common_not_modified),
                 modifier = Modifier.weight(1f),
                 onClick = {
-                    viewModel.update { it.copy(secret = null) }
+                    viewModel.setSecret(null)
                     showToast(resetDoneMsg)
                     showSecretDialog = false
                 },
@@ -245,7 +245,7 @@ fun ExternalControlScreen(
                 colors = ButtonDefaults.textButtonColorsPrimary(),
                 onClick = {
                     val value = secretTextState.text.toString().trim().takeIf { it.isNotEmpty() }
-                    viewModel.update { it.copy(secret = value) }
+                    viewModel.setSecret(value)
                     showSecretDialog = false
                 },
             )

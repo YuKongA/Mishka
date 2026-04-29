@@ -37,6 +37,7 @@ kotlin {
             implementation(libs.androidx.sqlite.bundled)
             implementation(libs.jetbrains.components.resources)
             implementation(libs.jetbrains.navigationevent)
+            implementation(libs.kotlinx.collections.immutable)
             implementation(libs.kotlinx.coroutines.core)
             implementation(libs.kotlinx.datetime)
             implementation(libs.kotlinx.serialization.json)
@@ -64,6 +65,12 @@ kotlin {
 
 compose.resources {
     publicResClass = true
+}
+
+composeCompiler {
+    stabilityConfigurationFiles.add(
+        rootProject.layout.projectDirectory.file("shared/compose_compiler_config.conf")
+    )
 }
 
 val generateVersionInfo by tasks.registering(GenerateVersionInfoTask::class) {

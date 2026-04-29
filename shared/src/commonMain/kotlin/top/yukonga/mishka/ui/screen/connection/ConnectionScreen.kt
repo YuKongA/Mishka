@@ -24,7 +24,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -45,7 +45,6 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -98,9 +97,8 @@ import top.yukonga.miuix.kmp.window.WindowDialog
 fun ConnectionScreen(
     viewModel: ConnectionViewModel,
     onBack: () -> Unit = {},
-    bottomPadding: Dp = 0.dp,
 ) {
-    val uiState by viewModel.uiState.collectAsState()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val scrollBehavior = MiuixScrollBehavior()
     var showCloseAllDialog by remember { mutableStateOf(false) }
     val density = LocalDensity.current
@@ -241,7 +239,11 @@ fun ConnectionScreen(
                     }
 
                     item {
-                        Spacer(Modifier.height(maxOf(bottomPadding, imeBottomPadding)))
+                        Spacer(
+                            Modifier
+                                .height(imeBottomPadding)
+                                .navigationBarsPadding(),
+                        )
                     }
                 }
             }
@@ -256,7 +258,6 @@ fun ConnectionScreen(
                     .nestedScroll(scrollBehavior.nestedScrollConnection),
                 contentPadding = PaddingValues(
                     top = innerPadding.calculateTopPadding(),
-                    bottom = bottomPadding,
                 ),
             ) {
                 if (uiState.connections.isEmpty() && !uiState.isConnected) {

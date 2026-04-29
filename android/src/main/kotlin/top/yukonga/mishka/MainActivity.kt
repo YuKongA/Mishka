@@ -40,9 +40,11 @@ import top.yukonga.mishka.service.RootHelper
 import top.yukonga.mishka.viewmodel.AppProxyViewModel
 import top.yukonga.mishka.viewmodel.ConnectionViewModel
 import top.yukonga.mishka.viewmodel.DnsQueryViewModel
+import top.yukonga.mishka.viewmodel.ExternalControlViewModel
 import top.yukonga.mishka.viewmodel.HomeViewModel
 import top.yukonga.mishka.viewmodel.LogViewModel
-import top.yukonga.mishka.viewmodel.OverrideSettingsViewModel
+import top.yukonga.mishka.viewmodel.MetaSettingsViewModel
+import top.yukonga.mishka.viewmodel.NetworkSettingsViewModel
 import top.yukonga.mishka.viewmodel.ProviderViewModel
 import top.yukonga.mishka.viewmodel.ProxyViewModel
 import top.yukonga.mishka.viewmodel.SubscriptionViewModel
@@ -57,7 +59,9 @@ class MainActivity : ComponentActivity() {
     private lateinit var providerViewModel: ProviderViewModel
     private lateinit var connectionViewModel: ConnectionViewModel
     private lateinit var dnsQueryViewModel: DnsQueryViewModel
-    private lateinit var overrideSettingsViewModel: OverrideSettingsViewModel
+    private lateinit var networkSettingsViewModel: NetworkSettingsViewModel
+    private lateinit var metaSettingsViewModel: MetaSettingsViewModel
+    private lateinit var externalControlViewModel: ExternalControlViewModel
     private lateinit var appProxyViewModel: AppProxyViewModel
     private lateinit var filePicker: FilePicker
     private lateinit var scanQrLauncher: ActivityResultLauncher<ScannerConfig>
@@ -123,7 +127,10 @@ class MainActivity : ComponentActivity() {
         connectionViewModel = ConnectionViewModel()
         dnsQueryViewModel = DnsQueryViewModel()
         val fileManager = AndroidProfileFileManager(this)
-        overrideSettingsViewModel = OverrideSettingsViewModel(store = OverrideJsonStore(fileManager))
+        val overrideStore = OverrideJsonStore(fileManager)
+        networkSettingsViewModel = NetworkSettingsViewModel(overrideStore)
+        metaSettingsViewModel = MetaSettingsViewModel(overrideStore)
+        externalControlViewModel = ExternalControlViewModel(overrideStore)
         appProxyViewModel = AppProxyViewModel(
             storage = storage,
             appListProvider = AppListProvider(this),
@@ -145,7 +152,7 @@ class MainActivity : ComponentActivity() {
         homeViewModel = HomeViewModel(
             serviceController = serviceController,
             storage = storage,
-            overrideStore = OverrideJsonStore(fileManager),
+            overrideStore = overrideStore,
             getActiveSubscriptionId = { subscriptionViewModel.getActiveSubscription()?.id },
         )
 
@@ -208,7 +215,9 @@ class MainActivity : ComponentActivity() {
                 providerViewModel = providerViewModel,
                 connectionViewModel = connectionViewModel,
                 dnsQueryViewModel = dnsQueryViewModel,
-                overrideSettingsViewModel = overrideSettingsViewModel,
+                networkSettingsViewModel = networkSettingsViewModel,
+                metaSettingsViewModel = metaSettingsViewModel,
+                externalControlViewModel = externalControlViewModel,
                 appProxyViewModel = appProxyViewModel,
                 filePicker = filePicker,
                 storage = storage,

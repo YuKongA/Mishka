@@ -8,7 +8,6 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -25,7 +24,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -62,6 +61,7 @@ import mishka.shared.generated.resources.proxy_title
 import org.jetbrains.compose.resources.stringResource
 import top.yukonga.mishka.platform.IconLoader
 import top.yukonga.mishka.ui.component.ListPopupDefaults.MenuPositionProvider
+import top.yukonga.mishka.ui.theme.StatusColors
 import top.yukonga.mishka.viewmodel.ProxyGroupUi
 import top.yukonga.mishka.viewmodel.ProxyUiState
 import top.yukonga.mishka.viewmodel.ProxyViewModel
@@ -91,7 +91,7 @@ fun ProxyScreen(
     bottomPadding: Dp = 0.dp,
     viewModel: ProxyViewModel? = null,
 ) {
-    val uiState = viewModel?.uiState?.collectAsState()?.value ?: ProxyUiState()
+    val uiState = viewModel?.uiState?.collectAsStateWithLifecycle()?.value ?: ProxyUiState()
     val scrollBehavior = MiuixScrollBehavior()
     val groups = uiState.groups
 
@@ -284,16 +284,10 @@ private fun ProxyGroupHeader(
         if (nowDelay != null) {
             val timeoutText = stringResource(Res.string.proxy_timeout)
             val delayText = if (nowDelay < 0) timeoutText else "${nowDelay}ms"
-            val delayColor = when {
-                nowDelay < 0 -> Color(0xFFE53935)
-                nowDelay < 200 -> Color(0xFF4CAF50)
-                nowDelay < 500 -> Color(0xFFFFC107)
-                else -> Color(0xFFE53935)
-            }
             Text(
                 text = delayText,
                 fontSize = 12.sp,
-                color = delayColor,
+                color = StatusColors.delay(nowDelay),
             )
             Spacer(Modifier.width(8.dp))
         }
@@ -378,8 +372,6 @@ private fun ProxyNodeGrid(
     group: ProxyGroupUi,
     onSelect: (String) -> Unit,
 ) {
-    val isDark = isSystemInDarkTheme()
-
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -404,7 +396,6 @@ private fun ProxyNodeGrid(
                         delay = delay,
                         isSelected = isSelected,
                         isSelectable = isSelectable,
-                        isDark = isDark,
                         onClick = { onSelect(proxyName) },
                         modifier = Modifier.weight(1f),
                     )
@@ -424,7 +415,6 @@ private fun ProxyNodeCard(
     delay: Int?,
     isSelected: Boolean,
     isSelectable: Boolean,
-    isDark: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -434,16 +424,10 @@ private fun ProxyNodeCard(
         delay < 0 -> timeoutStr
         else -> "$delay"
     }
-    val delayColor = when {
-        delay == null -> Color(0xFF9E9E9E)
-        delay < 0 -> Color(0xFFE53935)
-        delay < 200 -> Color(0xFF4CAF50)
-        delay < 500 -> Color(0xFFFFC107)
-        else -> Color(0xFFE53935)
-    }
+    val delayColor = StatusColors.delay(delay)
 
     val backgroundColor = if (isSelected) {
-        if (isDark) Color(0xFF1A3040) else Color(0xFFE3F2FD)
+        StatusColors.selectedNodeContainer
     } else {
         MiuixTheme.colorScheme.surface
     }

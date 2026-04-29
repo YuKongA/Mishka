@@ -1,6 +1,5 @@
 package top.yukonga.mishka.ui.screen.home
 
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -26,7 +25,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -45,6 +43,8 @@ import mishka.shared.generated.resources.home_switch_tun_stack
 import mishka.shared.generated.resources.home_tun
 import org.jetbrains.compose.resources.stringResource
 import top.yukonga.mishka.platform.TunMode
+import top.yukonga.mishka.ui.theme.RunState
+import top.yukonga.mishka.ui.theme.StatusColors
 import top.yukonga.mishka.viewmodel.HomeUiState
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Card
@@ -74,7 +74,6 @@ private fun StatusContent(
     onSwitchMode: (String) -> Unit,
     onSwitchTunStack: (String) -> Unit,
 ) {
-    val isDark = isSystemInDarkTheme()
     val isRunning = state.isRunning
     val isStarting = state.isStarting
     val isStopping = state.isStopping
@@ -84,13 +83,13 @@ private fun StatusContent(
     } else {
         Icons.Rounded.RemoveCircleOutline
     }
-    val statusTint = if (isStarting || isStopping) {
-        if (isDark) Color(0xFFF9A825) else Color(0xFFFFB300)
-    } else if (isRunning) {
-        if (isDark) Color(0xFF81C784) else Color(0xFF4CAF50)
-    } else {
-        if (isDark) Color(0xFFEF9A9A) else Color(0xFFE53935)
+    val runState = when {
+        isStarting || isStopping -> RunState.Pending
+        isRunning -> RunState.Running
+        else -> RunState.Stopped
     }
+    val statusTint = StatusColors.runState(runState)
+    val statusContainer = StatusColors.runStateContainer(runState)
 
     var showModeDialog by remember { mutableStateOf(false) }
     var showTunStackDialog by remember { mutableStateOf(false) }
@@ -107,15 +106,7 @@ private fun StatusContent(
         // 左侧状态卡片
         Card(
             modifier = Modifier.weight(1f).fillMaxHeight(),
-            colors = CardDefaults.defaultColors(
-                color = if (isStarting || isStopping) {
-                    if (isDark) Color(0xFF3A3420) else Color(0xFFFFF8E1)
-                } else if (isRunning) {
-                    if (isDark) Color(0xFF1A3825) else Color(0xFFDFFAE4)
-                } else {
-                    if (isDark) Color(0xFF3A2020) else Color(0xFFFDE8E8)
-                },
-            ),
+            colors = CardDefaults.defaultColors(color = statusContainer),
             onClick = { },
             pressFeedbackType = PressFeedbackType.Tilt,
         ) {
@@ -157,13 +148,13 @@ private fun StatusContent(
                         text = state.version,
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Medium,
-                        color = if (isDark) Color(0xFFAAAAAA) else Color(0xFF666666),
+                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                     )
                     Text(
                         text = uptime,
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Medium,
-                        color = if (isDark) Color(0xFFAAAAAA) else Color(0xFF666666),
+                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                     )
                 }
             }
@@ -265,7 +256,7 @@ private fun ModeSelectDialog(
     onSelect: (String) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val modes = listOf("rule" to "Rule", "global" to "Global", "direct" to "Direct")
+    val modes = remember { listOf("rule" to "Rule", "global" to "Global", "direct" to "Direct") }
     var selected by remember(show, currentMode) { mutableStateOf(currentMode.lowercase()) }
 
     WindowDialog(
@@ -311,7 +302,7 @@ private fun TunStackSelectDialog(
     onSelect: (String) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val stacks = listOf("mixed" to "Mixed", "gvisor" to "gVisor", "system" to "System")
+    val stacks = remember { listOf("mixed" to "Mixed", "gvisor" to "gVisor", "system" to "System") }
     var selected by remember(show, currentStack) { mutableStateOf(currentStack.lowercase()) }
 
     WindowDialog(

@@ -3,12 +3,15 @@ package top.yukonga.mishka.ui.screen.subscription
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -18,7 +21,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalLayoutDirection
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -62,9 +64,8 @@ fun SubscriptionAddUrlScreen(
     initialUrl: String = "",
     onBack: () -> Unit = {},
     onSaved: () -> Unit = {},
-    bottomPadding: Dp = 0.dp,
 ) {
-    val uiState by viewModel.uiState.collectAsState()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val scrollBehavior = MiuixScrollBehavior()
     val defaultName = stringResource(Res.string.common_new_config)
     var inputName by remember { mutableStateOf(defaultName) }
@@ -100,7 +101,6 @@ fun SubscriptionAddUrlScreen(
                 .nestedScroll(scrollBehavior.nestedScrollConnection),
             contentPadding = PaddingValues(
                 top = innerPadding.calculateTopPadding(),
-                bottom = bottomPadding,
             ),
         ) {
             item(key = "hint") {
@@ -194,8 +194,7 @@ fun SubscriptionAddUrlScreen(
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 12.dp)
-                            .padding(bottom = 16.dp + innerPadding.calculateBottomPadding()),
+                            .padding(horizontal = 12.dp),
                         insideMargin = PaddingValues(16.dp),
                     ) {
                         Text(
@@ -205,6 +204,9 @@ fun SubscriptionAddUrlScreen(
                         )
                     }
                 }
+            }
+            item(key = "bottom_spacer") {
+                Spacer(Modifier.height(24.dp).navigationBarsPadding())
             }
         }
     }

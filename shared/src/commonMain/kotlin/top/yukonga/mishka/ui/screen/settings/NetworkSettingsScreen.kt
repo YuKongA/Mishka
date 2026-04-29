@@ -14,11 +14,11 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -63,7 +63,7 @@ import top.yukonga.mishka.platform.showToast
 import top.yukonga.mishka.ui.component.ListEditDialog
 import top.yukonga.mishka.ui.component.RestartRequiredHint
 import top.yukonga.mishka.ui.component.TriStatePreference
-import top.yukonga.mishka.viewmodel.OverrideSettingsViewModel
+import top.yukonga.mishka.viewmodel.NetworkSettingsViewModel
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Icon
@@ -85,26 +85,19 @@ import top.yukonga.miuix.kmp.window.WindowDialog
 
 @Composable
 fun NetworkSettingsScreen(
-    viewModel: OverrideSettingsViewModel,
+    viewModel: NetworkSettingsViewModel,
     onBack: () -> Unit = {},
 ) {
-    val uiState by viewModel.state.collectAsState()
+    val uiState by viewModel.state.collectAsStateWithLifecycle()
     val scrollBehavior = MiuixScrollBehavior()
     val resetDoneMsg = stringResource(Res.string.dialog_reset_done)
 
-    // 更新顶层字段
     fun updateTop(transform: (ConfigurationOverride) -> ConfigurationOverride) {
         viewModel.update(transform)
     }
 
-    // 更新 dns 子段：沿用当前 dns 对象 copy 指定字段
     fun updateDns(transform: (DnsOverride) -> DnsOverride) {
-        viewModel.update { state ->
-            val current = state.dns ?: DnsOverride()
-            val next = transform(current)
-            val allNull = next == DnsOverride()
-            state.copy(dns = if (allNull) null else next)
-        }
+        viewModel.updateDns(transform)
     }
 
     // 端口编辑 Dialog 状态（setter 在 open 时绑定）

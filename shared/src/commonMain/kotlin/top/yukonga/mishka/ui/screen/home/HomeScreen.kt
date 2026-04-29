@@ -4,10 +4,10 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.unit.Dp
@@ -46,10 +46,10 @@ fun HomeScreen(
     val scrollBehavior = MiuixScrollBehavior()
 
     // 高频字段独立订阅，重组仅限到相应 Section
-    val speed by (viewModel?.speedState?.collectAsState() ?: remember { mutableStateOf(SpeedSnapshot()) })
-    val memory by (viewModel?.memoryState?.collectAsState() ?: remember { mutableStateOf(MemorySnapshot()) })
-    val systemInfo by (viewModel?.systemInfoState?.collectAsState() ?: remember { mutableStateOf(SystemInfoSnapshot()) })
-    val uptimeSeconds by (viewModel?.uptimeState?.collectAsState() ?: remember { mutableStateOf(-1L) })
+    val speed by (viewModel?.speedState?.collectAsStateWithLifecycle() ?: remember { mutableStateOf(SpeedSnapshot()) })
+    val memory by (viewModel?.memoryState?.collectAsStateWithLifecycle() ?: remember { mutableStateOf(MemorySnapshot()) })
+    val systemInfo by (viewModel?.systemInfoState?.collectAsStateWithLifecycle() ?: remember { mutableStateOf(SystemInfoSnapshot()) })
+    val uptimeSeconds by (viewModel?.uptimeState?.collectAsStateWithLifecycle() ?: remember { mutableStateOf(-1L) })
     val uptime = formatUptime(uptimeSeconds)
 
     Scaffold(

@@ -10,9 +10,11 @@ import top.yukonga.mishka.ui.navigation.AppNavigation
 import top.yukonga.mishka.viewmodel.AppProxyViewModel
 import top.yukonga.mishka.viewmodel.ConnectionViewModel
 import top.yukonga.mishka.viewmodel.DnsQueryViewModel
+import top.yukonga.mishka.viewmodel.ExternalControlViewModel
 import top.yukonga.mishka.viewmodel.HomeViewModel
 import top.yukonga.mishka.viewmodel.LogViewModel
-import top.yukonga.mishka.viewmodel.OverrideSettingsViewModel
+import top.yukonga.mishka.viewmodel.MetaSettingsViewModel
+import top.yukonga.mishka.viewmodel.NetworkSettingsViewModel
 import top.yukonga.mishka.viewmodel.ProviderViewModel
 import top.yukonga.mishka.viewmodel.ProxyViewModel
 import top.yukonga.mishka.viewmodel.SubscriptionViewModel
@@ -32,7 +34,9 @@ fun App(
     providerViewModel: ProviderViewModel? = null,
     connectionViewModel: ConnectionViewModel? = null,
     dnsQueryViewModel: DnsQueryViewModel? = null,
-    overrideSettingsViewModel: OverrideSettingsViewModel? = null,
+    networkSettingsViewModel: NetworkSettingsViewModel? = null,
+    metaSettingsViewModel: MetaSettingsViewModel? = null,
+    externalControlViewModel: ExternalControlViewModel? = null,
     appProxyViewModel: AppProxyViewModel? = null,
     filePicker: FilePicker? = null,
     storage: PlatformStorage? = null,
@@ -67,7 +71,9 @@ fun App(
                 providerViewModel = providerViewModel,
                 connectionViewModel = connectionViewModel,
                 dnsQueryViewModel = dnsQueryViewModel,
-                overrideSettingsViewModel = overrideSettingsViewModel,
+                networkSettingsViewModel = networkSettingsViewModel,
+                metaSettingsViewModel = metaSettingsViewModel,
+                externalControlViewModel = externalControlViewModel,
                 appProxyViewModel = appProxyViewModel,
                 filePicker = filePicker,
                 storage = storage,

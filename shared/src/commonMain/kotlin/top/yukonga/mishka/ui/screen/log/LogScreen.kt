@@ -19,7 +19,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -32,7 +32,6 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -64,10 +63,9 @@ import top.yukonga.miuix.kmp.utils.scrollEndHaptic
 fun LogScreen(
     viewModel: LogViewModel,
     onBack: () -> Unit = {},
-    bottomPadding: Dp = 0.dp,
 ) {
-    val uiState by viewModel.uiState.collectAsState()
-    val logs by viewModel.logs.collectAsState()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val logs by viewModel.logs.collectAsStateWithLifecycle()
     val scrollBehavior = MiuixScrollBehavior()
     val listState = rememberLazyListState()
 
@@ -135,7 +133,6 @@ fun LogScreen(
             state = listState,
             contentPadding = PaddingValues(
                 top = innerPadding.calculateTopPadding(),
-                bottom = bottomPadding,
             ),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
@@ -352,7 +349,6 @@ private fun ProtocolBadge(protocol: String) {
 
 private data class LevelInfo(val label: String, val name: String, val color: Color)
 
-@Composable
 private fun getLevelInfo(type: String): LevelInfo {
     return when (type.lowercase()) {
         "error" -> LevelInfo("E", "Error", Color(0xFFFF5252))

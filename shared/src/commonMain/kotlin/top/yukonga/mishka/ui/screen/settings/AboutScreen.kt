@@ -35,7 +35,6 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -83,7 +82,6 @@ fun AboutScreen(
     onBack: () -> Unit = {},
     mihomoVersion: String = "",
     onOpenUrl: (String) -> Unit = {},
-    bottomPadding: Dp = 0.dp,
 ) {
     val scrollBehavior = MiuixScrollBehavior()
     val lazyListState = rememberLazyListState()
@@ -128,7 +126,6 @@ fun AboutScreen(
         AboutContent(
             padding = PaddingValues(
                 top = innerPadding.calculateTopPadding(),
-                bottom = bottomPadding,
             ),
             scrollBehavior = scrollBehavior,
             lazyListState = lazyListState,

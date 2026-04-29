@@ -6,10 +6,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
@@ -56,13 +56,13 @@ fun SubscriptionEditScreen(
     onBack: () -> Unit = {},
     onSaved: () -> Unit = {},
 ) {
-    val uiState by viewModel.uiState.collectAsState()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val subscription = uiState.subscriptions.find { it.id == uuid }
     val scrollBehavior = MiuixScrollBehavior()
 
-    var name by remember(subscription) { mutableStateOf(subscription?.name ?: "") }
-    var url by remember(subscription) { mutableStateOf(subscription?.url ?: "") }
-    var intervalMinutes by remember(subscription) {
+    var name by rememberSaveable(uuid) { mutableStateOf(subscription?.name ?: "") }
+    var url by rememberSaveable(uuid) { mutableStateOf(subscription?.url ?: "") }
+    var intervalMinutes by rememberSaveable(uuid) {
         mutableStateOf(
             if ((subscription?.interval ?: 0) > 0) ((subscription?.interval ?: 0) / 60000).toString() else ""
         )

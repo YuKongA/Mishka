@@ -16,12 +16,11 @@ import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -53,6 +52,7 @@ import mishka.shared.generated.resources.subscription_updating_title
 import mishka.shared.generated.resources.subscription_used_traffic
 import org.jetbrains.compose.resources.stringResource
 import top.yukonga.mishka.data.model.Subscription
+import top.yukonga.mishka.ui.theme.StatusColors
 import top.yukonga.mishka.util.FormatUtils
 import top.yukonga.mishka.util.formatEpochMillisAsLocal
 import top.yukonga.mishka.viewmodel.ProfileOperation
@@ -89,7 +89,7 @@ fun SubscriptionScreen(
     onNavigateEdit: (uuid: String) -> Unit = {},
     onActiveChanged: (() -> Unit)? = null,
 ) {
-    val uiState by viewModel.uiState.collectAsState()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val scrollBehavior = MiuixScrollBehavior()
 
     Scaffold(
@@ -163,7 +163,7 @@ fun SubscriptionScreen(
                     ) {
                         Text(
                             text = uiState.error,
-                            color = Color(0xFFE53935),
+                            color = StatusColors.danger,
                         )
                     }
                 }
@@ -272,14 +272,15 @@ private fun SubscriptionItem(
                 color = MiuixTheme.colorScheme.onSurface,
             )
             if (subscription.isActive) {
+                val activeColor = StatusColors.healthy
                 Text(
                     text = stringResource(Res.string.subscription_in_use),
                     fontSize = 12.sp,
                     fontWeight = FontWeight(750),
-                    color = Color(0xFF4CAF50),
+                    color = activeColor,
                     modifier = Modifier
                         .clip(miuixShape(6.dp))
-                        .background(Color(0xFF4CAF50).copy(alpha = 0.15f))
+                        .background(activeColor.copy(alpha = 0.15f))
                         .padding(horizontal = 6.dp, vertical = 2.dp),
                 )
             }

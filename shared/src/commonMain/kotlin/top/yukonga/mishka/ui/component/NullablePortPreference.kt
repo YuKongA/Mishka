@@ -36,9 +36,11 @@ fun NullablePortPreference(
     onShowDialog: () -> Unit,
     onDismiss: () -> Unit,
     onConfirm: (Int?) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     ArrowPreference(
         title = title,
+        modifier = modifier,
         summary = if (value == null) stringResource(Res.string.common_not_modified) else "$value",
         onClick = onShowDialog,
     )

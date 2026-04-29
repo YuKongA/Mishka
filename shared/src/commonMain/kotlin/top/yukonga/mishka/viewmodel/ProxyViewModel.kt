@@ -3,6 +3,12 @@ package top.yukonga.mishka.viewmodel
 import androidx.compose.runtime.Immutable
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.collections.immutable.ImmutableList
+import kotlinx.collections.immutable.ImmutableMap
+import kotlinx.collections.immutable.persistentListOf
+import kotlinx.collections.immutable.persistentMapOf
+import kotlinx.collections.immutable.toPersistentList
+import kotlinx.collections.immutable.toPersistentMap
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -16,15 +22,15 @@ data class ProxyGroupUi(
     val name: String = "",
     val type: String = "",
     val now: String = "",
-    val all: List<String> = emptyList(),
-    val delays: Map<String, Int> = emptyMap(),
-    val nodeTypes: Map<String, String> = emptyMap(),
+    val all: ImmutableList<String> = persistentListOf(),
+    val delays: ImmutableMap<String, Int> = persistentMapOf(),
+    val nodeTypes: ImmutableMap<String, String> = persistentMapOf(),
     val icon: String = "",
 )
 
 @Immutable
 data class ProxyUiState(
-    val groups: List<ProxyGroupUi> = emptyList(),
+    val groups: ImmutableList<ProxyGroupUi> = persistentListOf(),
     val isLoading: Boolean = false,
     val isTesting: Boolean = false,
     val error: String = "",
@@ -96,12 +102,13 @@ class ProxyViewModel(
                             name = node.name,
                             type = node.type,
                             now = node.now,
-                            all = node.all,
-                            delays = delays,
-                            nodeTypes = nodeTypes,
+                            all = node.all.toPersistentList(),
+                            delays = delays.toPersistentMap(),
+                            nodeTypes = nodeTypes.toPersistentMap(),
                             icon = node.icon,
                         )
                     }
+                    .toPersistentList()
                 _uiState.value = _uiState.value.copy(
                     groups = groups,
                     isLoading = false,
@@ -123,9 +130,9 @@ class ProxyViewModel(
         viewModelScope.launch {
             repo.selectProxy(group, proxy).onSuccess {
                 _uiState.value = _uiState.value.copy(
-                    groups = _uiState.value.groups.map {
-                        if (it.name == group) it.copy(now = proxy) else it
-                    }
+                    groups = _uiState.value.groups
+                        .map { if (it.name == group) it.copy(now = proxy) else it }
+                        .toPersistentList()
                 )
                 // 保存选择到数据库
                 saveSelection(group, proxy)
@@ -150,7 +157,7 @@ class ProxyViewModel(
         dao.insert(SelectionEntity(uuid = uuid, proxy = group, selected = proxy))
     }
 
-    private suspend fun restoreSelections(repo: MihomoRepository, groups: List<ProxyGroupUi>) {
+    private suspend fun restoreSelections(repo: MihomoRepository, groups: ImmutableList<ProxyGroupUi>) {
         val uuid = getActiveUuid() ?: return
         val dao = selectionDao ?: return
         val selections = dao.queryByUUID(uuid)
@@ -171,6 +178,6 @@ class ProxyViewModel(
             }
         }
 
-        _uiState.value = _uiState.value.copy(groups = updatedGroups)
+        _uiState.value = _uiState.value.copy(groups = updatedGroups.toPersistentList())
     }
 }

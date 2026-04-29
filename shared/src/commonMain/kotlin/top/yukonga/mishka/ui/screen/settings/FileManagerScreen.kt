@@ -11,7 +11,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
@@ -46,7 +46,7 @@ fun FileManagerScreen(
     onOpenFile: (uuid: String, relativePath: String) -> Unit = { _, _ -> },
 ) {
     val scrollBehavior = MiuixScrollBehavior()
-    val uiState = subscriptionViewModel?.uiState?.collectAsState()?.value
+    val uiState = subscriptionViewModel?.uiState?.collectAsStateWithLifecycle()?.value
     val importedSubs = uiState?.subscriptions.orEmpty().filter { it.imported }
 
     Scaffold(

@@ -17,9 +17,11 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
  * 覆写设置页的顶部 Card 提示：这些设置修改后需重启代理服务生效。
  */
 @Composable
-fun RestartRequiredHint() {
+fun RestartRequiredHint(
+    modifier: Modifier = Modifier,
+) {
     Card(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 12.dp)
             .padding(top = 12.dp, bottom = 6.dp),

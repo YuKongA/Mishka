@@ -12,7 +12,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -73,10 +73,12 @@ import top.yukonga.mishka.ui.screen.subscription.SubscriptionScreen
 import top.yukonga.mishka.viewmodel.AppProxyViewModel
 import top.yukonga.mishka.viewmodel.ConnectionViewModel
 import top.yukonga.mishka.viewmodel.DnsQueryViewModel
+import top.yukonga.mishka.viewmodel.ExternalControlViewModel
 import top.yukonga.mishka.viewmodel.HomeUiState
 import top.yukonga.mishka.viewmodel.HomeViewModel
 import top.yukonga.mishka.viewmodel.LogViewModel
-import top.yukonga.mishka.viewmodel.OverrideSettingsViewModel
+import top.yukonga.mishka.viewmodel.MetaSettingsViewModel
+import top.yukonga.mishka.viewmodel.NetworkSettingsViewModel
 import top.yukonga.mishka.viewmodel.ProviderViewModel
 import top.yukonga.mishka.viewmodel.ProxyViewModel
 import top.yukonga.mishka.viewmodel.SubscriptionViewModel
@@ -105,7 +107,9 @@ fun AppNavigation(
     providerViewModel: ProviderViewModel? = null,
     connectionViewModel: ConnectionViewModel? = null,
     dnsQueryViewModel: DnsQueryViewModel? = null,
-    overrideSettingsViewModel: OverrideSettingsViewModel? = null,
+    networkSettingsViewModel: NetworkSettingsViewModel? = null,
+    metaSettingsViewModel: MetaSettingsViewModel? = null,
+    externalControlViewModel: ExternalControlViewModel? = null,
     appProxyViewModel: AppProxyViewModel? = null,
     filePicker: FilePicker? = null,
     storage: PlatformStorage? = null,
@@ -253,7 +257,7 @@ fun AppNavigation(
             }
             entry<Route.RootSettings> {
                 storage?.let {
-                    val homeState = homeViewModel?.uiState?.collectAsState()?.value
+                    val homeState = homeViewModel?.uiState?.collectAsStateWithLifecycle()?.value
                     RootSettingsScreen(
                         storage = it,
                         isProxyRunning = homeState?.isRunning == true || homeState?.isStarting == true,
@@ -262,7 +266,7 @@ fun AppNavigation(
                 }
             }
             entry<Route.NetworkSettings> {
-                overrideSettingsViewModel?.let {
+                networkSettingsViewModel?.let {
                     NetworkSettingsScreen(
                         viewModel = it,
                         onBack = { navigator.pop() },
@@ -270,7 +274,7 @@ fun AppNavigation(
                 }
             }
             entry<Route.MetaSettings> {
-                overrideSettingsViewModel?.let {
+                metaSettingsViewModel?.let {
                     MetaSettingsScreen(
                         viewModel = it,
                         onBack = { navigator.pop() },
@@ -286,7 +290,7 @@ fun AppNavigation(
                 }
             }
             entry<Route.ExternalControl> {
-                overrideSettingsViewModel?.let {
+                externalControlViewModel?.let {
                     ExternalControlScreen(
                         viewModel = it,
                         onBack = { navigator.pop() },
@@ -352,7 +356,7 @@ private fun MainPage(
     onPredictiveBackChange: ((Boolean) -> Unit)? = null,
     hasRootPermission: Boolean = false,
 ) {
-    val homeUiState = homeViewModel?.uiState?.collectAsState()?.value ?: HomeUiState()
+    val homeUiState = homeViewModel?.uiState?.collectAsStateWithLifecycle()?.value ?: HomeUiState()
     val selectedPage = mainPagerState.selectedPage
 
     Scaffold(

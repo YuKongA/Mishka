@@ -15,7 +15,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -99,7 +99,7 @@ fun AppProxyScreen(
     viewModel: AppProxyViewModel,
     onBack: () -> Unit = {},
 ) {
-    val uiState by viewModel.uiState.collectAsState()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val scrollBehavior = MiuixScrollBehavior()
     val showPopup = remember { mutableStateOf(false) }
     val density = LocalDensity.current
@@ -125,7 +125,7 @@ fun AppProxyScreen(
     }
 
     // 使用 ViewModel 缓存的 filteredAppsFlow（不依赖 selectedPackages，勾选不引起排序重算）
-    val filteredApps by viewModel.filteredAppsFlow.collectAsState()
+    val filteredApps by viewModel.filteredAppsFlow.collectAsStateWithLifecycle()
 
     // 更新搜索结果状态
     val resultStatus by remember(searchText, filteredApps) {

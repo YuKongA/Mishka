@@ -24,7 +24,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -40,6 +39,7 @@ import mishka.shared.generated.resources.home_latency_untested
 import mishka.shared.generated.resources.home_select_proxy_group
 import mishka.shared.generated.resources.home_switch
 import org.jetbrains.compose.resources.stringResource
+import top.yukonga.mishka.ui.theme.StatusColors
 import top.yukonga.mishka.util.FormatUtils
 import top.yukonga.mishka.viewmodel.HomeUiState
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
@@ -91,10 +91,10 @@ private fun LatencyHeader(
 ) {
     val allTested = state.latencyBaidu >= 0 || state.latencyCloudflare >= 0 || state.latencyGoogle >= 0
     val statusColor = when {
-        !allTested -> Color(0xFF9E9E9E)
-        state.latencyGoogle >= 0 -> Color(0xFF4CAF50)
-        state.latencyCloudflare >= 0 -> Color(0xFFFFC107)
-        else -> Color(0xFFE53935)
+        !allTested -> StatusColors.neutral
+        state.latencyGoogle >= 0 -> StatusColors.healthy
+        state.latencyCloudflare >= 0 -> StatusColors.warning
+        else -> StatusColors.danger
     }
     val statusText = when {
         !allTested -> stringResource(Res.string.home_latency_untested)
@@ -173,12 +173,8 @@ private fun LatencyHeader(
 
 @Composable
 private fun LatencyItem(name: String, delay: Int) {
-    val color = when {
-        delay < 0 -> Color(0xFF9E9E9E)
-        delay < 200 -> Color(0xFF4CAF50)
-        delay < 500 -> Color(0xFFFFC107)
-        else -> Color(0xFFE53935)
-    }
+    // -1 视为"未测/不可达"，由 token 映射到 neutral 灰
+    val color = StatusColors.delay(if (delay < 0) null else delay)
 
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Row(
