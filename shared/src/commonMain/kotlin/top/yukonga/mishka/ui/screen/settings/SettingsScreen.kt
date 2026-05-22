@@ -32,6 +32,8 @@ import mishka.shared.generated.resources.settings_external_control_summary
 import mishka.shared.generated.resources.settings_file_manager
 import mishka.shared.generated.resources.settings_file_manager_summary
 import mishka.shared.generated.resources.settings_general
+import mishka.shared.generated.resources.settings_hide_task_card
+import mishka.shared.generated.resources.settings_hide_task_card_summary
 import mishka.shared.generated.resources.settings_meta_settings
 import mishka.shared.generated.resources.settings_meta_summary
 import mishka.shared.generated.resources.settings_network
@@ -92,6 +94,7 @@ fun SettingsScreen(
     onColorModeChange: (Int) -> Unit = {},
     storage: PlatformStorage? = null,
     onPredictiveBackChange: ((Boolean) -> Unit)? = null,
+    onHideTaskCardChange: ((Boolean) -> Unit)? = null,
     hasRootPermission: Boolean = false,
     isProxyRunning: Boolean = false,
 ) {
@@ -107,6 +110,9 @@ fun SettingsScreen(
     }
     var isUpdateViaProxyEnabled by remember {
         mutableStateOf(storage?.getString(StorageKeys.SUBSCRIPTION_UPDATE_VIA_PROXY, "true") != "false")
+    }
+    var isHideTaskCardEnabled by remember {
+        mutableStateOf(storage?.getString(StorageKeys.HIDE_TASK_CARD, "false") == "true")
     }
     var tunModeIndex by remember {
         mutableIntStateOf(
@@ -239,6 +245,18 @@ fun SettingsScreen(
                         .padding(horizontal = 12.dp)
                         .padding(bottom = 12.dp),
                 ) {
+                    if (onHideTaskCardChange != null) {
+                        SwitchPreference(
+                            title = stringResource(Res.string.settings_hide_task_card),
+                            summary = stringResource(Res.string.settings_hide_task_card_summary),
+                            checked = isHideTaskCardEnabled,
+                            onCheckedChange = { checked ->
+                                storage?.putString(StorageKeys.HIDE_TASK_CARD, if (checked) "true" else "false")
+                                isHideTaskCardEnabled = checked
+                                onHideTaskCardChange(checked)
+                            },
+                        )
+                    }
                     val isVpnMode = tunModeIndex == 0
                     SwitchPreference(
                         title = stringResource(Res.string.settings_dynamic_notification),

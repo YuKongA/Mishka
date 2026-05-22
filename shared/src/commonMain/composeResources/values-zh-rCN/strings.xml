@@ -230,6 +230,8 @@
     <string name="settings_theme_dark">深色模式</string>
     <string name="settings_predictive_back">预测性返回手势</string>
     <string name="settings_predictive_back_summary">启用预测性返回动画效果</string>
+    <string name="settings_hide_task_card">后台卡片隐藏</string>
+    <string name="settings_hide_task_card_summary">在最近任务中隐藏任务卡片</string>
     <string name="settings_about">关于</string>
 
     <!-- VPN Settings -->

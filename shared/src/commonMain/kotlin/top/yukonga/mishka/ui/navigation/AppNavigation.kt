@@ -122,6 +122,7 @@ fun AppNavigation(
     mihomoVersion: String = "",
     onScanQR: ((callback: (String?) -> Unit) -> Unit)? = null,
     onPredictiveBackChange: ((Boolean) -> Unit)? = null,
+    onHideTaskCardChange: ((Boolean) -> Unit)? = null,
     hasRootPermission: Boolean = false,
 ) {
     val backStack = remember { mutableStateListOf<NavKey>(Route.Main) }
@@ -154,6 +155,7 @@ fun AppNavigation(
                     onColorModeChange,
                     storage,
                     onPredictiveBackChange,
+                    onHideTaskCardChange,
                     hasRootPermission,
                 )
             }
@@ -361,6 +363,7 @@ private fun MainPage(
     onColorModeChange: (Int) -> Unit = {},
     storage: PlatformStorage? = null,
     onPredictiveBackChange: ((Boolean) -> Unit)? = null,
+    onHideTaskCardChange: ((Boolean) -> Unit)? = null,
     hasRootPermission: Boolean = false,
 ) {
     val homeUiState = homeViewModel?.uiState?.collectAsStateWithLifecycle()?.value ?: HomeUiState()
@@ -459,6 +462,7 @@ private fun MainPage(
                     onColorModeChange = onColorModeChange,
                     storage = storage,
                     onPredictiveBackChange = onPredictiveBackChange,
+                    onHideTaskCardChange = onHideTaskCardChange,
                     hasRootPermission = hasRootPermission,
                     isProxyRunning = homeUiState.isRunning || homeUiState.isStarting,
                 )

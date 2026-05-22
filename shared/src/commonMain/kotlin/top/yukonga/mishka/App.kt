@@ -44,6 +44,7 @@ fun App(
     mihomoVersion: String = "",
     onScanQR: ((callback: (String?) -> Unit) -> Unit)? = null,
     onPredictiveBackChange: ((Boolean) -> Unit)? = null,
+    onHideTaskCardChange: ((Boolean) -> Unit)? = null,
     hasRootPermission: Boolean = false,
 ) {
     val controller = remember(colorMode) {
@@ -78,6 +79,7 @@ fun App(
                 mihomoVersion = mihomoVersion,
                 onScanQR = onScanQR,
                 onPredictiveBackChange = onPredictiveBackChange,
+                onHideTaskCardChange = onHideTaskCardChange,
                 hasRootPermission = hasRootPermission,
             )
         }

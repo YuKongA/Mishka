@@ -230,6 +230,8 @@
     <string name="settings_theme_dark">Dark Mode</string>
     <string name="settings_predictive_back">Predictive Back Gesture</string>
     <string name="settings_predictive_back_summary">Enable predictive back animation</string>
+    <string name="settings_hide_task_card">Hide from recents</string>
+    <string name="settings_hide_task_card_summary">Hide task card in recent tasks</string>
     <string name="settings_about">About</string>
 
     <!-- VPN Settings -->

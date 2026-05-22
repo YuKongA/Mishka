@@ -1,6 +1,7 @@
 package top.yukonga.mishka
 
 import android.Manifest
+import android.app.ActivityManager
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
@@ -203,6 +204,12 @@ class MainActivity : ComponentActivity() {
             "dark" -> 2
             else -> 0
         }
+
+        // 隐藏后台卡片：通过 excludeFromRecents 从最近任务中移除
+        if (storage.getString(StorageKeys.HIDE_TASK_CARD, "false") == "true") {
+            setExcludeFromRecents(true)
+        }
+
         setContent {
             var colorMode by remember { mutableIntStateOf(initialColorMode) }
             App(
@@ -233,6 +240,9 @@ class MainActivity : ComponentActivity() {
                         recreate()
                     }
                 } else null,
+                onHideTaskCardChange = { enabled ->
+                    setExcludeFromRecents(enabled)
+                },
             )
         }
     }
@@ -244,6 +254,11 @@ class MainActivity : ComponentActivity() {
 
     private fun showQrToast(@StringRes resId: Int) {
         Toast.makeText(this, resId, Toast.LENGTH_SHORT).show()
+    }
+
+    private fun setExcludeFromRecents(exclude: Boolean) {
+        val am = getSystemService(ACTIVITY_SERVICE) as ActivityManager
+        am.appTasks.firstOrNull()?.setExcludeFromRecents(exclude)
     }
 
     @Deprecated("Use ActivityResult API")

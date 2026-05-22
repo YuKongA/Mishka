@@ -67,6 +67,7 @@ object StorageKeys {
     const val DARK_MODE = "dark_mode"
     const val DYNAMIC_NOTIFICATION = "dynamic_notification"
     const val PREDICTIVE_BACK = "predictive_back"
+    const val HIDE_TASK_CARD = "hide_task_card"
 
     // 一次性迁移标记
     const val MIGRATION_ROOT_RECLAIM_DONE = "migration_root_reclaim_done"
