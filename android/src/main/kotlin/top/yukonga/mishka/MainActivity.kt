@@ -258,7 +258,10 @@ class MainActivity : ComponentActivity() {
 
     private fun setExcludeFromRecents(exclude: Boolean) {
         val am = getSystemService(ACTIVITY_SERVICE) as ActivityManager
-        am.appTasks.firstOrNull()?.setExcludeFromRecents(exclude)
+        val currentTaskId = taskId
+        am.appTasks
+            .firstOrNull { it.taskInfo.id == currentTaskId }
+            ?.setExcludeFromRecents(exclude)
     }
 
     @Deprecated("Use ActivityResult API")
