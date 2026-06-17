@@ -38,6 +38,7 @@ data class ProxyGroupUi(
 data class ProxyUiState(
     val groups: ImmutableList<ProxyGroupUi> = persistentListOf(),
     val testingGroups: ImmutableSet<String> = persistentSetOf(),
+    val testingNodes: ImmutableSet<String> = persistentSetOf(),
     val error: String = "",
 )
 
@@ -176,6 +177,39 @@ class ProxyViewModel(
             loadProxies()
             _uiState.value = _uiState.value.copy(
                 testingGroups = (_uiState.value.testingGroups - group).toPersistentSet(),
+            )
+        }
+    }
+
+    fun testNodeDelay(groupName: String, nodeName: String) {
+        val repo = repository ?: return
+        if (nodeName in _uiState.value.testingNodes) return
+        _uiState.value = _uiState.value.copy(
+            testingNodes = (_uiState.value.testingNodes + nodeName).toPersistentSet(),
+        )
+
+        viewModelScope.launch {
+            val result = repo.getProxyDelay(nodeName)
+            if (repository !== repo) {
+                _uiState.value = _uiState.value.copy(
+                    testingNodes = (_uiState.value.testingNodes - nodeName).toPersistentSet(),
+                )
+                return@launch
+            }
+            val rawDelay = result.getOrNull()?.delay ?: -1
+            val delay = if (rawDelay <= 0) -1 else rawDelay
+
+            _uiState.value = _uiState.value.copy(
+                groups = _uiState.value.groups.map { group ->
+                    if (group.name == groupName) {
+                        group.copy(
+                            delays = (group.delays + (nodeName to delay)).toPersistentMap()
+                        )
+                    } else {
+                        group
+                    }
+                }.toPersistentList(),
+                testingNodes = (_uiState.value.testingNodes - nodeName).toPersistentSet(),
             )
         }
     }

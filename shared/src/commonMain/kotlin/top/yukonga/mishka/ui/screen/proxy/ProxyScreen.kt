@@ -8,6 +8,7 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,6 +20,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -41,6 +43,7 @@ import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -62,6 +65,7 @@ import mishka.shared.generated.resources.proxy_sort_reverse
 import mishka.shared.generated.resources.proxy_sort_title
 import mishka.shared.generated.resources.proxy_start_first
 import mishka.shared.generated.resources.proxy_test_group_delay
+import mishka.shared.generated.resources.proxy_test_node_delay
 import mishka.shared.generated.resources.proxy_timeout
 import mishka.shared.generated.resources.proxy_title
 import org.jetbrains.compose.resources.stringResource
@@ -291,6 +295,10 @@ fun ProxyScreen(
                                 ProxyNodeGrid(
                                     group = group,
                                     sortOption = sortOption,
+                                    testingNodes = uiState.testingNodes,
+                                    onTestNodeDelay = { nodeName ->
+                                        viewModel?.testNodeDelay(group.name, nodeName)
+                                    },
                                     onSelect = { proxyName ->
                                         if (group.type.lowercase() == "selector") {
                                             viewModel?.selectProxy(group.name, proxyName)
@@ -473,6 +481,8 @@ private fun DefaultGroupIcon(name: String) {
 private fun ProxyNodeGrid(
     group: ProxyGroupUi,
     sortOption: Int,
+    testingNodes: Set<String> = emptySet(),
+    onTestNodeDelay: (String) -> Unit = {},
     onSelect: (String) -> Unit,
 ) {
     val sortedNodes = remember(group.all, group.delays, sortOption) {
@@ -502,6 +512,8 @@ private fun ProxyNodeGrid(
                         delay = delay,
                         isSelected = isSelected,
                         isSelectable = isSelectable,
+                        isTesting = proxyName in testingNodes,
+                        onTestDelay = { onTestNodeDelay(proxyName) },
                         onClick = { onSelect(proxyName) },
                         modifier = Modifier.weight(1f),
                     )
@@ -521,6 +533,8 @@ private fun ProxyNodeCard(
     delay: Int?,
     isSelected: Boolean,
     isSelectable: Boolean,
+    isTesting: Boolean = false,
+    onTestDelay: () -> Unit = {},
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -543,12 +557,12 @@ private fun ProxyNodeCard(
             .clip(RoundedCornerShape(12.dp))
             .background(backgroundColor)
             .then(
-                if (isSelectable) Modifier.clickable(onClick = onClick) else Modifier
+                if (isSelectable) Modifier.clickable { onClick() } else Modifier
             )
             .padding(12.dp),
     ) {
         Column {
-            // 第一行：节点名 + 延迟
+            // 第一行：节点名 + 延迟区域
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -563,13 +577,52 @@ private fun ProxyNodeCard(
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f, fill = false),
                 )
-                if (delayText != null) {
-                    Spacer(Modifier.width(6.dp))
-                    Text(
-                        text = delayText,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = delayColor,
+                Spacer(Modifier.width(6.dp))
+                Box(
+                    modifier = Modifier
+                        .sizeIn(minWidth = 28.dp)
+                        .layout { measurable, constraints ->
+                            val placeable = measurable.measure(constraints)
+                            val extra = 2.dp.roundToPx()
+                            layout(placeable.width + extra, placeable.height + extra) {
+                                placeable.placeRelative(extra, 0)
+                            }
+                        }
+                        .clickable(
+                            enabled = !isTesting,
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                        ) { onTestDelay() },
+                    contentAlignment = Alignment.CenterEnd,
+                ) {
+                    // All three content variants stay in layout (alpha-toggled)
+                    // so the Box height is stable across isTesting transitions.
+                    if (delayText != null) {
+                        Text(
+                            text = delayText,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = delayColor,
+                            modifier = Modifier.graphicsLayer {
+                                alpha = if (isTesting) 0f else 1f
+                            },
+                        )
+                    } else {
+                        Icon(
+                            imageVector = MiuixIcons.Refresh,
+                            contentDescription = stringResource(Res.string.proxy_test_node_delay),
+                            modifier = Modifier
+                                .size(14.dp)
+                                .graphicsLayer { alpha = if (isTesting) 0f else 1f },
+                            tint = StatusColors.neutral,
+                        )
+                    }
+                    CircularProgressIndicator(
+                        size = 12.dp,
+                        strokeWidth = 2.dp,
+                        modifier = Modifier.graphicsLayer {
+                            alpha = if (isTesting) 1f else 0f
+                        },
                     )
                 }
             }

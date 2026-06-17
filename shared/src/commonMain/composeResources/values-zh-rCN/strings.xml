@@ -97,6 +97,7 @@
     <string name="proxy_sort_delay">延迟</string>
     <string name="proxy_sort_reverse">倒序</string>
     <string name="proxy_test_group_delay">测试延迟</string>
+    <string name="proxy_test_node_delay">测试节点延迟</string>
 
     <!-- Subscription -->
     <string name="subscription_title">订阅管理</string>

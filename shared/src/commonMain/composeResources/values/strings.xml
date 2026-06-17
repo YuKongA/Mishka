@@ -97,6 +97,7 @@
     <string name="proxy_sort_delay">Latency</string>
     <string name="proxy_sort_reverse">Reverse</string>
     <string name="proxy_test_group_delay">Test latency</string>
+    <string name="proxy_test_node_delay">Test node delay</string>
 
     <!-- Subscription -->
     <string name="subscription_title">Subscriptions</string>
