@@ -8,7 +8,6 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -43,7 +42,6 @@ import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -53,6 +51,8 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.collections.immutable.ImmutableSet
+import kotlinx.collections.immutable.persistentSetOf
 import kotlinx.coroutines.launch
 import mishka.shared.generated.resources.Res
 import mishka.shared.generated.resources.common_more
@@ -297,7 +297,7 @@ fun ProxyScreen(
                                     sortOption = sortOption,
                                     testingNodes = uiState.testingNodes,
                                     onTestNodeDelay = { nodeName ->
-                                        viewModel?.testNodeDelay(group.name, nodeName)
+                                        viewModel?.testNodeDelay(nodeName)
                                     },
                                     onSelect = { proxyName ->
                                         if (group.type.lowercase() == "selector") {
@@ -481,7 +481,7 @@ private fun DefaultGroupIcon(name: String) {
 private fun ProxyNodeGrid(
     group: ProxyGroupUi,
     sortOption: Int,
-    testingNodes: Set<String> = emptySet(),
+    testingNodes: ImmutableSet<String> = persistentSetOf(),
     onTestNodeDelay: (String) -> Unit = {},
     onSelect: (String) -> Unit,
 ) {
@@ -545,6 +545,7 @@ private fun ProxyNodeCard(
         else -> "$delay"
     }
     val delayColor = StatusColors.delay(delay)
+    val testNodeDelayLabel = stringResource(Res.string.proxy_test_node_delay)
 
     val backgroundColor = if (isSelected) {
         StatusColors.selectedNodeContainer
@@ -557,9 +558,9 @@ private fun ProxyNodeCard(
             .clip(RoundedCornerShape(12.dp))
             .background(backgroundColor)
             .then(
-                if (isSelectable) Modifier.clickable { onClick() } else Modifier
+                if (isSelectable) Modifier.clickable(onClick = onClick) else Modifier
             )
-            .padding(12.dp),
+            .padding(start = 12.dp, end = 12.dp, top = 10.dp, bottom = 12.dp),
     ) {
         Column {
             // 第一行：节点名 + 延迟区域
@@ -581,49 +582,36 @@ private fun ProxyNodeCard(
                 Box(
                     modifier = Modifier
                         .sizeIn(minWidth = 28.dp)
-                        .layout { measurable, constraints ->
-                            val placeable = measurable.measure(constraints)
-                            val extra = 2.dp.roundToPx()
-                            layout(placeable.width + extra, placeable.height + extra) {
-                                placeable.placeRelative(extra, 0)
-                            }
-                        }
                         .clickable(
                             enabled = !isTesting,
-                            interactionSource = remember { MutableInteractionSource() },
+                            interactionSource = null,
                             indication = null,
+                            onClickLabel = testNodeDelayLabel,
                         ) { onTestDelay() },
                     contentAlignment = Alignment.CenterEnd,
                 ) {
-                    // All three content variants stay in layout (alpha-toggled)
-                    // so the Box height is stable across isTesting transitions.
-                    if (delayText != null) {
-                        Text(
+                    // 测试中 / 已测显示延迟 / 未测显示刷新图标，三态互斥
+                    // 行高由左侧节点名（13.sp）主导，切换不抖动
+                    when {
+                        isTesting -> CircularProgressIndicator(
+                            size = 12.dp,
+                            strokeWidth = 2.dp,
+                        )
+
+                        delayText != null -> Text(
                             text = delayText,
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Medium,
                             color = delayColor,
-                            modifier = Modifier.graphicsLayer {
-                                alpha = if (isTesting) 0f else 1f
-                            },
                         )
-                    } else {
-                        Icon(
+
+                        else -> Icon(
                             imageVector = MiuixIcons.Refresh,
-                            contentDescription = stringResource(Res.string.proxy_test_node_delay),
-                            modifier = Modifier
-                                .size(14.dp)
-                                .graphicsLayer { alpha = if (isTesting) 0f else 1f },
+                            contentDescription = testNodeDelayLabel,
+                            modifier = Modifier.size(14.dp),
                             tint = StatusColors.neutral,
                         )
                     }
-                    CircularProgressIndicator(
-                        size = 12.dp,
-                        strokeWidth = 2.dp,
-                        modifier = Modifier.graphicsLayer {
-                            alpha = if (isTesting) 1f else 0f
-                        },
-                    )
                 }
             }
 
