@@ -38,6 +38,7 @@ data class HomeUiState(
     val ipv6: Boolean = false,
     val config: MihomoConfig? = null,
     val subscription: SubscriptionInfo? = null,
+    val providerTraffic: List<ProviderTrafficInfo> = emptyList(),
     val latencyBaidu: Int = -1,
     val latencyCloudflare: Int = -1,
     val latencyGoogle: Int = -1,
@@ -47,6 +48,16 @@ data class HomeUiState(
     val version: String = "",
     val errorMessage: String = "",
     val needsVpnPermission: Boolean = false,
+)
+
+@Immutable
+data class ProviderTrafficInfo(
+    val id: String,
+    val name: String,
+    val upload: Long,
+    val download: Long,
+    val total: Long,
+    val expire: Long,
 )
 
 /** 高频流量快照：每 100–500ms 更新，独立 Flow 隔离重组 */
@@ -209,6 +220,7 @@ class HomeViewModel(
         // 把聚合后的 provider info 推回 Repository，由 Repository 合并到 active Subscription
         // 视图模型。订阅页和主页都从 SubscriptionRepository.subscriptions 读，自动一致。
         repository?.getProviders()?.onSuccess { providers ->
+            _uiState.value = _uiState.value.copy(providerTraffic = providerTrafficInfo(providers))
             onLiveProviderInfo(getActiveSubscriptionId(), aggregateProviderInfo(providers))
         }
     }
@@ -230,6 +242,22 @@ class HomeViewModel(
             Total = valid.sumOf { it.Total },
             Expire = valid.filter { it.Expire > 0 }.minOfOrNull { it.Expire } ?: 0,
         )
+    }
+
+    private fun providerTrafficInfo(providers: ProvidersResponse): List<ProviderTrafficInfo> {
+        return providers.providers
+            .mapNotNull { (fallbackName, provider) ->
+                val info = provider.subscriptionInfo ?: return@mapNotNull null
+                ProviderTrafficInfo(
+                    id = fallbackName,
+                    name = provider.name.ifBlank { fallbackName },
+                    upload = info.Upload,
+                    download = info.Download,
+                    total = info.Total,
+                    expire = info.Expire,
+                )
+            }
+            .sortedBy { it.name.lowercase() }
     }
 
     /**

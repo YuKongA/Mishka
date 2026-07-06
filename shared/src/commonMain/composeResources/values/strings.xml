@@ -84,6 +84,11 @@
     <string name="home_system">System</string>
     <string name="home_used">Used</string>
     <string name="home_total">Total</string>
+    <string name="home_subscription_provider_traffic">Provider Traffic</string>
+    <string name="home_subscription_no_provider_traffic">No provider traffic info</string>
+    <string name="home_remaining">Remaining</string>
+    <string name="home_expire">Expire</string>
+    <string name="home_no_expire">No expiry</string>
 
     <!-- Proxy -->
     <string name="proxy_title">Proxy Groups</string>

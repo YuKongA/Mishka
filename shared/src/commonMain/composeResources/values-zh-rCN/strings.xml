@@ -84,6 +84,11 @@
     <string name="home_system">系统</string>
     <string name="home_used">已用</string>
     <string name="home_total">总量</string>
+    <string name="home_subscription_provider_traffic">订阅提供者流量</string>
+    <string name="home_subscription_no_provider_traffic">暂无提供者流量信息</string>
+    <string name="home_remaining">剩余</string>
+    <string name="home_expire">到期</string>
+    <string name="home_no_expire">无到期时间</string>
 
     <!-- Proxy -->
     <string name="proxy_title">代理组</string>
