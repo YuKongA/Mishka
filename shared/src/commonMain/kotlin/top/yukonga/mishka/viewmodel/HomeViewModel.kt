@@ -320,20 +320,13 @@ class HomeViewModel(
     private suspend fun refreshRuntimeConfig() {
         repository?.getConfig()?.onSuccess { config ->
             val current = _uiState.value
-            if (!current.isRunning) return@onSuccess
-            if (
-                current.mode != config.mode ||
-                current.tunStack != (config.tun?.stack ?: "") ||
-                current.ipv6 != config.ipv6 ||
-                current.config != config
-            ) {
-                _uiState.value = current.copy(
-                    mode = config.mode,
-                    tunStack = config.tun?.stack ?: "",
-                    ipv6 = config.ipv6,
-                    config = config,
-                )
-            }
+            if (!current.isRunning || current.config == config) return@onSuccess
+            _uiState.value = current.copy(
+                mode = config.mode,
+                tunStack = config.tun?.stack ?: "",
+                ipv6 = config.ipv6,
+                config = config,
+            )
         }
     }
 

@@ -120,7 +120,7 @@
 
         <receiver
             android:name=".service.WifiPolicyBootReceiver"
-            android:enabled="true"
+            android:enabled="false"
             android:exported="false">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />

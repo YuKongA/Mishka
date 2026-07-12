@@ -20,7 +20,7 @@
     <string name="notification_wifi_policy_stop_enter">已匹配 Wi-Fi，代理服务已关闭</string>
     <string name="notification_wifi_policy_stop_leave">已离开匹配 Wi-Fi，代理服务已重新启动</string>
     <string name="notification_wifi_policy_direct_enter">已匹配 Wi-Fi，已切换到 Direct 模式</string>
-    <string name="notification_wifi_policy_direct_leave">已离开匹配 Wi-Fi，已恢复 Rule 模式</string>
+    <string name="notification_wifi_policy_direct_leave">已离开匹配 Wi-Fi，已恢复原模式</string>
 
     <!-- Profile Update Notifications -->
     <string name="notification_profile_update">配置更新</string>

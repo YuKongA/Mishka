@@ -22,7 +22,7 @@
     <string name="notification_wifi_policy_stop_enter">Matched Wi-Fi, proxy service stopped</string>
     <string name="notification_wifi_policy_stop_leave">Left matched Wi-Fi, proxy service restarted</string>
     <string name="notification_wifi_policy_direct_enter">Matched Wi-Fi, switched to Direct mode</string>
-    <string name="notification_wifi_policy_direct_leave">Left matched Wi-Fi, restored Rule mode</string>
+    <string name="notification_wifi_policy_direct_leave">Left matched Wi-Fi, restored previous mode</string>
 
     <!-- Profile Update Notifications -->
     <string name="notification_profile_update">Config Update</string>

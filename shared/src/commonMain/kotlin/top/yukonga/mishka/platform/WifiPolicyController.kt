@@ -8,7 +8,7 @@ object WifiPolicyIntents {
 
 enum class WifiPolicyAction(val storageValue: String) {
     StopService("stop_service"),
-    DirectMode("global_direct");
+    DirectMode("direct");
 
     companion object {
         fun fromStorage(value: String): WifiPolicyAction =

@@ -108,8 +108,8 @@ MainActivity → App → AppNavigation
   - ROOT 不可用自动回退 VPN（MainActivity 探测失败后回写 `TUN_MODE=vpn`）
 - **Wi-Fi 自动切换**：`WifiPolicyMonitorService` 前台监控当前 active Wi-Fi SSID（精确匹配，去掉 Android 外层双引号，忽略 `<unknown ssid>`），权限不足时不触发策略。设置页支持两种动作：
   - **停止服务**：进入匹配 Wi-Fi 且代理运行中时记录 `WIFI_POLICY_PENDING_RESTART=true` 后停止代理；离开匹配 Wi-Fi 时仅在 pending 存在时自动启动一次。监控服务可保留前台运行以保证自动恢复。
-  - **Direct 模式**：进入匹配 Wi-Fi 写 `WIFI_POLICY_RUNTIME_MODE=direct`，离开写 `rule`，统一通过 `ProxyServiceController.restart()` 热重载当前服务（VPN / ROOT TUN / ROOT TPROXY 行为一致）；runtime mode 由 `RuntimeOverrideBuilder` 优先于用户 `override.user.json` 注入，不污染持久配置。Starting/Stopping 窗口内的切换会排队，待状态进入 Running 后补一次 restart；离开后临时 `rule` override 自动清理。
-  - Wi-Fi 监控通知与切换事件通知使用独立 channel；切换通知可关闭，隐藏监控前台通知为可选项且会降低后台自动恢复可靠性。开机 / 包替换后 `WifiPolicyBootReceiver` 在功能开启或待恢复时恢复监控。
+  - **Direct 模式**：进入匹配 Wi-Fi 写 `WIFI_POLICY_RUNTIME_MODE=direct`，离开清空 override 回退用户持久 mode，统一通过 `ProxyServiceController.restart()` 热重载当前服务（VPN / ROOT TUN / ROOT TPROXY 行为一致）；runtime mode 由 `RuntimeOverrideBuilder` 优先于用户 `override.user.json` 注入，不污染持久配置。Starting 窗口内的切换排队待 Running 后补一次 restart（Stopping 之后的全新启动自然读到最新值）。
+  - 关闭功能时恢复被策略改动的代理状态（pending 补启动 / 清 runtime override 重载）。Wi-Fi 监控通知与切换事件通知使用独立 channel；切换通知可关闭，隐藏监控前台通知为可选项且会降低后台自动恢复可靠性。开机 / 包替换后 `WifiPolicyBootReceiver`（默认 disabled，随功能开关动态启用）恢复监控。
 - **状态桥接**：ProxyServiceBridge（全局 StateFlow + TunMode），Service 写入、ViewModel 读取
 - **进程模型**：单进程（VpnService 和 UI 同进程），ROOT 模式 mihomo 为独立 root 进程
 - **数据持久化**：Room 3.0 KMP（结构化数据）+ PlatformStorage（简单偏好）+ StorageKeys（key 常量）+ OverrideJsonStore（`override.user.json` + ConfigurationOverride `@Serializable`）；store 自带 `state: StateFlow<ConfigurationOverride>` + `update(transform)`，Settings 三个切片 VM 共享同一实例
@@ -260,7 +260,7 @@ files/mihomo/
 | MishkaTileService          | Quick Settings Tile 一键启停代理（双模式路由）                                                                                                               |
 | BootReceiver               | 开机自启（默认 disabled，动态启用）                                                                                                                          |
 | WifiPolicyMonitorService   | Wi-Fi 自动切换前台监控服务（NetworkCallback + 当前 SSID 匹配；停止服务 / Direct runtime mode + 统一重载）                                                     |
-| WifiPolicyBootReceiver     | 开机 / 包替换后在 Wi-Fi 自动切换启用或待恢复时拉起监控服务                                                                                                    |
+| WifiPolicyBootReceiver     | 开机 / 包替换后拉起监控服务（默认 disabled，随功能开关动态启用）                                                                                              |
 | ConfigGenerator            | mihomo 工作目录/secret 生成工具（getWorkDir/getConfigFile/generateSecret）                                                                                   |
 | RuntimeOverrideBuilder     | 运行时 override.run.json 装配（按 Submode = Vpn/RootTun/RootTproxy 分支：TUN fd / auto-route+include/exclude-package / tproxy-port+routing-mark+dns.listen；Wi-Fi runtime mode 优先于用户持久 mode） |
 | ProfileFileOps             | 订阅目录管理（imported/pending/processing/runtime + GeoIP + ROOT 沙箱）                                                                                      |

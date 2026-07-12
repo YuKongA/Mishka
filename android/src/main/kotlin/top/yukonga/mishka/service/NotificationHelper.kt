@@ -28,7 +28,8 @@ object NotificationHelper {
     private const val CHANNEL_WIFI_POLICY_SERVICE = "mishka_wifi_policy_service"
     private const val CHANNEL_WIFI_POLICY_EVENT = "mishka_wifi_policy_event"
     const val NOTIFICATION_ID_WIFI_POLICY = 3
-    private val nextWifiPolicyEventId = AtomicInteger(200)
+    // 事件通知用固定 id 互相覆盖，只保留最新一条，避免在通知栏堆积历史事件
+    private const val NOTIFICATION_ID_WIFI_POLICY_EVENT = 4
 
     fun createChannels(context: Context) {
         val manager = context.getSystemService(NotificationManager::class.java)
@@ -161,12 +162,11 @@ object NotificationHelper {
     }
 
     fun notifyWifiPolicyEvent(context: Context, contentResId: Int) {
-        val id = nextWifiPolicyEventId.getAndIncrement()
         val intent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_SINGLE_TOP
         }
         val pendingIntent = PendingIntent.getActivity(
-            context, id, intent,
+            context, NOTIFICATION_ID_WIFI_POLICY_EVENT, intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
 
@@ -179,7 +179,8 @@ object NotificationHelper {
             .setCategory(Notification.CATEGORY_STATUS)
             .build()
 
-        context.getSystemService(NotificationManager::class.java).notify(id, notification)
+        context.getSystemService(NotificationManager::class.java)
+            .notify(NOTIFICATION_ID_WIFI_POLICY_EVENT, notification)
     }
 
     // === 配置更新进度通知 ===
