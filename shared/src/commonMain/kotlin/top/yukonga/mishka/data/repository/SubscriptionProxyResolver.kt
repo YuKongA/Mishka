@@ -21,9 +21,15 @@ class SubscriptionProxyResolver(
     private val storage: PlatformStorage,
     private val overrideStore: OverrideJsonStore,
 ) {
-    suspend fun resolve(): String? {
-        val enabled = storage.getString(StorageKeys.SUBSCRIPTION_UPDATE_VIA_PROXY, "true") == "true"
-        if (!enabled) return null
+    /**
+     * @param requireUserToggle 是否受 [StorageKeys.SUBSCRIPTION_UPDATE_VIA_PROXY] 开关约束。
+     * 订阅下载传 true；图标等通用资源下载传 false（只要代理运行就走本机代理）。
+     */
+    suspend fun resolve(requireUserToggle: Boolean = true): String? {
+        if (requireUserToggle) {
+            val enabled = storage.getString(StorageKeys.SUBSCRIPTION_UPDATE_VIA_PROXY, "true") == "true"
+            if (!enabled) return null
+        }
         val bridge = ProxyServiceBridge.state.value
         if (bridge.state != ProxyState.Running) return null
 

@@ -26,6 +26,7 @@ import kotlinx.coroutines.launch
 import top.yukonga.mishka.data.database.getAppDatabase
 import top.yukonga.mishka.data.repository.OverrideJsonStore
 import top.yukonga.mishka.data.repository.ProfileProcessor
+import top.yukonga.mishka.data.repository.SubscriptionProxyResolver
 import top.yukonga.mishka.data.repository.SubscriptionRepository
 import top.yukonga.mishka.platform.AppListProvider
 import top.yukonga.mishka.platform.AndroidWifiPolicy
@@ -157,6 +158,12 @@ class MainActivity : ComponentActivity() {
         connectionViewModel = ConnectionViewModel()
         dnsQueryViewModel = DnsQueryViewModel()
         val overrideStore = OverrideJsonStore(fileManager)
+        // 代理组图标下载走 mihomo mixed-port（Mishka 自身绕过 TUN，直连境外图标 CDN 极慢）；
+        // 不受订阅走代理开关约束，代理运行中即生效
+        val iconProxyResolver = SubscriptionProxyResolver(storage, overrideStore)
+        top.yukonga.mishka.platform.IconLoader.setProxyResolver {
+            iconProxyResolver.resolve(requireUserToggle = false)
+        }
         networkSettingsViewModel = NetworkSettingsViewModel(overrideStore)
         metaSettingsViewModel = MetaSettingsViewModel(overrideStore)
         externalControlViewModel = ExternalControlViewModel(overrideStore)
