@@ -31,6 +31,9 @@ dependencyResolutionManagement {
     }
 }
 
+// scripta editor library, consumed as a composite build (dependency "scripta:editor")
+includeBuild("scripta")
+
 include(":shared")
 include(":android")
 include(":desktop")

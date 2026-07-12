@@ -30,6 +30,7 @@ kotlin {
         }
         commonMain.dependencies {
             api(libs.miuix.ui)
+            implementation("scripta:editor")
             api(libs.androidx.room3.runtime)
             implementation(libs.androidx.lifecycle.viewmodel)
             implementation(libs.androidx.lifecycle.runtime)

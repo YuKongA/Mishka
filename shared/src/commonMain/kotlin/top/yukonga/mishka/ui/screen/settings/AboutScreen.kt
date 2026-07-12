@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredSize
@@ -209,11 +208,6 @@ private fun AboutContent(
 
     var logoHeightDp by remember { mutableStateOf(300.dp) }
 
-    // 内容区至少铺满一屏（LazyColumn 视口高），内容更高时按内容增长——横屏矮视口下用固定高会把超出部分裁掉
-    val viewportHeight by remember {
-        derivedStateOf { lazyListState.layoutInfo.viewportSize.height }
-    }
-
     val versionCodeProgress = ((scrollProgress - 0.05f) / 0.15f).coerceIn(0f, 1f)
     val projectNameProgress = ((scrollProgress - 0.20f) / 0.15f).coerceIn(0f, 1f)
     val iconProgress = ((scrollProgress - 0.35f) / 0.15f).coerceIn(0f, 1f)
@@ -347,94 +341,95 @@ private fun AboutContent(
             }
 
             item(key = "about") {
-                Column(
-                    modifier = Modifier
-                        .heightIn(min = with(density) { viewportHeight.toDp() })
-                        .padding(bottom = 12.dp),
-                ) {
-                    SmallTitle(text = stringResource(Res.string.about_info))
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 12.dp)
-                            .padding(bottom = 12.dp)
-                            .then(
-                                if (blurEnabled) {
-                                    Modifier.textureBlur(
-                                        backdrop = backdrop,
-                                        shape = RoundedCornerShape(16.dp),
-                                        blurRadius = 60f,
-                                        colors = BlurColors(blendColors = cardBlendColors),
-                                        enabled = true,
-                                    )
-                                } else Modifier
-                            ),
-                        colors = CardDefaults.defaultColors(
-                            if (blurEnabled) Color.Transparent else colorScheme.surfaceContainer,
-                            Color.Transparent,
-                        ),
+                Box {
+                    Spacer(Modifier.fillParentMaxHeight())
+                    Column(
+                        modifier = Modifier.padding(bottom = 12.dp),
                     ) {
-                        BasicComponent(
-                            title = stringResource(Res.string.about_app_version),
-                            summary = misc.VersionInfo.VERSION_NAME,
-                        )
-                        BasicComponent(
-                            title = stringResource(Res.string.about_build_version),
-                            summary = "${misc.VersionInfo.VERSION_CODE}",
-                        )
-                        if (mihomoVersion.isNotEmpty()) {
+                        SmallTitle(text = stringResource(Res.string.about_info))
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 12.dp)
+                                .padding(bottom = 12.dp)
+                                .then(
+                                    if (blurEnabled) {
+                                        Modifier.textureBlur(
+                                            backdrop = backdrop,
+                                            shape = RoundedCornerShape(16.dp),
+                                            blurRadius = 60f,
+                                            colors = BlurColors(blendColors = cardBlendColors),
+                                            enabled = true,
+                                        )
+                                    } else Modifier
+                                ),
+                            colors = CardDefaults.defaultColors(
+                                if (blurEnabled) Color.Transparent else colorScheme.surfaceContainer,
+                                Color.Transparent,
+                            ),
+                        ) {
                             BasicComponent(
-                                title = stringResource(Res.string.about_mihomo_version),
-                                summary = mihomoVersion,
+                                title = stringResource(Res.string.about_app_version),
+                                summary = misc.VersionInfo.VERSION_NAME,
+                            )
+                            BasicComponent(
+                                title = stringResource(Res.string.about_build_version),
+                                summary = "${misc.VersionInfo.VERSION_CODE}",
+                            )
+                            if (mihomoVersion.isNotEmpty()) {
+                                BasicComponent(
+                                    title = stringResource(Res.string.about_mihomo_version),
+                                    summary = mihomoVersion,
+                                )
+                            }
+                        }
+
+                        SmallTitle(text = stringResource(Res.string.about_project))
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 12.dp)
+                                .padding(bottom = 12.dp)
+                                .then(
+                                    if (blurEnabled) {
+                                        Modifier.textureBlur(
+                                            backdrop = backdrop,
+                                            shape = RoundedCornerShape(16.dp),
+                                            blurRadius = 60f,
+                                            colors = BlurColors(blendColors = cardBlendColors),
+                                            enabled = true,
+                                        )
+                                    } else Modifier
+                                ),
+                            colors = CardDefaults.defaultColors(
+                                if (blurEnabled) Color.Transparent else colorScheme.surfaceContainer,
+                                Color.Transparent,
+                            ),
+                        ) {
+                            ArrowPreference(
+                                title = "Mishka",
+                                summary = "github.com/YuKongA/Mishka",
+                                onClick = { onOpenUrl("https://github.com/YuKongA/Mishka") },
+                            )
+                            ArrowPreference(
+                                title = "mihomo",
+                                summary = "github.com/MetaCubeX/mihomo",
+                                onClick = { onOpenUrl("https://github.com/MetaCubeX/mihomo") },
+                            )
+                            ArrowPreference(
+                                title = "miuix",
+                                summary = "github.com/compose-miuix-ui/miuix",
+                                onClick = { onOpenUrl("https://github.com/compose-miuix-ui/miuix") },
+                            )
+                            ArrowPreference(
+                                title = "quickie",
+                                summary = "github.com/G00fY2/quickie",
+                                onClick = { onOpenUrl("https://github.com/G00fY2/quickie") },
                             )
                         }
-                    }
 
-                    SmallTitle(text = stringResource(Res.string.about_project))
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 12.dp)
-                            .padding(bottom = 12.dp)
-                            .then(
-                                if (blurEnabled) {
-                                    Modifier.textureBlur(
-                                        backdrop = backdrop,
-                                        shape = RoundedCornerShape(16.dp),
-                                        blurRadius = 60f,
-                                        colors = BlurColors(blendColors = cardBlendColors),
-                                        enabled = true,
-                                    )
-                                } else Modifier
-                            ),
-                        colors = CardDefaults.defaultColors(
-                            if (blurEnabled) Color.Transparent else colorScheme.surfaceContainer,
-                            Color.Transparent,
-                        ),
-                    ) {
-                        ArrowPreference(
-                            title = "Mishka",
-                            summary = "github.com/YuKongA/Mishka",
-                            onClick = { onOpenUrl("https://github.com/YuKongA/Mishka") },
-                        )
-                        ArrowPreference(
-                            title = "mihomo",
-                            summary = "github.com/MetaCubeX/mihomo",
-                            onClick = { onOpenUrl("https://github.com/MetaCubeX/mihomo") },
-                        )
-                        ArrowPreference(
-                            title = "miuix",
-                            summary = "github.com/compose-miuix-ui/miuix",
-                            onClick = { onOpenUrl("https://github.com/compose-miuix-ui/miuix") },
-                        )
-                        ArrowPreference(
-                            title = "quickie",
-                            summary = "github.com/G00fY2/quickie",
-                            onClick = { onOpenUrl("https://github.com/G00fY2/quickie") },
-                        )
+                        Spacer(Modifier.windowInsetsBottomHeight(WindowInsets.systemBars))
                     }
-
-                    Spacer(Modifier.windowInsetsBottomHeight(WindowInsets.systemBars))
                 }
             }
         }
