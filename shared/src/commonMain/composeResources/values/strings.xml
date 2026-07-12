@@ -308,6 +308,7 @@
 
     <!-- Wi-Fi Policy -->
     <string name="wifi_policy_title">Wi-Fi Auto Switch</string>
+    <string name="wifi_policy_basic">Basic</string>
     <string name="wifi_policy_enable">Enable</string>
     <string name="wifi_policy_enable_summary">Apply policy when current Wi-Fi matches the list</string>
     <string name="wifi_policy_notify_switch">Switch notifications</string>

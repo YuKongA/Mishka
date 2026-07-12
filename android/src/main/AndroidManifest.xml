@@ -46,7 +46,8 @@
             android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|mnc|colorMode|density|fontScale|fontWeightAdjustment|keyboard|layoutDirection|locale|mcc|navigation|smallestScreenSize|touchscreen|uiMode"
             android:excludeFromRecents="true"
             android:exported="false"
-            android:theme="@style/Theme.Mishka.Transparent" />
+            android:theme="@style/Theme.Mishka.Transparent"
+            android:windowSoftInputMode="adjustResize" />
 
         <service
             android:name=".service.MishkaTunService"

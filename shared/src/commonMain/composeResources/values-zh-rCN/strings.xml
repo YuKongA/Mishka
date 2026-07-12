@@ -308,6 +308,7 @@
 
     <!-- Wi-Fi 策略 -->
     <string name="wifi_policy_title">Wi-Fi 自动切换</string>
+    <string name="wifi_policy_basic">基本</string>
     <string name="wifi_policy_enable">启用</string>
     <string name="wifi_policy_enable_summary">当前 Wi-Fi 匹配列表时自动应用策略</string>
     <string name="wifi_policy_notify_switch">切换通知</string>

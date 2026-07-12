@@ -5,6 +5,8 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -21,6 +23,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import mishka.shared.generated.resources.Res
@@ -31,6 +34,7 @@ import mishka.shared.generated.resources.wifi_policy_action_direct
 import mishka.shared.generated.resources.wifi_policy_action_direct_summary
 import mishka.shared.generated.resources.wifi_policy_action_stop
 import mishka.shared.generated.resources.wifi_policy_action_stop_summary
+import mishka.shared.generated.resources.wifi_policy_basic
 import mishka.shared.generated.resources.wifi_policy_current
 import mishka.shared.generated.resources.wifi_policy_enable
 import mishka.shared.generated.resources.wifi_policy_enable_summary
@@ -130,19 +134,18 @@ fun WifiPolicyScreen(
     }
 
     fun requestPermissionThenEnable() {
-        val ctrl = controller
-        if (ctrl == null || onRequestPermission == null) {
+        if (controller == null || onRequestPermission == null) {
             showToast(permissionRequired, long = true)
             return
         }
-        if (ctrl.hasRequiredPermission()) {
+        if (controller.hasRequiredPermission()) {
             refreshStatus()
             persistEnabled(true)
             return
         }
         onRequestPermission { granted ->
             permissionGranted = granted
-            currentSsid = ctrl.currentSsid()
+            currentSsid = controller.currentSsid()
             if (granted) {
                 persistEnabled(true)
             } else {
@@ -153,19 +156,18 @@ fun WifiPolicyScreen(
     }
 
     fun requestPermissionOnly(onGranted: () -> Unit) {
-        val ctrl = controller
-        if (ctrl == null || onRequestPermission == null) {
+        if (controller == null || onRequestPermission == null) {
             showToast(permissionRequired, long = true)
             return
         }
-        if (ctrl.hasRequiredPermission()) {
+        if (controller.hasRequiredPermission()) {
             refreshStatus()
             onGranted()
             return
         }
         onRequestPermission { granted ->
             permissionGranted = granted
-            currentSsid = ctrl.currentSsid()
+            currentSsid = controller.currentSsid()
             if (granted) {
                 onGranted()
             } else {
@@ -294,14 +296,15 @@ fun WifiPolicyScreen(
                     .then(if (backdrop != null) Modifier.layerBackdrop(backdrop) else Modifier)
                     .scrollEndHaptic()
                     .overScrollVertical()
-                    .nestedScroll(scrollBehavior.nestedScrollConnection),
+                    .nestedScroll(scrollBehavior.nestedScrollConnection)
+                    .imePadding(),
                 contentPadding = PaddingValues(
                     top = innerPadding.calculateTopPadding(),
                     start = sidePadding,
                     end = sidePadding,
                 ),
             ) {
-                item { SmallTitle(text = stringResource(Res.string.wifi_policy_title)) }
+                item { SmallTitle(text = stringResource(Res.string.wifi_policy_basic)) }
                 groupedCardItems(
                     keyPrefix = "wifi_policy_control",
                     items = listOf(
@@ -398,7 +401,9 @@ private fun SsidInputRow(
         TextField(
             value = value,
             onValueChange = onValueChange,
-            modifier = Modifier.weight(1f),
+            // 与两侧 40dp 圆形按钮等高，默认 16dp 垂直内边距会把高度撑到 ~53dp
+            modifier = Modifier.weight(1f).height(40.dp),
+            insideMargin = DpSize(16.dp, 8.dp),
             label = stringResource(Res.string.wifi_policy_ssid_add_placeholder),
             useLabelAsPlaceholder = true,
         )
