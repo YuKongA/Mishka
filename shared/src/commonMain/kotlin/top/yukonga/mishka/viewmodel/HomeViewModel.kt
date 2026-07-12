@@ -3,6 +3,9 @@ package top.yukonga.mishka.viewmodel
 import androidx.compose.runtime.Immutable
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.collections.immutable.ImmutableList
+import kotlinx.collections.immutable.persistentListOf
+import kotlinx.collections.immutable.toPersistentList
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -39,7 +42,7 @@ data class HomeUiState(
     val ipv6: Boolean = false,
     val config: MihomoConfig? = null,
     val subscription: SubscriptionInfo? = null,
-    val providerTraffic: List<ProviderTrafficInfo> = emptyList(),
+    val providerTraffic: ImmutableList<ProviderTrafficInfo> = persistentListOf(),
     val isProviderTrafficLoading: Boolean = false,
     val providerTrafficLoadFailed: Boolean = false,
     val latencyBaidu: Int = -1,
@@ -299,7 +302,7 @@ class HomeViewModel(
         providerTrafficRequestId++
         _uiState.update {
             it.copy(
-                providerTraffic = emptyList(),
+                providerTraffic = persistentListOf(),
                 isProviderTrafficLoading = false,
                 providerTrafficLoadFailed = false,
             )
@@ -325,7 +328,7 @@ class HomeViewModel(
         )
     }
 
-    private fun providerTrafficInfo(providers: ProvidersResponse): List<ProviderTrafficInfo> {
+    private fun providerTrafficInfo(providers: ProvidersResponse): ImmutableList<ProviderTrafficInfo> {
         return providers.providers
             .mapNotNull { (fallbackName, provider) ->
                 val info = provider.subscriptionInfo ?: return@mapNotNull null
@@ -339,6 +342,7 @@ class HomeViewModel(
                 )
             }
             .sortedBy { it.name.lowercase() }
+            .toPersistentList()
     }
 
     /**
