@@ -1,0 +1,571 @@
+<resources>
+    <!-- Notification Channels -->
+    <string name="channel_vpn_name">Состояние службы VPN</string>
+    <string name="channel_vpn_desc">Состояние работы службы прокси Mishka</string>
+    <string name="channel_profile_status_name">Прогресс обновления конфигурации</string>
+    <string name="channel_profile_status_desc">Прогресс загрузки и проверки конфигурации</string>
+    <string name="channel_profile_result_name">Результат обновления конфигурации</string>
+    <string name="channel_profile_result_desc">Уведомления об успешном или неудачном обновлении</string>
+    <string name="channel_wifi_policy_service_name">Служба автопереключения Wi-Fi</string>
+    <string name="channel_wifi_policy_service_desc">Внутренняя служба мониторинга для автопереключения по Wi-Fi</string>
+    <string name="channel_wifi_policy_event_name">События автопереключения Wi-Fi</string>
+    <string name="channel_wifi_policy_event_desc">Уведомления при изменении состояния прокси правилами Wi-Fi</string>
+
+    <!-- VPN Notifications -->
+    <string name="notification_loading">Запуск…</string>
+    <string name="notification_running_title">Mishka работает</string>
+    <string name="notification_running_content">Режим: %1$s</string>
+    <string name="notification_wifi_policy_title">Автопереключение Wi-Fi</string>
+    <string name="notification_wifi_policy_service_content">Ожидание изменений Wi-Fi</string>
+    <string name="notification_wifi_policy_stop_enter">Подключен указанный Wi-Fi, служба прокси остановлена</string>
+    <string name="notification_wifi_policy_stop_leave">Отключен указанный Wi-Fi, служба прокси перезапущена</string>
+    <string name="notification_wifi_policy_direct_enter">Подключен указанный Wi-Fi, переключено в режим Direct</string>
+    <string name="notification_wifi_policy_direct_leave">Отключен указанный Wi-Fi, восстановлен предыдущий режим</string>
+
+    <!-- Profile Update Notifications -->
+    <string name="notification_profile_update">Обновление конфигурации</string>
+    <string name="notification_profile_running">Выполняется…</string>
+    <string name="notification_profile_updating">Обновление конфигурации</string>
+    <string name="notification_update_success">Обновление успешно</string>
+    <string name="notification_update_success_content">%1$s обновлен</string>
+    <string name="notification_update_failed">Ошибка обновления</string>
+    <string name="notification_unknown_error">Неизвестная ошибка</string>
+
+    <!-- Tile -->
+    <string name="tile_connected">Подключено</string>
+    <string name="tile_connecting">Подключение…</string>
+    <string name="tile_error">Ошибка</string>
+    <string name="tile_disconnected">Отключено</string>
+
+    <!-- QR Scanner -->
+    <string name="qr_scanner_overlay">Поместите QR-код в рамку</string>
+    <string name="qr_permission_denied">Разрешение на использование камеры не предоставлено</string>
+    <string name="qr_scan_failed">Не удалось отсканировать QR-код</string>
+    <string name="qr_invalid_subscription">Некорректная ссылка на подписку</string>
+    <string name="qr_unsupported">Неподдерживаемый QR-код</string>
+
+    <!-- Deep Link Import -->
+    <string name="deep_link_invalid">Недопустимая ссылка для импорта подписки</string>
+
+    <!-- Service Errors -->
+    <string name="error_vpn_failed">Сбой создания VPN: %1$s</string>
+    <string name="error_vpn_denied">В доступе к VPN отказано</string>
+    <string name="error_start_failed">Ошибка запуска</string>
+    <string name="error_root_failed">Не удалось получить Root-права</string>
+    <string name="error_mihomo_not_found">Исполняемый файл mihomo не найден</string>
+    <string name="error_fork_failed">Сбой fork+exec</string>
+    <string name="error_root_start_failed">Ошибка root-запуска</string>
+    <string name="error_mihomo_exited">Процесс mihomo завершился сразу после запуска</string>
+    <string name="error_api_not_ready">Процесс mihomo запущен, но API не отвечает</string>
+    <string name="error_mihomo_start_failed">Сбой запуска mihomo:\n%1$s</string>
+    <string name="error_generic_start_failed">Ошибка запуска: %1$s</string>
+    <string name="error_foreground_failed">Не удалось запустить службу переднего плана: %1$s</string>
+    <string name="error_fd_setup_failed">Не удалось подготовить файловый дескриптор TUN: %1$s</string>
+    <string name="error_tun_init_failed">Ошибка инициализации TUN: %1$s</string>
+    <string name="error_tproxy_unsupported">Режим ROOT TPROXY требует модули ядра xt_TPROXY/xt_socket, которые отсутствуют на этом устройстве</string>
+    <string name="error_no_active_profile">Нет активной подписки. Пожалуйста, импортируйте подписку перед запуском прокси.</string>
+
+    <!-- Navigation -->
+    <string name="nav_home">Главная</string>
+    <string name="nav_proxy">Прокси</string>
+    <string name="nav_subscription">Подписки</string>
+    <string name="nav_settings">Настройки</string>
+
+    <!-- Common -->
+    <string name="common_confirm">ОК</string>
+    <string name="common_cancel">Отмена</string>
+    <string name="common_save">Сохранить</string>
+    <string name="common_back">Назад</string>
+    <string name="common_refresh">Обновить</string>
+    <string name="common_more">Еще</string>
+    <string name="common_close">Закрыть</string>
+    <string name="common_delete">Удалить</string>
+    <string name="common_edit">Изменить</string>
+    <string name="common_update">Обновить</string>
+    <string name="common_clear">Очистить</string>
+    <string name="common_not_modified">Не изменено</string>
+    <string name="common_enabled">Включено</string>
+    <string name="common_disabled">Отключено</string>
+    <string name="common_cleared">Очищено</string>
+    <string name="common_items_count">%1$d элементов</string>
+    <string name="common_processing">Обработка...</string>
+
+    <!-- Home - Status -->
+    <string name="home_starting">Запуск</string>
+    <string name="home_running">Работает</string>
+    <string name="home_stopping">Остановка</string>
+    <string name="home_stopped">Остановлено</string>
+    <string name="home_mode">Режим прокси</string>
+    <string name="home_tun">Стек TUN</string>
+    <string name="home_inbound">Входящие</string>
+    <string name="home_inbound_tproxy">TPROXY:%1$d</string>
+    <string name="home_switch_mode">Сменить режим прокси</string>
+    <string name="home_switch_tun_stack">Сменить стек TUN</string>
+    <string name="home_uptime_seconds">%1$d с</string>
+    <string name="home_uptime_minutes">%1$d мин</string>
+    <string name="home_uptime_hours_minutes">%1$d ч %2$d мин</string>
+    <string name="home_uptime_days_hours">%1$d д %2$d ч</string>
+
+    <!-- Home - Action Buttons -->
+    <string name="home_restart">Перезапуск</string>
+    <string name="home_stop">Остановить</string>
+    <string name="home_reload">Горячая перезагрузка</string>
+    <string name="home_start">Запустить</string>
+    <string name="home_starting_btn">Запуск...</string>
+    <string name="home_stopping_btn">Остановка...</string>
+
+    <!-- Home - Quick Entries -->
+    <string name="home_providers">Провайдеры</string>
+    <string name="home_providers_subtitle">Провайдер</string>
+    <string name="home_connections">Соединения</string>
+    <string name="home_connections_subtitle">Соединение</string>
+    <string name="home_logs">Журнал</string>
+    <string name="home_logs_subtitle">Просмотр</string>
+    <string name="home_dns">DNS</string>
+    <string name="home_dns_subtitle">Запрос</string>
+
+    <!-- Home - Latency -->
+    <string name="home_latency">Задержка</string>
+    <string name="home_latency_untested">Не проверено</string>
+    <string name="home_latency_normal">В норме</string>
+    <string name="home_latency_partial">Частично</string>
+    <string name="home_latency_abnormal">Ошибка</string>
+    <string name="home_latency_not_via_rules">Не по правилам</string>
+
+    <!-- Home - Overview -->
+    <string name="home_overview">Обзор</string>
+    <string name="home_speed_detail">Скорость соединений в реальном времени</string>
+    <string name="home_speed_no_active_connection">Нет активных соединений</string>
+    <string name="home_tools">Инструменты</string>
+    <string name="home_address">Адрес</string>
+    <string name="home_interface">Интерфейс</string>
+    <string name="home_speed">Скорость</string>
+    <string name="home_upload">Отдача</string>
+    <string name="home_download">Загрузка</string>
+
+    <!-- Home - Bottom Cards -->
+    <string name="home_subscription">Подписка</string>
+    <string name="home_system">Система</string>
+    <string name="home_used">Использовано</string>
+    <string name="home_total">Всего</string>
+    <string name="home_subscription_provider_traffic">Провайдеры прокси</string>
+    <string name="home_subscription_no_provider_traffic">В этой подписке нет провайдеров прокси</string>
+    <string name="home_subscription_provider_traffic_load_failed">Не удалось загрузить данные провайдеров</string>
+    <string name="home_provider_update_all">Обновить все</string>
+    <string name="home_remaining">Осталось</string>
+    <string name="home_expire">Истекает</string>
+    <string name="home_no_expire">Бессрочно</string>
+    <string name="home_expire_unknown">Неизвестно</string>
+
+    <!-- Proxy -->
+    <string name="proxy_title">Группы прокси</string>
+    <string name="proxy_no_groups">Нет групп прокси</string>
+    <string name="proxy_start_first">Сначала запустите службу прокси</string>
+    <string name="proxy_mode_direct_hint">Активен прямой режим (Direct): весь трафик идет в обход прокси. Выбор групп сохраняется, но вступит в силу только после переключения в режим правил (Rule).</string>
+    <string name="proxy_mode_global_hint">Активен глобальный режим (Global): весь трафик направляется через группу GLOBAL. Выбор в остальных группах вступит в силу после переключения в режим правил (Rule).</string>
+    <string name="proxy_refresh_icon">Обновить значки</string>
+    <string name="proxy_single_column">В один столбец</string>
+    <string name="proxy_show_global_group">Группа GLOBAL</string>
+    <string name="proxy_timeout">Тайм-аут</string>
+    <string name="proxy_sort_title">Сортировка</string>
+    <string name="proxy_sort_default">По умолчанию</string>
+    <string name="proxy_sort_name">По имени</string>
+    <string name="proxy_sort_delay">По задержке</string>
+    <string name="proxy_sort_reverse">В обратном порядке</string>
+    <string name="proxy_test_group_delay">Проверить задержку</string>
+    <string name="proxy_test_node_delay">Проверить задержку узла</string>
+    <string name="proxy_fixed">Зафиксировано на этом узле</string>
+    <string name="proxy_unfix">Открепить, вернуть автовыбор</string>
+
+    <!-- Subscription -->
+    <string name="subscription_title">Подписки</string>
+    <string name="subscription_update_all">Обновить все</string>
+    <string name="subscription_add">Добавить</string>
+    <string name="subscription_no_config">Нет конфигураций</string>
+    <string name="subscription_tap_add">Нажмите +, чтобы добавить конфигурацию</string>
+    <string name="subscription_in_use">Используется</string>
+    <string name="subscription_config">Конфигурация</string>
+    <string name="subscription_used_traffic">Использовано %1$s / %2$s</string>
+    <string name="subscription_no_traffic">Нет данных о трафике</string>
+    <string name="subscription_updated_at">Обновлено: %1$s</string>
+    <string name="subscription_delete_title">Удаление подписки</string>
+    <string name="subscription_delete_summary">Удалить «%1$s»? Это приведет к удалению файлов конфигурации и истории выбора узлов.</string>
+
+    <!-- Subscription Create/Edit -->
+    <string name="subscription_create">Создать конфигурацию</string>
+    <string name="subscription_edit">Редактировать конфигурацию</string>
+    <string name="subscription_file">Файл</string>
+    <string name="subscription_file_summary">Импорт из файла</string>
+    <string name="subscription_url">URL</string>
+    <string name="subscription_url_summary">Импорт по ссылке</string>
+    <string name="subscription_qr">QR-код</string>
+    <string name="subscription_qr_summary">Сканировать QR-код для импорта</string>
+    <string name="subscription_url_hint">Поддерживаются только файлы конфигурации mihomo (с прокси/правилами)</string>
+    <string name="subscription_name">Имя</string>
+    <string name="subscription_name_auto_placeholder">Оставьте пустым для автонаименования</string>
+    <string name="subscription_default_name">Подписка</string>
+    <string name="subscription_url_label">URL</string>
+    <string name="subscription_url_placeholder">Поддерживаются только http(s) и схемы content</string>
+    <string name="subscription_user_agent">User-Agent</string>
+    <string name="subscription_user_agent_placeholder">Оставьте пустым для значения по умолчанию</string>
+    <string name="subscription_config_name">Имя конфигурации</string>
+    <string name="subscription_sub_url">URL подписки</string>
+    <string name="subscription_auto_update">Интервал автообновления</string>
+    <string name="subscription_auto_update_placeholder">минуты, 0 или пусто — отключить, мин. 15</string>
+    <string name="subscription_import_config">Импортировать конфигурацию</string>
+    <string name="subscription_updating_title">Обновление подписок</string>
+    <string name="subscription_updating_progress">%1$s (%2$d / %3$d)</string>
+    <string name="subscription_downloading">Загрузка конфигурации...</string>
+    <string name="subscription_validating">Проверка конфигурации...</string>
+    <string name="subscription_prefetching">Предзагрузка провайдеров...</string>
+    <string name="subscription_update_config">Обновить конфигурацию</string>
+    <string name="subscription_file_only_no_update">Импортированная из файла конфигурация не может обновляться по сети</string>
+
+    <!-- Subscription import errors -->
+    <string name="error_import_failed">Ошибка импорта: %1$s</string>
+    <string name="error_update_failed">Ошибка обновления: %1$s</string>
+    <string name="error_save_failed">Ошибка сохранения: %1$s</string>
+    <string name="error_validation_failed">Ошибка проверки: %1$s</string>
+    <string name="error_import_empty_body">Подписка вернула пустой ответ</string>
+    <string name="error_import_invalid_scheme">URL должен начинаться с http:// или https://: %1$s</string>
+    <string name="error_import_invalid_name">Имя подписки не может быть пустым</string>
+    <string name="error_import_interval_too_small">Интервал автообновления должен быть не менее 15 минут (0 — отключено)</string>
+
+    <!-- Connection -->
+    <string name="connection_title">Соединения</string>
+    <string name="connection_search">Поиск соединений</string>
+    <string name="connection_no_active">Нет активных соединений</string>
+    <string name="connection_start_first">Сначала запустите службу прокси</string>
+    <string name="connection_list">Список соединений</string>
+    <string name="connection_close_all_title">Закрыть все соединения</string>
+    <string name="connection_close_all_summary">Вы уверены, что хотите разорвать все активные соединения?</string>
+    <string name="connection_close_all">Закрыть все</string>
+    <string name="connection_no_match">Ничего не найдено</string>
+    <string name="connection_active">Активные соединения</string>
+    <string name="connection_upload_total">Всего отдано</string>
+    <string name="connection_download_total">Всего принято</string>
+
+    <!-- Log -->
+    <string name="log_title">Журнал</string>
+    <string name="log_clear">Очистить</string>
+    <string name="log_waiting">Ожидание логов...</string>
+    <string name="log_not_connected">Не подключено</string>
+
+    <!-- DNS -->
+    <string name="dns_title">DNS-запрос</string>
+    <string name="dns_domain">Домен</string>
+    <string name="dns_results">Результаты</string>
+    <string name="dns_no_record">Нет записей</string>
+    <string name="dns_clear_cache">Очистить кэш</string>
+    <string name="dns_clear_dns">Очистить DNS-кэш</string>
+    <string name="dns_clear_fakeip">Очистить FakeIP-кэш</string>
+    <string name="dns_querying">Выполняется запрос...</string>
+    <string name="dns_query">Запрос</string>
+    <string name="dns_query_failed">Ошибка запроса: %1$s</string>
+
+    <!-- Provider -->
+    <string name="provider_title">Провайдеры</string>
+    <string name="provider_rule_providers">Провайдеры правил</string>
+    <string name="provider_proxy_providers">Провайдеры прокси</string>
+    <string name="provider_no_providers">Нет провайдеров</string>
+    <string name="provider_kind_proxy">Прокси (%1$s)</string>
+    <string name="provider_kind_rule">Правило (%1$s)</string>
+    <string name="provider_start_first">Сначала запустите службу прокси</string>
+    <string name="provider_updating_title">Обновление провайдера</string>
+    <string name="provider_updating_single">Обновление %1$s…</string>
+    <string name="provider_updating_progress">%1$d / %2$d</string>
+    <string name="provider_update_failed">Не удалось обновить %1$s: %2$s</string>
+
+    <!-- Settings -->
+    <string name="settings_title">Настройки</string>
+    <string name="settings_network">Сеть</string>
+    <string name="settings_general">Основные</string>
+    <string name="settings_tun_mode">Режим туннеля</string>
+    <string name="settings_tun_vpn_summary">через VpnService</string>
+    <string name="settings_tun_root_tun_summary">собственное TUN-устройство</string>
+    <string name="settings_tun_root_tproxy_summary">iptables TPROXY</string>
+    <string name="settings_tun_mode_vpn">VPN</string>
+    <string name="settings_tun_mode_root_tun">ROOT TUN</string>
+    <string name="settings_tun_mode_root_tproxy">ROOT TPROXY</string>
+    <string name="settings_vpn_settings">Настройки VPN</string>
+    <string name="settings_vpn_summary">Обход локальной сети, перехват DNS, IPv6</string>
+    <string name="settings_tun_device">Имя устройства TUN</string>
+    <string name="settings_override_settings">Параметры переопределения</string>
+    <string name="settings_override_summary">Порты, DNS, сетевые переопределения</string>
+    <string name="settings_meta_settings">Настройки Meta</string>
+    <string name="settings_meta_summary">Унифицированная задержка, сниффер и др.</string>
+    <string name="settings_app_proxy">Раздельное проксирование</string>
+    <string name="settings_app_proxy_summary">Выбор приложений для работы через прокси</string>
+    <string name="settings_wifi_policy">Автопереключение Wi-Fi</string>
+    <string name="settings_wifi_policy_summary">Остановка службы или режим DIRECT в выбранных сетях Wi-Fi</string>
+    <string name="settings_dynamic_notification">Динамическое уведомление</string>
+    <string name="settings_dynamic_notification_summary">Отображать текущую скорость и трафик в шторке</string>
+    <string name="settings_dynamic_notification_summary_root_unsupported">Только в режиме VPN</string>
+    <string name="settings_subscription_via_proxy">Обновлять через прокси</string>
+    <string name="settings_subscription_via_proxy_summary">Использовать прокси при обновлении подписок</string>
+    <string name="settings_restart_after_update">Перезапуск после обновления</string>
+    <string name="settings_restart_after_update_summary">Перезапускать прокси при обновлении активного профиля для применения новой конфигурации (кратковременный разрыв соединения)</string>
+    <string name="settings_auto_connect">Подключать при запуске</string>
+    <string name="settings_auto_connect_summary">Запускать прокси при открытии приложения при наличии рабочего профиля</string>
+    <string name="settings_auto_restart">Перезапуск при загрузке</string>
+    <string name="settings_auto_restart_summary">Восстанавливать работу прокси после перезагрузки устройства или обновления приложения</string>
+    <string name="settings_theme_title">Внешний вид и тема</string>
+    <string name="settings_theme_group_color">Цвет и тема</string>
+    <string name="settings_theme_group_interface">Интерфейс и эффекты</string>
+    <string name="settings_theme_group_navigation">Нижняя навигация</string>
+    <string name="settings_theme_summary">Цвет, размытие и масштаб интерфейса; нижняя панель и жесты назад</string>
+    <string name="settings_theme_mode">Тема оформления</string>
+    <string name="settings_theme_system">Системная</string>
+    <string name="settings_theme_light">Светлая</string>
+    <string name="settings_theme_dark">Темная</string>
+    <string name="settings_theme_monet">Цвета Monet</string>
+    <string name="settings_theme_monet_summary">Использовать динамические системные цвета Material You</string>
+    <string name="settings_theme_blur">Эффекты размытия</string>
+    <string name="settings_theme_blur_summary">Включить размытие для панелей и слоев интерфейса</string>
+    <string name="settings_theme_blur_style">Стиль размытия верхней панели</string>
+    <string name="settings_theme_blur_style_gaussian">Гауссово</string>
+    <string name="settings_theme_blur_style_progressive">Прогрессивное</string>
+    <string name="settings_theme_blur_style_gaussian_summary">Равномерное матовое размытие по всей верхней панели</string>
+    <string name="settings_theme_blur_style_progressive_summary">Градиентное размытие с усилением к верхнему краю</string>
+    <string name="settings_theme_density_scale">Масштаб интерфейса</string>
+    <string name="settings_theme_density_scale_summary">Настройка общего масштаба отображения (80% – 110%)</string>
+    <string name="settings_theme_floating_bottom_bar">Плавающая нижняя панель</string>
+    <string name="settings_theme_floating_bottom_bar_summary">Использовать парящую нижнюю панель на смартфонах</string>
+    <string name="settings_theme_floating_bottom_bar_style">Стиль плавающей нижней панели</string>
+    <string name="settings_theme_floating_bottom_bar_style_miuix">Miuix</string>
+    <string name="settings_theme_floating_bottom_bar_style_ios_like">В стиле iOS (Жидкое стекло)</string>
+    <string name="settings_theme_bottom_bar_mode">Отображение нижней панели</string>
+    <string name="settings_theme_bottom_bar_icon_and_text">Значок и текст</string>
+    <string name="settings_theme_bottom_bar_icon_only">Только значок</string>
+    <string name="settings_theme_palette_style">Цветовая палитра</string>
+    <string name="settings_theme_palette_tonal_spot">Тональная (TonalSpot)</string>
+    <string name="settings_theme_palette_neutral">Нейтральная (Neutral)</string>
+    <string name="settings_theme_palette_vibrant">Насыщенная (Vibrant)</string>
+    <string name="settings_theme_palette_expressive">Выразительная (Expressive)</string>
+    <string name="settings_theme_palette_rainbow">Радуга (Rainbow)</string>
+    <string name="settings_theme_palette_fruit_salad">Фруктовый салат (FruitSalad)</string>
+    <string name="settings_theme_palette_monochrome">Монохромная (Monochrome)</string>
+    <string name="settings_theme_palette_fidelity">Точная (Fidelity)</string>
+    <string name="settings_theme_palette_content">Контентная (Content)</string>
+    <string name="settings_theme_pure_black">Чисто черный фон</string>
+    <string name="settings_theme_pure_black_summary">Использовать абсолютно черный фон (AMOLED) в темной теме</string>
+    <string name="settings_theme_accent_title">Акцентный цвет</string>
+    <string name="settings_theme_accent_default">Системный цвет</string>
+    <string name="settings_theme_accent_blue">Синий</string>
+    <string name="settings_theme_accent_purple">Фиолетовый</string>
+    <string name="settings_theme_accent_pink">Розовый</string>
+    <string name="settings_theme_accent_red">Красный</string>
+    <string name="settings_theme_accent_orange">Оранжевый</string>
+    <string name="settings_theme_accent_yellow">Желтый</string>
+    <string name="settings_theme_accent_green">Зеленый</string>
+    <string name="settings_theme_accent_teal">Бирюзовый</string>
+    <string name="settings_predictive_back">Предиктивный жест «Назад»</string>
+    <string name="settings_predictive_back_summary">Включить анимацию предиктивного возврата назад</string>
+    <string name="settings_swipe_dismiss">Жест свайпа назад</string>
+    <string name="settings_swipe_dismiss_summary">Свайп в сторону в любом месте экрана для возврата назад</string>
+    <string name="settings_hide_task_card">Скрывать в недавних приложениях</string>
+    <string name="settings_hide_task_card_summary">Скрывать миниатюру приложения в списке недавних задач</string>
+    <string name="settings_about">О приложении</string>
+
+    <!-- VPN Settings -->
+    <string name="vpn_settings_title">Настройки VPN</string>
+    <string name="vpn_tunnel">Туннель VPN</string>
+    <string name="vpn_bypass_private">Обход локальной сети</string>
+    <string name="vpn_bypass_private_summary">Исключить LAN-адреса из маршрутизации VPN</string>
+    <string name="vpn_allow_bypass">Разрешить обход приложениям</string>
+    <string name="vpn_allow_bypass_summary">Разрешить приложениям запрашивать прямой доступ в обход VPN</string>
+    <string name="vpn_dns_hijacking">Перехват DNS</string>
+    <string name="vpn_dns_hijacking_summary">Перехватывать все DNS-запросы</string>
+    <string name="vpn_system_proxy">Системный прокси</string>
+    <string name="vpn_system_proxy_summary">Настройка HTTP-прокси на уровне системы</string>
+    <string name="vpn_allow_ipv6">Разрешить IPv6</string>
+    <string name="vpn_allow_ipv6_summary">Маршрутизировать трафик IPv6 через прокси</string>
+
+    <!-- ROOT Mode -->
+    <string name="root_settings_title">Настройки ROOT</string>
+    <string name="root_settings_summary">Имя TUN-устройства, трафик клиентов точки доступа</string>
+    <string name="root_section_device">Устройство TUN</string>
+    <string name="root_section_tether">Точка доступа</string>
+    <string name="root_tether_mode_title">Трафик клиентов точки доступа</string>
+    <string name="root_tether_mode_bypass">В обход прокси</string>
+    <string name="root_tether_mode_proxy">Через прокси</string>
+    <string name="root_tether_ifaces_title">Интерфейсы точки доступа</string>
+    <string name="root_tether_ifaces_hint">По одному на строку, например wlan2</string>
+    <string name="root_tether_scan">Определить текущие интерфейсы</string>
+    <string name="root_tether_scan_scanning">Сканирование...</string>
+    <string name="root_tether_scan_empty">Активные интерфейсы точки доступа не обнаружены</string>
+    <string name="root_tether_scan_result_title">Обнаруженные интерфейсы</string>
+    <string name="root_tether_tproxy_unavailable_warning">В ядре отсутствует модуль xt_TPROXY. Используется резервный режим (меньшая скорость, но соединения работают). Для максимальной производительности TPROXY используйте ядро с поддержкой xt_TPROXY.</string>
+    <string name="root_tproxy_tether_note">В режиме TPROXY весь трафик точки доступа направляется через ядро автоматически; переключение «В обход / Через прокси» не требуется.</string>
+    <string name="root_tun_jumbo_mtu_title">Jumbo MTU и GSO</string>
+    <string name="root_tun_jumbo_mtu_summary">Агрегация больших пакетов (mtu=9000, gso=on) уменьшает системные вызовы на пакет для максимальной пропускной способности. Отключите, если восходящий канал отбрасывает фрагментированные пакеты.</string>
+    <string name="root_attach_force_reapply_title">Принудительно применять правила при переподключении</string>
+    <string name="root_attach_force_reapply_summary">Диагностика: повторно применять правила iptables при каждом подключении приложения к работающему mihomo. Включайте только если правила раздачи пропадают после переподключения.</string>
+
+    <!-- Network Settings -->
+    <string name="network_settings_title">Параметры переопределения</string>
+    <string name="network_proxy_ports">Порты прокси</string>
+    <string name="network_http_port">Порт HTTP</string>
+    <string name="network_socks_port">Порт SOCKS</string>
+    <string name="network_redir_port">Порт Redir</string>
+    <string name="network_tproxy_port">Порт TProxy</string>
+    <string name="network_mixed_port">Смешанный порт (Mixed)</string>
+    <string name="network_options">Параметры сети</string>
+    <string name="network_allow_lan">Разрешить доступ из LAN</string>
+    <string name="network_external_controller">Внешний контроллер</string>
+    <string name="network_bind_address">Адрес привязки</string>
+    <string name="network_log_level">Уровень логирования</string>
+    <string name="network_dns">DNS</string>
+    <string name="network_dns_enable">Включить DNS</string>
+    <string name="network_dns_listen">Адрес прослушивания</string>
+    <string name="network_dns_listen_title">Адрес прослушивания DNS</string>
+    <string name="network_dns_use_hosts">Использовать Hosts</string>
+    <string name="network_dns_prefer_h3">Предпочитать HTTP/3 (H3)</string>
+    <string name="network_dns_enhanced_mode">Расширенный режим</string>
+    <string name="network_dns_default_nameserver">Сервер DNS по умолчанию</string>
+    <string name="network_dns_fakeip_filter">Фильтр FakeIP</string>
+    <string name="network_port_label">Порт (0-65535)</string>
+    <string name="network_port_zero_hint">0 отключает данный порт</string>
+    <string name="network_input_value">Введите значение</string>
+    <string name="network_one_per_line">По одной записи на строку</string>
+    <string name="settings_override_restart_hint">Изменения этих настроек вступят в силу после перезапуска службы прокси.</string>
+
+    <!-- Wi-Fi Policy -->
+    <string name="wifi_policy_title">Автопереключение Wi-Fi</string>
+    <string name="wifi_policy_basic">Основные</string>
+    <string name="wifi_policy_enable">Включить</string>
+    <string name="wifi_policy_enable_summary">Применять правило при совпадении текущей сети Wi-Fi со списком</string>
+    <string name="wifi_policy_notify_switch">Уведомления о переключении</string>
+    <string name="wifi_policy_notify_switch_summary">Уведомлять только при изменении состояния прокси правилами Wi-Fi</string>
+    <string name="wifi_policy_hide_monitor_notification">Скрыть уведомление ожидания</string>
+    <string name="wifi_policy_hide_monitor_notification_summary">Необязательно. Скрытие уведомления монитора может снизить надежность фонового автовосстановления.</string>
+    <string name="wifi_policy_action">Действие при совпадении</string>
+    <string name="wifi_policy_action_stop">Остановить службу</string>
+    <string name="wifi_policy_action_stop_summary">Останавливать прокси в указанных Wi-Fi сетях и перезапускать после отключения</string>
+    <string name="wifi_policy_action_direct">Режим Direct</string>
+    <string name="wifi_policy_action_direct_summary">Переключать работающий прокси в режим Direct без перезапуска</string>
+    <string name="wifi_policy_ssids_title">Имена сетей Wi-Fi</string>
+    <string name="wifi_policy_ssid_add_placeholder">Имя сети (SSID)</string>
+    <string name="wifi_policy_ssid_add">Добавить SSID</string>
+    <string name="wifi_policy_ssid_scan">Заполнить текущей Wi-Fi</string>
+    <string name="wifi_policy_ssid_scan_empty">Текущая сеть Wi-Fi не найдена. Убедитесь, что Wi-Fi подключен и включена геолокация.</string>
+    <string name="wifi_policy_ssid_empty">Сначала введите имя Wi-Fi</string>
+    <string name="wifi_policy_ssid_duplicate">Такой SSID уже существует</string>
+    <string name="wifi_policy_current">Текущий Wi-Fi</string>
+    <string name="wifi_policy_unknown_ssid">Неизвестно или нет подключения</string>
+    <string name="wifi_policy_permission">Разрешение Wi-Fi</string>
+    <string name="wifi_policy_permission_granted">Предоставлено</string>
+    <string name="wifi_policy_permission_missing">Для чтения SSID требуются разрешения на поиск устройств поблизости и местоположение</string>
+    <string name="wifi_policy_permission_required">Для чтения текущего SSID требуются разрешения на устройства поблизости и местоположение</string>
+
+    <!-- Meta Settings -->
+    <string name="meta_settings_title">Настройки Meta</string>
+    <string name="meta_basic">Основные</string>
+    <string name="meta_unified_delay">Унифицированная задержка</string>
+    <string name="meta_geodata_mode">Режим Geodata</string>
+    <string name="meta_tcp_concurrent">Конкурентный TCP</string>
+    <string name="meta_find_process_mode">Режим сопоставления процессов</string>
+    <string name="meta_sniffer">Сниффер</string>
+    <string name="meta_sniffer_enable">Включить сниффер</string>
+    <string name="meta_sniffer_force_dns_mapping">Принудительное сопоставление DNS</string>
+    <string name="meta_sniffer_parse_pure_ip">Разбор чистого IP</string>
+    <string name="meta_sniffer_override_dest">Переопределять назначение</string>
+    <string name="meta_sniffer_force_domain">Принудительный сниффинг доменов</string>
+    <string name="meta_sniffer_skip_domain">Исключения сниффинга доменов</string>
+
+    <!-- App Proxy -->
+    <string name="app_proxy_title">Раздельное проксирование</string>
+    <string name="app_proxy_search">Поиск приложений</string>
+    <string name="app_proxy_select_all">Выбрать все</string>
+    <string name="app_proxy_deselect_all">Снять выделение</string>
+    <string name="app_proxy_invert">Инвертировать</string>
+    <string name="app_proxy_show_system">Показать системные</string>
+    <string name="app_proxy_hide_system">Скрыть системные</string>
+    <string name="app_proxy_import">Импорт</string>
+    <string name="app_proxy_export">Экспорт</string>
+    <string name="app_proxy_no_match">Приложения не найдены</string>
+    <string name="app_proxy_allow_all">Все приложения</string>
+    <string name="app_proxy_allow_all_summary">Трафик всех приложений направляется через прокси</string>
+    <string name="app_proxy_allow_selected">Только выбранные</string>
+    <string name="app_proxy_allow_selected_summary">Только трафик выбранных приложений идет через прокси</string>
+    <string name="app_proxy_deny_selected">Исключить выбранные</string>
+    <string name="app_proxy_deny_selected_summary">Выбранные приложения работают напрямую в обход прокси</string>
+    <string name="app_proxy_app_list">Список приложений (%1$d/%2$d)</string>
+    <string name="app_proxy_applied">Настройки раздельного проксирования применены</string>
+    <string name="dialog_reset_done">Сброшено к значениям по умолчанию</string>
+
+    <!-- External Control -->
+    <string name="external_control_title">Внешний контроллер</string>
+    <string name="external_control_ip">Адрес API</string>
+    <string name="external_control_controller_hint">Адрес привязки для HTTP API (например, 127.0.0.1:9090). Значение 0.0.0.0 будет автоматически заменено на 127.0.0.1.</string>
+    <string name="external_control_secret">Секретный ключ API</string>
+    <string name="external_control_secret_hint">Bearer-токен для авторизации в HTTP API. Если поле пустое, используется secret из конфигурации подписки, либо генерируется случайный.</string>
+    <string name="settings_external_control_summary">Переопределение конфигурации внешнего контроллера</string>
+
+    <!-- File Manager -->
+    <string name="file_manager_title">Файловый менеджер</string>
+    <string name="file_manager_empty">Нет импортированных подписок</string>
+    <string name="file_manager_save">Сохранить</string>
+    <string name="file_manager_save_failed">Ошибка сохранения: %1$s</string>
+    <string name="file_manager_saved">Сохранено</string>
+    <string name="file_manager_edit_warning">Ручные правки идут в обход конвейера подписок. Невалидный YAML заблокирует сохранение.</string>
+    <string name="settings_file_manager">Файловый менеджер</string>
+    <string name="settings_file_manager_summary">Просмотр и редактирование файлов импортированных подписок</string>
+
+    <!-- WebDAV Backup & Restore -->
+    <string name="settings_backup">Резервное копирование</string>
+    <string name="settings_backup_summary">Резервное копирование и восстановление локально или через WebDAV</string>
+    <string name="backup_title">Резервное копирование</string>
+    <string name="backup_hint">Создание единого архива с подписками, переопределениями и настройками на сервере WebDAV. Восстановление перезапишет локальные данные.</string>
+    <string name="backup_server_url">URL сервера</string>
+    <string name="backup_username">Имя пользователя</string>
+    <string name="backup_password">Пароль</string>
+    <string name="backup_test_connection">Проверить соединение</string>
+    <string name="backup_now">Создать копию в WebDAV</string>
+    <string name="backup_restore_now">Восстановить из WebDAV</string>
+    <string name="backup_missing_credentials">Необходимо указать URL сервера, имя пользователя и пароль</string>
+    <string name="backup_connection_ok">Соединение успешно установлено</string>
+    <string name="backup_done">Резервное копирование завершено</string>
+    <string name="backup_not_found">Резервная копия на сервере не найдена</string>
+    <string name="backup_stop_proxy_first">Остановите прокси перед восстановлением</string>
+    <string name="backup_failed">Сбой операции: %1$s</string>
+    <string name="backup_restore_confirm_title">Восстановление резервной копии</string>
+    <string name="backup_restore_confirm_summary">Локальные подписки и настройки будут заменены копией с сервера. Это действие необратимо. Продолжить?</string>
+    <string name="backup_restore_done_title">Восстановление завершено</string>
+    <string name="backup_restore_done_summary">Для применения восстановленных данных требуется перезапуск приложения.</string>
+    <string name="backup_restart_now">Перезапустить сейчас</string>
+    <string name="backup_section_local">Локальная копия</string>
+    <string name="backup_export_local">Сохранить в файл</string>
+    <string name="backup_restore_local">Восстановить из файла</string>
+    <string name="backup_export_done">Файл резервной копии сохранен</string>
+    <string name="backup_section_webdav">WebDAV</string>
+    <string name="backup_local_row_summary">Резервное копирование в файл или восстановление из него</string>
+    <string name="backup_webdav_row_summary">Резервное копирование или восстановление через сервер WebDAV</string>
+
+    <!-- About -->
+    <string name="about_title">О приложении</string>
+    <string name="about_open_source">Лицензии с открытым исходным кодом</string>
+
+    <!-- FormatUtils -->
+
+    <!-- Provider -->
+    <string name="provider_update">Обновить</string>
+
+    <!-- Subscription errors -->
+
+    <!-- Age encryption -->
+    <string name="common_copied">Скопировано</string>
+    <string name="subscription_age_secret_key">Секретный ключ Age</string>
+    <string name="subscription_age_secret_key_placeholder">Для зашифрованных профилей Age, оставьте пустым если не используется</string>
+    <string name="meta_age">Шифрование Age</string>
+    <string name="meta_age_generate">Сгенерировать пару ключей</string>
+    <string name="meta_age_generate_summary">Создать пару ключей age x25519 для зашифрованных подписок</string>
+    <string name="meta_age_generate_hybrid">Сгенерировать гибридную пару ключей</string>
+    <string name="meta_age_generate_hybrid_summary">Постквантовая пара ключей mlkem768-x25519</string>
+    <string name="meta_age_keypair_title">Пара ключей Age</string>
+    <string name="meta_age_secret_key">Секретный ключ</string>
+    <string name="meta_age_public_key">Открытый ключ</string>
+    <string name="meta_age_copy_secret">Копировать секретный ключ</string>
+    <string name="meta_age_copy_public">Копировать открытый ключ</string>
+    <string name="meta_age_keygen_failed">Не удалось сгенерировать пару ключей</string>
+</resources>
