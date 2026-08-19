@@ -87,7 +87,12 @@
     <string name="common_enabled">Включено</string>
     <string name="common_disabled">Отключено</string>
     <string name="common_cleared">Очищено</string>
-    <string name="common_items_count">%1$d элементов</string>
+    <plurals name="common_items_count">
+        <item quantity="one">%1$d элемент</item>
+        <item quantity="few">%1$d элемента</item>
+        <item quantity="many">%1$d элементов</item>
+        <item quantity="other">%1$d элемента</item>
+    </plurals>
     <string name="common_processing">Обработка...</string>
 
     <!-- Home - Status -->

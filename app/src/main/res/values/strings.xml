@@ -89,7 +89,10 @@
     <string name="common_enabled">Enabled</string>
     <string name="common_disabled">Disabled</string>
     <string name="common_cleared">Cleared</string>
-    <string name="common_items_count">%1$d items</string>
+    <plurals name="common_items_count">
+        <item quantity="one">%1$d item</item>
+        <item quantity="other">%1$d items</item>
+    </plurals>
     <string name="common_processing">Processing...</string>
 
     <!-- Home - Status -->

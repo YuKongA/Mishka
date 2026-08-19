@@ -23,6 +23,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
@@ -555,5 +556,5 @@ private fun portSummary(port: Int?): String = if (port == null) stringResource(R
 private fun listSummary(list: List<String>?): String {
     if (list == null) return stringResource(R.string.common_not_modified)
     if (list.isEmpty()) return stringResource(R.string.common_cleared)
-    return stringResource(R.string.common_items_count, list.size)
+    return pluralStringResource(R.plurals.common_items_count, list.size, list.size)
 }

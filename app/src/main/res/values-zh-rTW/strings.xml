@@ -87,7 +87,10 @@
     <string name="common_enabled">啟用</string>
     <string name="common_disabled">停用</string>
     <string name="common_cleared">已清除</string>
-    <string name="common_items_count">%1$d 筆</string>
+    <plurals name="common_items_count">
+        <item quantity="one">%1$d 筆</item>
+        <item quantity="other">%1$d 筆</item>
+    </plurals>
     <string name="common_processing">處理中...</string>
 
     <!-- Home - Status -->

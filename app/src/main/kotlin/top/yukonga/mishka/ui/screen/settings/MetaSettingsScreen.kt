@@ -27,6 +27,7 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
@@ -393,5 +394,5 @@ private fun FindProcessModePreference(
 private fun listSummary(list: List<String>?): String {
     if (list == null) return stringResource(R.string.common_not_modified)
     if (list.isEmpty()) return stringResource(R.string.common_cleared)
-    return stringResource(R.string.common_items_count, list.size)
+    return pluralStringResource(R.plurals.common_items_count, list.size, list.size)
 }
