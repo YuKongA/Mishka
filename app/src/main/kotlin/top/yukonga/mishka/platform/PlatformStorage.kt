@@ -100,6 +100,7 @@ object StorageKeys {
     const val THEME_FLOATING_BOTTOM_BAR_STYLE = "theme_floating_bottom_bar_style"
     const val THEME_BOTTOM_BAR_MODE = "theme_bottom_bar_mode"
     const val THEME_DENSITY_SCALE = "theme_density_scale"
+    const val NAV_RAIL_EXPANDED = "nav_rail_expanded"
     const val DYNAMIC_NOTIFICATION = "dynamic_notification"
     const val PREDICTIVE_BACK = "predictive_back"
     // 横移返回手势，默认启用；由 AppNavigation 持有状态实时生效，这里只作持久化

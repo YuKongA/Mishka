@@ -1,8 +1,6 @@
 package top.yukonga.mishka.ui.navigation
 
-import androidx.compose.animation.core.EaseInOut
-import androidx.compose.animation.core.animate
-import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.MutatePriority
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -126,6 +124,7 @@ import top.yukonga.miuix.kmp.basic.NavigationBarItem
 import top.yukonga.miuix.kmp.basic.NavigationItem
 import top.yukonga.miuix.kmp.basic.NavigationRail
 import top.yukonga.miuix.kmp.basic.NavigationRailItem
+import top.yukonga.miuix.kmp.basic.NavigationRailValue
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.rememberNavigationRailState
@@ -208,7 +207,11 @@ fun AppNavigation(
     val backStack = rememberSaveable(saver = NavBackStackSaver) { mutableStateListOf(Route.Main) }
     val navigator = remember { Navigator(backStack) }
     val pagerState = rememberPagerState(pageCount = { 4 })
-    val mainPagerState = rememberMainPagerState(pagerState)
+    val useNavigationRail = rememberIsWideScreen()
+    val mainPagerState = rememberMainPagerState(
+        pagerState = pagerState,
+        animatePageChanges = !useNavigationRail,
+    )
 
     // 深链导入：回 Main 并把 pager 切到订阅 Tab 后直接压预填添加页（订阅管理是 pager Tab，无二级路由）
     LaunchedEffect(deepLinkImport) {
@@ -270,6 +273,7 @@ fun AppNavigation(
                     storage,
                     onHideTaskCardChange,
                     hasRootPermission,
+                    useNavigationRail,
                 )
             }
             entry<Route.SubscriptionAdd>(swipeDismiss = swipeDismiss) {
@@ -484,6 +488,7 @@ private fun MainPage(
     storage: PlatformStorage? = null,
     onHideTaskCardChange: ((Boolean) -> Unit)? = null,
     hasRootPermission: Boolean = false,
+    useNavigationRail: Boolean = false,
 ) {
     val homeUiState = homeViewModel?.uiState?.collectAsStateWithLifecycle()?.value ?: HomeUiState()
     val selectedPage = mainPagerState.selectedPage
@@ -494,6 +499,7 @@ private fun MainPage(
             modifier = pagerModifier,
             state = mainPagerState.pagerState,
             verticalAlignment = Alignment.Top,
+            overscrollEffect = null,
         ) { page ->
             when (page) {
                 0 -> HomeScreen(
@@ -547,11 +553,21 @@ private fun MainPage(
         }
     }
 
-    if (rememberIsWideScreen()) {
+    if (useNavigationRail) {
         // 宽屏：侧边 NavigationRail 取代底部 NavigationBar，纵向空间全部让给内容
+        val railState = rememberNavigationRailState(
+            initialValue = if (storage?.getString(StorageKeys.NAV_RAIL_EXPANDED, "false") == "true") {
+                NavigationRailValue.Expanded
+            } else {
+                NavigationRailValue.Collapsed
+            },
+        )
+        LaunchedEffect(railState.currentValue, storage) {
+            storage?.putString(StorageKeys.NAV_RAIL_EXPANDED, railState.isExpanded.toString())
+        }
         Scaffold(modifier = Modifier.fillMaxSize()) { _ ->
             Row(Modifier.fillMaxSize()) {
-                NavigationRail(state = rememberNavigationRailState()) {
+                NavigationRail(state = railState) {
                     NavigationRailItem(
                         selected = selectedPage == 0,
                         onClick = { mainPagerState.animateToPage(0) },
@@ -757,6 +773,7 @@ private fun MiuixFloatingNavigationBarItem(
 class MainPagerState(
     val pagerState: PagerState,
     private val coroutineScope: CoroutineScope,
+    private val animatePageChanges: Boolean,
 ) {
     var selectedPage by mutableIntStateOf(pagerState.currentPage)
         private set
@@ -776,26 +793,9 @@ class MainPagerState(
         navJob = coroutineScope.launch {
             val myJob = coroutineContext.job
             try {
-                pagerState.scroll(MutatePriority.UserInput) {
-                    val distance = abs(targetIndex - pagerState.currentPage).coerceAtLeast(2)
-                    val duration = 100 * distance + 100
-                    val layoutInfo = pagerState.layoutInfo
-                    val pageSize = layoutInfo.pageSize + layoutInfo.pageSpacing
-                    val currentDistanceInPages =
-                        targetIndex - pagerState.currentPage - pagerState.currentPageOffsetFraction
-                    val scrollPixels = currentDistanceInPages * pageSize
-
-                    var previousValue = 0f
-                    animate(
-                        initialValue = 0f,
-                        targetValue = scrollPixels,
-                        animationSpec = tween(easing = EaseInOut, durationMillis = duration),
-                    ) { currentValue, _ ->
-                        previousValue += scrollBy(currentValue - previousValue)
-                    }
-                }
-
-                if (pagerState.currentPage != targetIndex) {
+                if (animatePageChanges) {
+                    pagerState.springAnimateToPage(targetIndex)
+                } else {
                     pagerState.scrollToPage(targetIndex)
                 }
             } finally {
@@ -816,12 +816,58 @@ class MainPagerState(
     }
 }
 
+private suspend fun PagerState.springAnimateToPage(target: Int) {
+    if (target !in 0 until pageCount) return
+    var shouldSnapToTarget = false
+    scroll(MutatePriority.UserInput) {
+        val pageSize = layoutInfo.pageSize + layoutInfo.pageSpacing
+        val distance = target - currentPage - currentPageOffsetFraction
+        val scrollPixels = distance * pageSize
+        if (abs(scrollPixels) <= 0.5f) return@scroll
+
+        var consumedScroll = 0f
+        var skipScroll = false
+        Animatable(0f).animateTo(
+            targetValue = scrollPixels,
+            animationSpec = PagerNavigationSpringSpec,
+        ) {
+            if (skipScroll) return@animateTo
+
+            val delta = value - consumedScroll
+            if (abs(delta) > 0.5f) {
+                val consumed = scrollBy(delta)
+                consumedScroll += consumed
+                if (abs(delta - consumed) > 0.1f) {
+                    shouldSnapToTarget = true
+                    skipScroll = true
+                }
+            } else {
+                consumedScroll = value
+            }
+
+            if (abs(velocity) < 0.1f && abs(scrollPixels - consumedScroll) < 1.0f) {
+                skipScroll = true
+            }
+        }
+
+        val remaining = scrollPixels - consumedScroll
+        if (abs(remaining) > 0.5f) {
+            scrollBy(remaining)
+        }
+    }
+
+    if (shouldSnapToTarget || currentPage != target) {
+        scrollToPage(target)
+    }
+}
+
 @Composable
 fun rememberMainPagerState(
     pagerState: PagerState,
     coroutineScope: CoroutineScope = rememberCoroutineScope(),
-): MainPagerState = remember(pagerState, coroutineScope) {
-    MainPagerState(pagerState, coroutineScope)
+    animatePageChanges: Boolean = true,
+): MainPagerState = remember(pagerState, coroutineScope, animatePageChanges) {
+    MainPagerState(pagerState, coroutineScope, animatePageChanges)
 }
 
 // === 返回键处理 ===
