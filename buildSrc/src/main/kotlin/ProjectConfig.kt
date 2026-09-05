@@ -1,3 +1,5 @@
+import org.gradle.api.Project
+
 object ProjectConfig {
     const val APP_NAME = "Mishka"
     const val PACKAGE_NAME = "top.yukonga.mishka"
@@ -7,7 +9,7 @@ object ProjectConfig {
         const val TARGET_SDK = 37
         const val MIN_SDK = 31
         const val COMPILE_SDK = 37
-        const val COMPILE_SDK_MINOR = 0
+        const val COMPILE_SDK_MINOR = 2
     }
 }
 
@@ -17,11 +19,8 @@ private const val FALLBACK_VERSION_CODE = 1
 /**
  * 提交数作为 versionCode。**调用方应只求值一次**——每次求值都 fork 一个 git 进程，
  * 且结果是配置缓存的输入。
- *
- * 失败必须兜底：`.trim().toInt()` 在空输出上抛的是 NumberFormatException，报错内容与
- * 「这台机器上没有 git」毫无关系，排查要绕一大圈。
  */
-fun org.gradle.api.Project.getGitVersionCode(): Int =
+fun Project.getGitVersionCode(): Int =
     runCatching {
         providers.exec {
             commandLine("git", "rev-list", "--count", "HEAD")
