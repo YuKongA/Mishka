@@ -175,10 +175,11 @@ object RuntimeOverrideBuilder {
         }
 
         val ipv6Enabled = storage.getString(StorageKeys.VPN_ALLOW_IPV6, "false") == "true"
+        // null 会被序列化省略；关闭时必须用空列表清除内核默认的 IPv6 地址。
         val inet6 = when {
             isRootTun && ipv6Enabled -> listOf("fdfe:dcba:9876::1/126")
             !isRootTun -> emptyList()
-            else -> null
+            else -> emptyList()
         }
 
         // ROOT TUN 的 auto_route 缺省铺满 0.0.0.0/0，会把 LAN 单播 + 224/4 组播吸进 mihomo，
