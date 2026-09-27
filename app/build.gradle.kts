@@ -84,7 +84,7 @@ android {
         targetCompatibility = JavaVersion.VERSION_21
     }
     defaultConfig {
-        applicationId = ProjectConfig.PACKAGE_NAME
+        applicationId = ProjectConfig.APPLICATION_ID
         minSdk = ProjectConfig.Android.MIN_SDK
         targetSdk = ProjectConfig.Android.TARGET_SDK
         versionName = ProjectConfig.VERSION_NAME
@@ -99,7 +99,7 @@ android {
             path = file("src/main/cpp/CMakeLists.txt")
         }
     }
-    namespace = ProjectConfig.PACKAGE_NAME
+    namespace = ProjectConfig.NAMESPACE
     packaging {
         jniLibs {
             useLegacyPackaging = true

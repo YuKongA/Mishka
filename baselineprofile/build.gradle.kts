@@ -19,9 +19,9 @@ android {
     defaultConfig {
         minSdk = ProjectConfig.Android.MIN_SDK
         targetSdk = ProjectConfig.Android.TARGET_SDK
-        buildConfigField("String", "TARGET_APP_ID", "\"${ProjectConfig.PACKAGE_NAME}\"")
+        buildConfigField("String", "TARGET_APP_ID", "\"${ProjectConfig.APPLICATION_ID}\"")
     }
-    namespace = "${ProjectConfig.PACKAGE_NAME}.baselineprofile"
+    namespace = "${ProjectConfig.NAMESPACE}.baselineprofile"
     targetProjectPath = ":app"
 }
 

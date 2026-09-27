@@ -1,9 +1,9 @@
 <resources>
-    <string name="app_name" translatable="false">Mishka</string>
+    <string name="app_name" translatable="false">MarveBox</string>
 
     <!-- Notification Channels -->
     <string name="channel_vpn_name">VPN Service Status</string>
-    <string name="channel_vpn_desc">Mishka proxy service status</string>
+    <string name="channel_vpn_desc">MarveBox proxy service status</string>
     <string name="channel_profile_status_name">Config Update Progress</string>
     <string name="channel_profile_status_desc">Config download and validation progress</string>
     <string name="channel_profile_result_name">Config Update Result</string>
@@ -15,7 +15,7 @@
 
     <!-- VPN Notifications -->
     <string name="notification_loading">Starting…</string>
-    <string name="notification_running_title">Mishka Running</string>
+    <string name="notification_running_title">MarveBox Running</string>
     <string name="notification_running_content">Mode: %1$s</string>
     <string name="notification_wifi_policy_title">Wi-Fi Auto Switch</string>
     <string name="notification_wifi_policy_service_content">Waiting for Wi-Fi changes</string>

@@ -1,7 +1,7 @@
 <resources>
     <!-- Notification Channels -->
     <string name="channel_vpn_name">Состояние службы VPN</string>
-    <string name="channel_vpn_desc">Состояние работы службы прокси Mishka</string>
+    <string name="channel_vpn_desc">Состояние работы службы прокси MarveBox</string>
     <string name="channel_profile_status_name">Прогресс обновления конфигурации</string>
     <string name="channel_profile_status_desc">Прогресс загрузки и проверки конфигурации</string>
     <string name="channel_profile_result_name">Результат обновления конфигурации</string>
@@ -13,7 +13,7 @@
 
     <!-- VPN Notifications -->
     <string name="notification_loading">Запуск…</string>
-    <string name="notification_running_title">Mishka работает</string>
+    <string name="notification_running_title">MarveBox работает</string>
     <string name="notification_running_content">Режим: %1$s</string>
     <string name="notification_wifi_policy_title">Автопереключение Wi-Fi</string>
     <string name="notification_wifi_policy_service_content">Ожидание изменений Wi-Fi</string>

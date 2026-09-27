@@ -1,7 +1,7 @@
 <resources>
     <!-- Notification Channels -->
     <string name="channel_vpn_name">VPN 服務狀態</string>
-    <string name="channel_vpn_desc">Mishka 代理服務執行狀態</string>
+    <string name="channel_vpn_desc">MarveBox 代理服務執行狀態</string>
     <string name="channel_profile_status_name">設定檔更新進度</string>
     <string name="channel_profile_status_desc">設定檔下載與驗證進度</string>
     <string name="channel_profile_result_name">設定檔更新結果</string>
@@ -13,7 +13,7 @@
 
     <!-- VPN Notifications -->
     <string name="notification_loading">正在啟動…</string>
-    <string name="notification_running_title">Mishka 執行中</string>
+    <string name="notification_running_title">MarveBox 執行中</string>
     <string name="notification_running_content">模式: %1$s</string>
     <string name="notification_wifi_policy_title">Wi-Fi 自動切換</string>
     <string name="notification_wifi_policy_service_content">等待 Wi-Fi 變化</string>
