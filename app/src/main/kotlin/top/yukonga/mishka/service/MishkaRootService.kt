@@ -305,6 +305,8 @@ class MishkaRootService : Service() {
             RootHelper.cleanupOrphanedMihomo(tunDevice = currentTun)
             // 启动前把上一次残留的 iptables 规则（另一个 submode 可能还没清干净）彻底擦一遍
             teardownAllRootRules()
+            // 上次停机若没来得及回写，这里补一次；进程已在上面杀掉
+            RootRuntimeCache.releaseAll(this@MishkaRootService, subscriptionRepository, transformWriter)
 
             // 3. 检查 ROOT 权限
             if (!RootHelper.hasRootAccess()) {
@@ -531,10 +533,12 @@ class MishkaRootService : Service() {
             val storage = PlatformStorage(this@MishkaRootService)
             val runningSubscriptionId = storage.getString(StorageKeys.ROOT_ACTIVE_SUBSCRIPTION_ID, "").ifEmpty { null }
             teardownAllRootRules()
+            // 进程已死，先把 provider 缓存回写 imported/，再删 runtime/
+            runningSubscriptionId?.let {
+                RootRuntimeCache.release(this@MishkaRootService, it, subscriptionRepository, transformWriter)
+            }
             clearPersistedState(storage)
             storage.putString(StorageKeys.SERVICE_WAS_RUNNING, "false")
-            // 进程死透了，清 runtime/{uuid}/（里面有 root:root 的 provider 缓存，app 删不动）
-            runningSubscriptionId?.let { ProfileFileOps.cleanupRootRuntime(this@MishkaRootService, it) }
             ProxyServiceBridge.updateState(ProxyServiceStatus(ProxyState.Error, errorMessage = errorMsg, tunMode = currentSubmode.tunMode))
             dynamicNotification.stop()
             stopForeground(STOP_FOREGROUND_REMOVE)
@@ -595,8 +599,10 @@ class MishkaRootService : Service() {
             val runningSubscriptionId = storage.getString(StorageKeys.ROOT_ACTIVE_SUBSCRIPTION_ID, "").ifEmpty { null }
             runner.stop()
             teardownAllRootRules()
-            // 清掉上一轮 runtime 沙箱，下轮 startProxy 会 prepareRootRuntime 重新从 imported/ 复制
-            runningSubscriptionId?.let { ProfileFileOps.cleanupRootRuntime(this@MishkaRootService, it) }
+            // 回写缓存后再清沙箱，下轮 startProxy 从 imported/ 复制才能跳过未过期的 HTTP 拉取
+            runningSubscriptionId?.let {
+                RootRuntimeCache.release(this@MishkaRootService, it, subscriptionRepository, transformWriter)
+            }
             clearPersistedState(storage)
             withContext(Dispatchers.Main) {
                 startProxy(subscriptionId)
@@ -616,7 +622,9 @@ class MishkaRootService : Service() {
             val runningSubscriptionId = storage.getString(StorageKeys.ROOT_ACTIVE_SUBSCRIPTION_ID, "").ifEmpty { null }
             runner.stop()
             teardownAllRootRules()
-            runningSubscriptionId?.let { ProfileFileOps.cleanupRootRuntime(this@MishkaRootService, it) }
+            runningSubscriptionId?.let {
+                RootRuntimeCache.release(this@MishkaRootService, it, subscriptionRepository, transformWriter)
+            }
             clearPersistedState(storage)
             storage.putString(StorageKeys.SERVICE_WAS_RUNNING, "false")
             ProxyServiceBridge.markStopped(currentSubmode.tunMode)

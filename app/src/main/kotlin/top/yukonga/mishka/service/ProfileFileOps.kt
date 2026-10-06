@@ -4,6 +4,7 @@ import android.content.Context
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
+import java.nio.file.Files
 
 /**
  * 订阅文件操作。三阶段目录：pending → processing → imported。
@@ -58,6 +59,15 @@ object ProfileFileOps {
      */
     fun getRuntimeDir(context: Context, uuid: String): File =
         File(getWorkDir(context), "runtime/$uuid")
+
+    /** 不创建目录。回写缓存时不能把已删除的订阅目录又 mkdir 出来。 */
+    fun peekImportedDir(context: Context, uuid: String): File =
+        File(getWorkDir(context), "imported/$uuid")
+
+    fun listRuntimeUuids(context: Context): List<String> {
+        val runtime = File(getWorkDir(context), "runtime")
+        return runtime.listFiles()?.filter { it.isDirectory }?.map { it.name }.orEmpty()
+    }
 
     // === pending 写入 ===
 
@@ -209,7 +219,7 @@ object ProfileFileOps {
 
     /**
      * ROOT 启动前准备：清残留 → 从 imported/{uuid}/ 复制一份到 runtime/{uuid}/（app UID 写入）→ 重建 geodata 链接。
-     * imported/ 里已包含 -prefetch 落盘的 provider 文件，copy 一并带过去，mihomo 启动可跳过 HTTP 拉取。
+     * 复制保留 mtime：Fetcher.Initial 用它和 interval 比较，重置成「现在」会让 ROOT 每次都显得刚更新过。
      */
     fun prepareRootRuntime(context: Context, uuid: String): File {
         val imported = File(getWorkDir(context), "imported/$uuid")
@@ -223,9 +233,19 @@ object ProfileFileOps {
         runtime.mkdirs()
         if (imported.exists()) {
             imported.copyRecursively(runtime, overwrite = true)
+            preserveCopiedMtimes(imported, runtime)
         }
         ensureGeodataLinks(context, runtime)
         return runtime
+    }
+
+    private fun preserveCopiedMtimes(source: File, dest: File) {
+        source.walkTopDown().forEach { file ->
+            if (Files.isSymbolicLink(file.toPath()) || !file.isFile) return@forEach
+            val copied = File(dest, file.relativeTo(source).path)
+            if (Files.isSymbolicLink(copied.toPath()) || !copied.isFile) return@forEach
+            copied.setLastModified(file.lastModified())
+        }
     }
 
     /**

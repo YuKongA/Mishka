@@ -94,7 +94,7 @@ class MihomoRunner(private val context: Context) {
         this@MihomoRunner.secret = secret
         this@MihomoRunner.externalController = externalController
 
-        // ROOT 模式走独立 runtime/{uuid}/ 沙箱（mihomo 会以 uid=0 写 provider 缓存，不能污染 imported/）；
+        // ROOT 模式走独立 runtime/{uuid}/ 沙箱（mihomo 会以 uid=0 写 provider 缓存，不能污染 imported/；停机由 RootRuntimeCache 回写后再删）；
         // 调用方（MishkaRootService）必须在 start 之前调 ProfileFileOps.prepareRootRuntime 准备好内容。
         val workDir = when {
             useRoot && subscriptionId != null -> ProfileFileOps.getRuntimeDir(context, subscriptionId)

@@ -332,4 +332,93 @@ object RootHelper {
             false
         }
     }
+
+    /**
+     * 单次 su 把 root 写入的普通文件拷回 [bound] 下。跳过符号链接和更新的目标；
+     * 结果 chown 到 [uid]、chmod 0644，并用 bound 的 SELinux 标签标记，避免 imported/ 留下
+     * root:root 或 app 读不回的文件。保留源 mtime。中间新建目录同样改属主和标签。
+     * 任一文件失败返回 false，已成功的不回滚。
+     */
+    fun syncRegularFiles(uid: Int, bound: String, pairs: List<Pair<String, String>>): Boolean {
+        if (pairs.isEmpty() || uid <= 0) return pairs.isEmpty()
+        if (bound.isEmpty() || bound.any { it == '\n' || it == '\r' || it == '\u0000' }) return false
+        val script = buildString {
+            appendLine("uid=$uid")
+            appendLine("bound=${escapeShellSingleQuoted(bound)}")
+            appendLine("fail=0")
+            appendLine(syncRegularFile)
+            pairs.forEach { (src, dst) ->
+                if (src.any { it == '\n' || it == '\r' || it == '\u0000' } ||
+                    dst.any { it == '\n' || it == '\r' || it == '\u0000' }
+                ) {
+                    appendLine("fail=1")
+                    return@forEach
+                }
+                append("sync_one ")
+                append(escapeShellSingleQuoted(src))
+                append(' ')
+                append(escapeShellSingleQuoted(dst))
+                appendLine()
+            }
+            appendLine("exit ${'$'}fail")
+        }
+        return runRootScriptHeredoc(script, timeoutSeconds = 120) == 0
+    }
+
+    private val syncRegularFile = """
+        label_as_bound() {
+          target=${'$'}1
+          if chcon --reference="${'$'}bound" "${'$'}target" 2>/dev/null; then
+            return 0
+          fi
+          if command -v restorecon >/dev/null 2>&1; then
+            restorecon -F "${'$'}target" 2>/dev/null && return 0
+            restorecon "${'$'}target" 2>/dev/null && return 0
+          fi
+          fail=1
+          return 0
+        }
+        own_parents() {
+          dir=${'$'}1
+          while [ "${'$'}dir" != "${'$'}bound" ]; do
+            case "${'$'}dir" in
+              "${'$'}bound"/*) ;;
+              *) fail=1; return 0 ;;
+            esac
+            chown "${'$'}uid:${'$'}uid" "${'$'}dir" || { fail=1; return 0; }
+            label_as_bound "${'$'}dir"
+            dir=${'$'}(dirname "${'$'}dir")
+          done
+        }
+        sync_one() {
+          src=${'$'}1
+          dst=${'$'}2
+          case "${'$'}dst" in
+            "${'$'}bound"/*) ;;
+            *) fail=1; return 0 ;;
+          esac
+          if [ -L "${'$'}src" ] || [ ! -f "${'$'}src" ] || [ -L "${'$'}dst" ] || [ -d "${'$'}dst" ]; then
+            return 0
+          fi
+          if [ -f "${'$'}dst" ]; then
+            src_m=${'$'}(stat -c %Y "${'$'}src" 2>/dev/null) || src_m=
+            dst_m=${'$'}(stat -c %Y "${'$'}dst" 2>/dev/null) || dst_m=
+            if [ -n "${'$'}src_m" ] && [ -n "${'$'}dst_m" ] && [ "${'$'}dst_m" -ge "${'$'}src_m" ]; then
+              return 0
+            fi
+          fi
+          parent=${'$'}(dirname "${'$'}dst")
+          mkdir -p "${'$'}parent" || { fail=1; return 0; }
+          own_parents "${'$'}parent"
+          tmp="${'$'}dst.tmp.${'$'}${'$'}"
+          rm -f "${'$'}tmp"
+          cp "${'$'}src" "${'$'}tmp" || { fail=1; rm -f "${'$'}tmp"; return 0; }
+          chown "${'$'}uid:${'$'}uid" "${'$'}tmp" || { fail=1; rm -f "${'$'}tmp"; return 0; }
+          chmod 0644 "${'$'}tmp" || { fail=1; rm -f "${'$'}tmp"; return 0; }
+          label_as_bound "${'$'}tmp"
+          touch -r "${'$'}src" "${'$'}tmp" || fail=1
+          mv -f "${'$'}tmp" "${'$'}dst" || { fail=1; rm -f "${'$'}tmp"; return 0; }
+        }
+    """.trimIndent()
+
 }
