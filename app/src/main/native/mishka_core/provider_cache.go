@@ -9,10 +9,15 @@ import (
 	"github.com/metacubex/mihomo/config"
 )
 
+type providerCacheEntry struct {
+	Path string `json:"path"`
+	URL  string `json:"url"`
+}
+
 // 运行时缓存路径必须和 adapter/provider、rules/provider 的 HTTP vehicle 一致。
 // 不能复用 patchProvidersPath：那是导入校验把文件改写到 providers/ 的内存补丁，
 // 磁盘上的 config.yaml 并不走这条路径。停机回写若按 providers/ 拷，下次启动仍会重拉。
-func listProviderCachePaths(workDir, transformPath, ageSecretKey string) ([]string, error) {
+func listProviderCachePaths(workDir, transformPath, ageSecretKey string) ([]providerCacheEntry, error) {
 	out, err := readTransformedConfig(workDir, transformPath, ageSecretKey)
 	if err != nil {
 		return nil, err
@@ -24,32 +29,37 @@ func listProviderCachePaths(workDir, transformPath, ageSecretKey string) ([]stri
 	return providerCacheRelPaths(workDir, rawCfg), nil
 }
 
-func providerCacheRelPaths(workDir string, cfg *config.RawConfig) []string {
+func providerCacheRelPaths(workDir string, cfg *config.RawConfig) []providerCacheEntry {
 	seen := make(map[string]struct{})
-	add := func(rel string) {
+	entries := make([]providerCacheEntry, 0)
+	add := func(rel, url string) {
 		if rel == "" {
 			return
 		}
-		if _, ok := seen[rel]; ok {
+		key := rel + "\n" + url
+		if _, ok := seen[key]; ok {
 			return
 		}
-		seen[rel] = struct{}{}
+		seen[key] = struct{}{}
+		entries = append(entries, providerCacheEntry{Path: rel, URL: url})
 	}
 	forEachProviders(cfg, func(_, _ int, _ string, provider map[string]any, kind string) {
-		add(httpProviderCacheRel(workDir, kind, provider))
+		rel, url := httpProviderCacheRel(workDir, kind, provider)
+		add(rel, url)
 	})
-	add("cache.db")
-	paths := make([]string, 0, len(seen))
-	for rel := range seen {
-		paths = append(paths, rel)
-	}
-	sort.Strings(paths)
-	return paths
+	add("cache.db", "")
+	sort.Slice(entries, func(i, j int) bool {
+		if entries[i].Path != entries[j].Path {
+			return entries[i].Path < entries[j].Path
+		}
+		return entries[i].URL < entries[j].URL
+	})
+	return entries
 }
 
-func httpProviderCacheRel(workDir, kind string, provider map[string]any) string {
+func httpProviderCacheRel(workDir, kind string, provider map[string]any) (string, string) {
 	if providerString(provider, "type") != "http" {
-		return ""
+		return "", ""
 	}
 	pathStr := providerString(provider, "path")
 	urlStr := providerString(provider, "url")
@@ -64,17 +74,17 @@ func httpProviderCacheRel(workDir, kind string, provider map[string]any) string 
 	case urlStr != "":
 		abs = filepath.Join(workDir, kind, utils.MakeHash([]byte(urlStr)).String())
 	default:
-		return ""
+		return "", ""
 	}
 	rel, err := filepath.Rel(workDir, abs)
 	if err != nil || rel == "." || !filepath.IsLocal(rel) {
-		return ""
+		return "", ""
 	}
 	rel = filepath.ToSlash(rel)
 	if !safeProviderCacheRel(rel) {
-		return ""
+		return "", ""
 	}
-	return rel
+	return rel, urlStr
 }
 
 func providerString(provider map[string]any, key string) string {
@@ -97,7 +107,8 @@ func safeProviderCacheRel(rel string) bool {
 		base = part
 	}
 	switch base {
-	case "config.yaml", "mihomo.log",
+	case ".mishka-provider-cache.json",
+		"config.yaml", "mihomo.log",
 		"geoip.metadb", "geoip.db", "geoip.dat", "GeoIP.dat",
 		"Country.mmdb", "country.mmdb",
 		"geosite.dat", "GeoSite.dat",

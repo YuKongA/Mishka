@@ -37,6 +37,12 @@ data class CoreFetchResult(
 @Serializable
 private data class TransformCheck(val valid: Boolean = false)
 
+@Serializable
+data class ProviderCacheEntry(
+    val path: String = "",
+    val url: String = "",
+)
+
 
 class MishkaCoreError(message: String) : RuntimeException(message)
 
@@ -137,14 +143,18 @@ object MishkaCoreBridge {
     }
 
     /**
-     * 按运行时 vehicle 列出 HTTP provider 缓存与 cache.db 的相对路径。
+     * 按运行时 vehicle 列出 HTTP provider 缓存与 cache.db 的相对路径和 URL。
      * 只在内存里解密，不设置全局 age 密钥，避免和 processLock 里的 fetch 抢密钥。
      */
-    fun providerCachePaths(workDir: java.io.File, transform: java.io.File?, ageSecretKey: String): List<String> {
+    fun providerCachePaths(
+        workDir: java.io.File,
+        transform: java.io.File?,
+        ageSecretKey: String,
+    ): List<ProviderCacheEntry> {
         val raw = nativeProviderCachePaths(workDir.path, transform?.path.orEmpty(), ageSecretKey)
         if (raw.isNullOrEmpty()) throw MishkaCoreError("native returned empty result")
         if (raw.startsWith("error:")) throw MishkaCoreError(raw.removePrefix("error:").trim())
-        return runCatching { json.decodeFromString<List<String>>(raw) }
+        return runCatching { json.decodeFromString<List<ProviderCacheEntry>>(raw) }
             .getOrElse { throw MishkaCoreError("invalid native payload: $raw") }
     }
 

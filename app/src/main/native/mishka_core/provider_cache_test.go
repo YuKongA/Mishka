@@ -48,13 +48,18 @@ rule-providers:
 	}
 	hashed := "proxies/" + utils.MakeHash([]byte("https://example.com/a.yaml")).String()
 	rules := "rules/" + utils.MakeHash([]byte("https://example.com/r.yaml")).String()
-	want := []string{"cache.db", hashed, "proxy_providers/b.yaml", rules}
+	want := []providerCacheEntry{
+		{Path: "cache.db"},
+		{Path: hashed, URL: "https://example.com/a.yaml"},
+		{Path: "proxy_providers/b.yaml", URL: "https://example.com/b.yaml"},
+		{Path: rules, URL: "https://example.com/r.yaml"},
+	}
 	if len(got) != len(want) {
-		t.Fatalf("paths = %v, want %v", got, want)
+		t.Fatalf("paths = %+v, want %+v", got, want)
 	}
 	for i := range want {
 		if got[i] != want[i] {
-			t.Fatalf("paths = %v, want %v", got, want)
+			t.Fatalf("paths = %+v, want %+v", got, want)
 		}
 	}
 }
@@ -93,19 +98,56 @@ func TestProviderCachePathsFollowTransformAndAge(t *testing.T) {
 		t.Fatal(err)
 	}
 	found := false
-	for _, path := range got {
-		if path == "original.yaml" {
-			t.Fatalf("transform did not replace provider path: %v", got)
+	for _, entry := range got {
+		if entry.Path == "original.yaml" {
+			t.Fatalf("transform did not replace provider path: %+v", got)
 		}
-		if path == "from-script.yaml" {
+		if entry.Path == "from-script.yaml" {
 			found = true
+			if entry.URL != "https://example.com/a.yaml" {
+				t.Fatalf("url = %q, want provider url", entry.URL)
+			}
 		}
-		if path == "providers/from-script.yaml" {
-			t.Fatalf("validation prefetch path leaked into runtime cache list: %v", got)
+		if entry.Path == "providers/from-script.yaml" {
+			t.Fatalf("validation prefetch path leaked into runtime cache list: %+v", got)
 		}
 	}
 	if !found {
-		t.Fatalf("transformed path missing: %v", got)
+		t.Fatalf("transformed path missing: %+v", got)
+	}
+}
+
+func TestProviderCacheKeepsDistinctURLsForSamePath(t *testing.T) {
+	workDir := t.TempDir()
+	config := []byte(`
+proxy-providers:
+  a:
+    type: http
+    url: https://example.com/a.yaml
+    path: shared.yaml
+  b:
+    type: http
+    url: https://example.com/b.yaml
+    path: shared.yaml
+`)
+	if err := os.WriteFile(filepath.Join(workDir, "config.yaml"), config, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	got, err := listProviderCachePaths(workDir, "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	urls := map[string]struct{}{}
+	for _, entry := range got {
+		if entry.Path == "shared.yaml" {
+			urls[entry.URL] = struct{}{}
+		}
+	}
+	if _, ok := urls["https://example.com/a.yaml"]; !ok {
+		t.Fatalf("missing first url: %+v", got)
+	}
+	if _, ok := urls["https://example.com/b.yaml"]; !ok {
+		t.Fatalf("collapsed distinct url: %+v", got)
 	}
 }
 
@@ -117,6 +159,7 @@ func TestProviderCacheRelRejectsUnsafe(t *testing.T) {
 		"a/../b",
 		"a//b",
 		"config.yaml",
+		".mishka-provider-cache.json",
 		"proxies/../config.yaml",
 		"geoip.metadb",
 	}

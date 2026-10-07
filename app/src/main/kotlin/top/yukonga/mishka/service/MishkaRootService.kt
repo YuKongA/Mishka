@@ -399,6 +399,14 @@ class MishkaRootService : Service() {
 
             // 5. 以 root 启动 mihomo
             // age 加密订阅：runtime/ 保持密文，密钥与覆写选择来自同一份 imported DB 快照。
+            // 快照用的就是即将传给进程的那份 transform；停机只回写 path 与 URL 仍一致的项。
+            if (subscriptionId != null) {
+                RootRuntimeCache.capture(
+                    ProfileFileOps.getRuntimeDir(this@MishkaRootService, subscriptionId),
+                    transformPlan.transformPath?.let(::File),
+                    transformPlan.ageSecretKey,
+                )
+            }
             val success = runner.start(
                 subscriptionId = subscriptionId,
                 useRoot = true,

@@ -6,8 +6,12 @@ import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.json.Json
 import top.yukonga.mishka.data.bridge.MishkaCoreBridge
+import top.yukonga.mishka.data.bridge.ProviderCacheEntry
 import top.yukonga.mishka.data.database.decodeOverrideIds
+import top.yukonga.mishka.data.repository.ProfileProcessor
 import top.yukonga.mishka.data.repository.SubscriptionRepositoryImpl
 import top.yukonga.mishka.data.store.ProfileTransformWriter
 import top.yukonga.mishka.domain.model.Subscription
@@ -17,11 +21,33 @@ import java.security.MessageDigest
 /**
  * ROOT 停机前把 mihomo 写在 runtime/ 里的 HTTP provider 缓存回写到 imported/。
  * 进程已死才能调：cache.db 与 provider 文件还在被写时拷贝会留下半截文件。
+ * 回写只保留启动时记下、且 path 与 URL 仍一致的项；没有快照就跳过，不按停机时的覆写重算。
  * 回写失败仍删除沙箱，避免 root:root 残留挡住下一次启动。
  */
 internal object RootRuntimeCache {
 
     private const val TAG = "RootRuntimeCache"
+    private const val SNAPSHOT_NAME = ".mishka-provider-cache.json"
+    private val json = Json { encodeDefaults = true; ignoreUnknownKeys = true }
+
+    /**
+     * 新鲜启动、进程起来之前调用。快照必须落在 runtime/：写进 imported/ 会被下一轮
+     * prepareRootRuntime 拷走，停机时就分不清这是哪一次启动的定义。
+     */
+    fun capture(runtime: File, transform: File?, ageSecretKey: String) {
+        if (!runtime.isDirectory) return
+        try {
+            val entries = MishkaCoreBridge.providerCachePaths(runtime, transform, ageSecretKey)
+            ProfileFileOps.writeAtomically(
+                File(runtime, SNAPSHOT_NAME),
+                json.encodeToString(ListSerializer(ProviderCacheEntry.serializer()), entries),
+            )
+        } catch (e: Exception) {
+            Log.w(TAG, "provider cache snapshot failed: ${e.message}")
+        } catch (e: LinkageError) {
+            Log.w(TAG, "provider cache snapshot unavailable: ${e.message}")
+        }
+    }
 
     suspend fun release(
         context: Context,
@@ -71,47 +97,70 @@ internal object RootRuntimeCache {
         val imported = ProfileFileOps.peekImportedDir(context, uuid)
         if (!runtime.isDirectory || !imported.isDirectory) return
         withContext(Dispatchers.IO) {
-            // 不能在锁内调 loadRuntimeSubscription：它自己再取 profileLock，Mutex 不可重入。
-            repository.withProfileLock {
-                val entity = repository.queryImported(uuid) ?: return@withProfileLock
-                val runtimeConfig = File(runtime, "config.yaml")
-                val importedConfig = File(imported, "config.yaml")
-                if (!sameFileContent(runtimeConfig, importedConfig)) {
-                    Log.i(TAG, "skip provider cache sync for $uuid: subscription config changed")
-                    return@withProfileLock
-                }
-                val subscription = Subscription(
-                    id = uuid,
-                    ageSecretKey = entity.ageSecretKey,
-                    overrideIds = entity.overrideIds.decodeOverrideIds(),
-                    overrideSortPreference = entity.overrideSortPreference.decodeOverrideIds(),
-                )
-                val transformRelative = "cache-sync/$uuid.transform.json"
-                val transformFile = File(File(context.filesDir, "mihomo"), transformRelative)
-                try {
-                    val transformPath = writer.write(subscription, transformRelative)
-                    val paths = MishkaCoreBridge.providerCachePaths(
-                        imported,
-                        transformPath?.let(::File),
-                        entity.ageSecretKey,
-                    )
-                    val pairs = cachePairs(runtime, imported, paths)
-                    if (pairs.isEmpty()) return@withProfileLock
-                    val copied = RootHelper.syncRegularFiles(
-                        Process.myUid(),
-                        imported.absolutePath,
-                        pairs,
-                    )
-                    if (!copied) {
-                        Log.w(TAG, "provider cache sync incomplete for $uuid (${pairs.size} files)")
-                    } else {
-                        Log.i(TAG, "synced provider cache for $uuid (${pairs.size} files)")
+            // ProfileWorker 另建仓库，只持本实例的 profileLock 挡不住它换入 imported/。
+            // 先 processLock 再 profileLock，与导入提交同一顺序。Mutex 不可重入，
+            // 锁内不能再调 loadRuntimeSubscription。
+            ProfileProcessor.withProcessLock {
+                repository.withProfileLock {
+                    if (!runtime.isDirectory || !imported.isDirectory) return@withProfileLock
+                    val entity = repository.queryImported(uuid) ?: return@withProfileLock
+                    val runtimeConfig = File(runtime, "config.yaml")
+                    val importedConfig = File(imported, "config.yaml")
+                    if (!sameFileContent(runtimeConfig, importedConfig)) {
+                        Log.i(TAG, "skip provider cache sync for $uuid: subscription config changed")
+                        return@withProfileLock
                     }
-                } finally {
-                    transformFile.delete()
-                    transformFile.parentFile?.takeIf { it.list().isNullOrEmpty() }?.delete()
+                    val snapshot = readSnapshot(runtime)
+                    if (snapshot == null) {
+                        Log.i(TAG, "skip provider cache sync for $uuid: no startup snapshot")
+                        return@withProfileLock
+                    }
+                    val subscription = Subscription(
+                        id = uuid,
+                        ageSecretKey = entity.ageSecretKey,
+                        overrideIds = entity.overrideIds.decodeOverrideIds(),
+                        overrideSortPreference = entity.overrideSortPreference.decodeOverrideIds(),
+                    )
+                    val transformRelative = "cache-sync/$uuid.transform.json"
+                    val transformFile = File(File(context.filesDir, "mihomo"), transformRelative)
+                    try {
+                        val transformPath = writer.write(subscription, transformRelative)
+                        val current = MishkaCoreBridge.providerCachePaths(
+                            imported,
+                            transformPath?.let(::File),
+                            entity.ageSecretKey,
+                        )
+                        val rels = matchingCacheRels(snapshot, current)
+                        val pairs = cachePairs(runtime, imported, rels)
+                        if (pairs.isEmpty()) return@withProfileLock
+                        val copied = RootHelper.syncRegularFiles(
+                            Process.myUid(),
+                            runtime.absolutePath,
+                            imported.absolutePath,
+                            pairs,
+                        )
+                        if (!copied) {
+                            Log.w(TAG, "provider cache sync incomplete for $uuid (${pairs.size} files)")
+                        } else {
+                            Log.i(TAG, "synced provider cache for $uuid (${pairs.size} files)")
+                        }
+                    } finally {
+                        transformFile.delete()
+                        transformFile.parentFile?.takeIf { it.list().isNullOrEmpty() }?.delete()
+                    }
                 }
             }
+        }
+    }
+
+    private fun readSnapshot(runtime: File): List<ProviderCacheEntry>? {
+        val file = File(runtime, SNAPSHOT_NAME)
+        if (!file.isFile) return null
+        return runCatching {
+            json.decodeFromString(ListSerializer(ProviderCacheEntry.serializer()), file.readText())
+        }.getOrElse {
+            Log.w(TAG, "provider cache snapshot unreadable: ${it.message}")
+            null
         }
     }
 
@@ -153,6 +202,27 @@ internal object RootRuntimeCache {
     }
 }
 
+internal fun matchingCacheRels(
+    started: List<ProviderCacheEntry>,
+    current: List<ProviderCacheEntry>,
+): List<String> {
+    fun groups(entries: List<ProviderCacheEntry>): Map<String, Set<String>> {
+        val out = linkedMapOf<String, MutableSet<String>>()
+        for (entry in entries) {
+            if (!isProviderCacheRel(entry.path)) continue
+            out.getOrPut(entry.path) { linkedSetOf() }.add(entry.url)
+        }
+        return out
+    }
+    val now = groups(current)
+    return groups(started).mapNotNull { (path, urls) ->
+        val currentUrls = now[path] ?: return@mapNotNull null
+        if (currentUrls != urls) return@mapNotNull null
+        if (path == "cache.db" && urls != setOf("")) return@mapNotNull null
+        path
+    }.sorted()
+}
+
 private fun isRuntimeUuid(uuid: String): Boolean {
     if (uuid.isEmpty() || uuid.length > 128 || uuid == "." || uuid == "..") return false
     return uuid.none { it == '/' || it == '\\' || it == '\u0000' || it == '\n' || it == '\r' }
@@ -168,6 +238,7 @@ internal fun isProviderCacheRel(path: String): Boolean {
 }
 
 private val PROVIDER_CACHE_DENY_BASES = setOf(
+    ".mishka-provider-cache.json",
     "config.yaml",
     "mihomo.log",
     "geoip.metadb",

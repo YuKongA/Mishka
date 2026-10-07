@@ -334,16 +334,21 @@ object RootHelper {
     }
 
     /**
-     * 单次 su 把 root 写入的普通文件拷回 [bound] 下。跳过符号链接和更新的目标；
-     * 结果 chown 到 [uid]、chmod 0644，并用 bound 的 SELinux 标签标记，避免 imported/ 留下
-     * root:root 或 app 读不回的文件。保留源 mtime。中间新建目录同样改属主和标签。
-     * 任一文件失败返回 false，已成功的不回滚。
+     * 单次 su 把 root 写入的普通文件从 [srcBound] 拷回 [bound]。
+     * 源和目标的祖先符号链接都拒绝，物理路径必须仍在对应根下；缺尾可以 mkdir，
+     * 但 mkdir、chown -h、cp -P、chcon 之前再查一次。chown 用 -h，避免跟随链接。
+     * mtime 用 stat %y 的纳秒比较（toybox 的 %N 是长文件名）。相等则 cmp，内容不同才拷源；
+     * 解析不出纳秒就失败，不用秒级 -ge/-gt。结果 chown 到 [uid]、chmod 0644，并用 bound 的
+     * SELinux 标签标记。保留源 mtime。任一文件失败返回 false，已成功的不回滚。
      */
-    fun syncRegularFiles(uid: Int, bound: String, pairs: List<Pair<String, String>>): Boolean {
+    fun syncRegularFiles(uid: Int, srcBound: String, bound: String, pairs: List<Pair<String, String>>): Boolean {
         if (pairs.isEmpty() || uid <= 0) return pairs.isEmpty()
-        if (bound.isEmpty() || bound.any { it == '\n' || it == '\r' || it == '\u0000' }) return false
+        if (bound.isEmpty() || srcBound.isEmpty()) return false
+        if (bound.any { it == '\n' || it == '\r' || it == '\u0000' }) return false
+        if (srcBound.any { it == '\n' || it == '\r' || it == '\u0000' }) return false
         val script = buildString {
             appendLine("uid=$uid")
+            appendLine("src_bound=${escapeShellSingleQuoted(srcBound)}")
             appendLine("bound=${escapeShellSingleQuoted(bound)}")
             appendLine("fail=0")
             appendLine(syncRegularFile)
@@ -365,30 +370,154 @@ object RootHelper {
         return runRootScriptHeredoc(script, timeoutSeconds = 120) == 0
     }
 
+    // POSIX sh 没有局部变量，辅助函数的临时名必须带前缀，否则会盖掉 sync_one 的 parent。
     private val syncRegularFile = """
         label_as_bound() {
-          target=${'$'}1
-          if chcon --reference="${'$'}bound" "${'$'}target" 2>/dev/null; then
+          lb_target=${'$'}1
+          if [ -L "${'$'}lb_target" ]; then
+            fail=1
+            return 0
+          fi
+          guard "${'$'}bound" "${'$'}lb_target" || { fail=1; return 0; }
+          if chcon --reference="${'$'}bound" "${'$'}lb_target" 2>/dev/null; then
             return 0
           fi
           if command -v restorecon >/dev/null 2>&1; then
-            restorecon -F "${'$'}target" 2>/dev/null && return 0
-            restorecon "${'$'}target" 2>/dev/null && return 0
+            restorecon -F "${'$'}lb_target" 2>/dev/null && return 0
+            restorecon "${'$'}lb_target" 2>/dev/null && return 0
           fi
           fail=1
           return 0
         }
         own_parents() {
-          dir=${'$'}1
-          while [ "${'$'}dir" != "${'$'}bound" ]; do
-            case "${'$'}dir" in
+          op_dir=${'$'}1
+          while [ "${'$'}op_dir" != "${'$'}bound" ]; do
+            case "${'$'}op_dir" in
               "${'$'}bound"/*) ;;
               *) fail=1; return 0 ;;
             esac
-            chown "${'$'}uid:${'$'}uid" "${'$'}dir" || { fail=1; return 0; }
-            label_as_bound "${'$'}dir"
-            dir=${'$'}(dirname "${'$'}dir")
+            if [ -L "${'$'}op_dir" ] || [ ! -d "${'$'}op_dir" ]; then
+              fail=1
+              return 0
+            fi
+            phys_inside "${'$'}bound" "${'$'}op_dir" || { fail=1; return 0; }
+            chown -h "${'$'}uid:${'$'}uid" "${'$'}op_dir" || { fail=1; return 0; }
+            label_as_bound "${'$'}op_dir"
+            op_dir=${'$'}(dirname "${'$'}op_dir")
           done
+        }
+        reject_dots() {
+          rd_root=${'$'}1
+          rd_cur=${'$'}2
+          while [ "${'$'}rd_cur" != "${'$'}rd_root" ]; do
+            rd_base=${'$'}(basename "${'$'}rd_cur")
+            case "${'$'}rd_base" in
+              ""|.|..) return 1 ;;
+            esac
+            rd_parent=${'$'}(dirname "${'$'}rd_cur")
+            if [ "${'$'}rd_parent" = "${'$'}rd_cur" ]; then
+              return 1
+            fi
+            rd_cur=${'$'}rd_parent
+          done
+          return 0
+        }
+        reject_links() {
+          rl_root=${'$'}1
+          rl_cur=${'$'}2
+          while :; do
+            if [ -L "${'$'}rl_cur" ]; then
+              return 1
+            fi
+            if [ "${'$'}rl_cur" = "${'$'}rl_root" ]; then
+              return 0
+            fi
+            rl_parent=${'$'}(dirname "${'$'}rl_cur")
+            if [ "${'$'}rl_parent" = "${'$'}rl_cur" ]; then
+              return 1
+            fi
+            rl_cur=${'$'}rl_parent
+          done
+        }
+        phys_inside() {
+          pi_root=${'$'}1
+          pi_cur=${'$'}2
+          pi_root_real=${'$'}(readlink -f "${'$'}pi_root") || return 1
+          while [ ! -e "${'$'}pi_cur" ] && [ ! -L "${'$'}pi_cur" ]; do
+            pi_parent=${'$'}(dirname "${'$'}pi_cur")
+            if [ "${'$'}pi_parent" = "${'$'}pi_cur" ]; then
+              return 1
+            fi
+            pi_cur=${'$'}pi_parent
+          done
+          if [ -L "${'$'}pi_cur" ]; then
+            return 1
+          fi
+          pi_real=${'$'}(readlink -f "${'$'}pi_cur") || return 1
+          case "${'$'}pi_real" in
+            "${'$'}pi_root_real"|"${'$'}pi_root_real"/*) return 0 ;;
+            *) return 1 ;;
+          esac
+        }
+        guard() {
+          g_root=${'$'}1
+          g_path=${'$'}2
+          case "${'$'}g_path" in
+            "${'$'}g_root"|"${'$'}g_root"/*) ;;
+            *) return 1 ;;
+          esac
+          reject_dots "${'$'}g_root" "${'$'}g_path" || return 1
+          reject_links "${'$'}g_root" "${'$'}g_path" || return 1
+          phys_inside "${'$'}g_root" "${'$'}g_path" || return 1
+        }
+        parse_mtime() {
+          mt_stamp=${'$'}1
+          case "${'$'}mt_stamp" in
+            [0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]" "[0-9][0-9]:[0-9][0-9]:[0-9][0-9].[0-9]*) ;;
+            *) return 1 ;;
+          esac
+          _sec=${'$'}{mt_stamp%%.*}
+          mt_rest=${'$'}{mt_stamp#*.}
+          _nsec=${'$'}{mt_rest%%[!0-9]*}
+          case "${'$'}_nsec" in
+            [0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]) ;;
+            *) return 1 ;;
+          esac
+          return 0
+        }
+        dst_not_older() {
+          mt_src=${'$'}1
+          mt_dst=${'$'}2
+          src_y=${'$'}(stat -c %y "${'$'}mt_src" 2>/dev/null) || return 2
+          dst_y=${'$'}(stat -c %y "${'$'}mt_dst" 2>/dev/null) || return 2
+          parse_mtime "${'$'}src_y" || return 2
+          src_sec=${'$'}_sec
+          src_nsec=${'$'}_nsec
+          parse_mtime "${'$'}dst_y" || return 2
+          dst_sec=${'$'}_sec
+          dst_nsec=${'$'}_nsec
+          if [ "${'$'}dst_sec" = "${'$'}src_sec" ] && [ "${'$'}dst_nsec" = "${'$'}src_nsec" ]; then
+            cmp -s "${'$'}mt_src" "${'$'}mt_dst"
+            cmp_rc=${'$'}?
+            if [ "${'$'}cmp_rc" -eq 0 ]; then
+              return 0
+            fi
+            if [ "${'$'}cmp_rc" -eq 1 ]; then
+              return 1
+            fi
+            return 2
+          fi
+          if [ "${'$'}dst_sec" != "${'$'}src_sec" ]; then
+            first=${'$'}(printf '%s\n%s\n' "${'$'}dst_sec" "${'$'}src_sec" | LC_ALL=C sort | head -n 1)
+            if [ "${'$'}first" = "${'$'}dst_sec" ]; then
+              return 1
+            fi
+            return 0
+          fi
+          if [ "${'$'}dst_nsec" -gt "${'$'}src_nsec" ]; then
+            return 0
+          fi
+          return 1
         }
         sync_one() {
           src=${'$'}1
@@ -397,26 +526,56 @@ object RootHelper {
             "${'$'}bound"/*) ;;
             *) fail=1; return 0 ;;
           esac
+          case "${'$'}src" in
+            "${'$'}src_bound"/*) ;;
+            *) fail=1; return 0 ;;
+          esac
           if [ -L "${'$'}src" ] || [ ! -f "${'$'}src" ] || [ -L "${'$'}dst" ] || [ -d "${'$'}dst" ]; then
             return 0
           fi
           if [ -f "${'$'}dst" ]; then
-            src_m=${'$'}(stat -c %Y "${'$'}src" 2>/dev/null) || src_m=
-            dst_m=${'$'}(stat -c %Y "${'$'}dst" 2>/dev/null) || dst_m=
-            if [ -n "${'$'}src_m" ] && [ -n "${'$'}dst_m" ] && [ "${'$'}dst_m" -ge "${'$'}src_m" ]; then
+            dst_not_older "${'$'}src" "${'$'}dst"
+            rc=${'$'}?
+            if [ "${'$'}rc" -eq 0 ]; then
+              return 0
+            fi
+            if [ "${'$'}rc" -eq 2 ]; then
+              fail=1
               return 0
             fi
           fi
+          guard "${'$'}src_bound" "${'$'}src" || { fail=1; return 0; }
+          guard "${'$'}bound" "${'$'}dst" || { fail=1; return 0; }
           parent=${'$'}(dirname "${'$'}dst")
+          guard "${'$'}bound" "${'$'}parent" || { fail=1; return 0; }
           mkdir -p "${'$'}parent" || { fail=1; return 0; }
+          guard "${'$'}bound" "${'$'}parent" || { fail=1; return 0; }
           own_parents "${'$'}parent"
+          if [ -L "${'$'}src" ] || [ ! -f "${'$'}src" ] || ! guard "${'$'}src_bound" "${'$'}src"; then
+            fail=1
+            return 0
+          fi
+          if [ -L "${'$'}dst" ] || [ -d "${'$'}dst" ] || ! guard "${'$'}bound" "${'$'}dst"; then
+            fail=1
+            return 0
+          fi
           tmp="${'$'}dst.tmp.${'$'}${'$'}"
           rm -f "${'$'}tmp"
-          cp "${'$'}src" "${'$'}tmp" || { fail=1; rm -f "${'$'}tmp"; return 0; }
-          chown "${'$'}uid:${'$'}uid" "${'$'}tmp" || { fail=1; rm -f "${'$'}tmp"; return 0; }
+          cp -P "${'$'}src" "${'$'}tmp" || { fail=1; rm -f "${'$'}tmp"; return 0; }
+          if [ -L "${'$'}tmp" ]; then
+            fail=1
+            rm -f "${'$'}tmp"
+            return 0
+          fi
+          chown -h "${'$'}uid:${'$'}uid" "${'$'}tmp" || { fail=1; rm -f "${'$'}tmp"; return 0; }
           chmod 0644 "${'$'}tmp" || { fail=1; rm -f "${'$'}tmp"; return 0; }
           label_as_bound "${'$'}tmp"
           touch -r "${'$'}src" "${'$'}tmp" || fail=1
+          if [ -L "${'$'}dst" ] || [ -d "${'$'}dst" ]; then
+            fail=1
+            rm -f "${'$'}tmp"
+            return 0
+          fi
           mv -f "${'$'}tmp" "${'$'}dst" || { fail=1; rm -f "${'$'}tmp"; return 0; }
         }
     """.trimIndent()
