@@ -16,6 +16,7 @@ import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.contentType
+import io.ktor.http.encodeURLPath
 import io.ktor.http.isSuccess
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.serialization.json.Json
@@ -74,7 +75,7 @@ class MihomoApiClient(
         client.get("$baseUrl/group").body()
 
     suspend fun selectProxy(group: String, name: String) {
-        val response: HttpResponse = client.put("$baseUrl/proxies/$group") {
+        val response: HttpResponse = client.put("$baseUrl/proxies/${pathSegment(group)}") {
             contentType(ContentType.Application.Json)
             setBody(mapOf("name" to name))
         }
@@ -86,12 +87,12 @@ class MihomoApiClient(
      * Selector 组无固定态，mihomo 对其返回 400。
      */
     suspend fun unfixProxy(group: String) {
-        val response: HttpResponse = client.delete("$baseUrl/proxies/$group")
+        val response: HttpResponse = client.delete("$baseUrl/proxies/${pathSegment(group)}")
         ensureSuccess(response, "proxy group '$group'")
     }
 
     suspend fun getProxyDelay(name: String, testUrl: String = "http://www.gstatic.com/generate_204", timeout: Int = 5000): DelayResult =
-        client.get("$baseUrl/proxies/$name/delay") {
+        client.get("$baseUrl/proxies/${pathSegment(name)}/delay") {
             url {
                 parameters.append("url", testUrl)
                 parameters.append("timeout", timeout.toString())
@@ -108,7 +109,7 @@ class MihomoApiClient(
         testUrl: String = "http://www.gstatic.com/generate_204",
         timeout: Int = 5000,
     ): DelayResult =
-        client.get("$baseUrl/providers/proxies/$provider/$name/healthcheck") {
+        client.get("$baseUrl/providers/proxies/${pathSegment(provider)}/${pathSegment(name)}/healthcheck") {
             url {
                 parameters.append("url", testUrl)
                 parameters.append("timeout", timeout.toString())
@@ -128,7 +129,7 @@ class MihomoApiClient(
     }
 
     suspend fun closeConnection(id: String) {
-        client.delete("$baseUrl/connections/$id")
+        client.delete("$baseUrl/connections/${pathSegment(id)}")
     }
 
     // === Provider ===
@@ -143,7 +144,7 @@ class MihomoApiClient(
      * 让 UI 误以为刷新成功。
      */
     suspend fun updateProvider(name: String) {
-        val response: HttpResponse = client.put("$baseUrl/providers/proxies/$name")
+        val response: HttpResponse = client.put("$baseUrl/providers/proxies/${pathSegment(name)}")
         ensureSuccess(response, "proxy provider '$name'")
     }
 
@@ -156,7 +157,7 @@ class MihomoApiClient(
      * 触发 rule provider 重新拉取。语义同 [updateProvider]，但路由到 /providers/rules/。
      */
     suspend fun updateRuleProvider(name: String) {
-        val response: HttpResponse = client.put("$baseUrl/providers/rules/$name")
+        val response: HttpResponse = client.put("$baseUrl/providers/rules/${pathSegment(name)}")
         ensureSuccess(response, "rule provider '$name'")
     }
 
@@ -185,6 +186,14 @@ class MihomoApiClient(
     fun close() {
         client.close()
     }
+
+    /**
+     * 路径段只编码一次，并且必须编码 `/`。
+     * chi 的 `/{name}` 只匹配一段；斜杠不编码时请求被切开，中间件用第一段查找，
+     * 回 404 Resource not found。内核 getEscapeParam 会再 PathUnescape 一次，
+     * 预编码或编两次都会对不上注册名。
+     */
+    private fun pathSegment(raw: String): String = raw.encodeURLPath(encodeSlash = true)
 
     /**
      * mihomo 返回的 JSON 错误体格式：`{"message": "..."}`。非 2xx 时抛带上下文的异常，
