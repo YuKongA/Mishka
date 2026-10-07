@@ -306,7 +306,7 @@ class MishkaRootService : Service() {
             // 启动前把上一次残留的 iptables 规则（另一个 submode 可能还没清干净）彻底擦一遍
             teardownAllRootRules()
             // 上次停机若没来得及回写，这里补一次；进程已在上面杀掉
-            RootRuntimeCache.releaseAll(this@MishkaRootService, subscriptionRepository, transformWriter)
+            RootRuntimeCache.releaseAll(this@MishkaRootService, subscriptionRepository)
 
             // 3. 检查 ROOT 权限
             if (!RootHelper.hasRootAccess()) {
@@ -399,14 +399,6 @@ class MishkaRootService : Service() {
 
             // 5. 以 root 启动 mihomo
             // age 加密订阅：runtime/ 保持密文，密钥与覆写选择来自同一份 imported DB 快照。
-            // 快照用的就是即将传给进程的那份 transform；停机只回写 path 与 URL 仍一致的项。
-            if (subscriptionId != null) {
-                RootRuntimeCache.capture(
-                    ProfileFileOps.getRuntimeDir(this@MishkaRootService, subscriptionId),
-                    transformPlan.transformPath?.let(::File),
-                    transformPlan.ageSecretKey,
-                )
-            }
             val success = runner.start(
                 subscriptionId = subscriptionId,
                 useRoot = true,
@@ -543,7 +535,7 @@ class MishkaRootService : Service() {
             teardownAllRootRules()
             // 进程已死，先把 provider 缓存回写 imported/，再删 runtime/
             runningSubscriptionId?.let {
-                RootRuntimeCache.release(this@MishkaRootService, it, subscriptionRepository, transformWriter)
+                RootRuntimeCache.release(this@MishkaRootService, it, subscriptionRepository)
             }
             clearPersistedState(storage)
             storage.putString(StorageKeys.SERVICE_WAS_RUNNING, "false")
@@ -609,7 +601,7 @@ class MishkaRootService : Service() {
             teardownAllRootRules()
             // 回写缓存后再清沙箱，下轮 startProxy 从 imported/ 复制才能跳过未过期的 HTTP 拉取
             runningSubscriptionId?.let {
-                RootRuntimeCache.release(this@MishkaRootService, it, subscriptionRepository, transformWriter)
+                RootRuntimeCache.release(this@MishkaRootService, it, subscriptionRepository)
             }
             clearPersistedState(storage)
             withContext(Dispatchers.Main) {
@@ -631,7 +623,7 @@ class MishkaRootService : Service() {
             runner.stop()
             teardownAllRootRules()
             runningSubscriptionId?.let {
-                RootRuntimeCache.release(this@MishkaRootService, it, subscriptionRepository, transformWriter)
+                RootRuntimeCache.release(this@MishkaRootService, it, subscriptionRepository)
             }
             clearPersistedState(storage)
             storage.putString(StorageKeys.SERVICE_WAS_RUNNING, "false")

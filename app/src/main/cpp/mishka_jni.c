@@ -111,19 +111,3 @@ Java_top_yukonga_mishka_data_bridge_MishkaCoreBridge_nativeValidateTransform(
     free(key);
     return go_cstr_to_jstring(env, result);
 }
-
-JNIEXPORT jstring JNICALL
-Java_top_yukonga_mishka_data_bridge_MishkaCoreBridge_nativeProviderCachePaths(
-        JNIEnv *env, jclass clazz, jstring jWorkDir, jstring jTransform, jstring jKey) {
-    char *workDir = jstring_to_cstr(env, jWorkDir);
-    char *transform = jstring_to_cstr(env, jTransform);
-    char *key = jstring_to_cstr(env, jKey);
-    char *result = mishkaProviderCachePaths(
-            workDir ? workDir : "",
-            transform ? transform : "",
-            key ? key : "");
-    free(workDir);
-    free(transform);
-    free(key);
-    return go_cstr_to_jstring(env, result);
-}

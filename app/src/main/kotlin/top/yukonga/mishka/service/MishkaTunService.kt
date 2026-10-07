@@ -147,7 +147,7 @@ class MishkaTunService : VpnService() {
                 val residualTun = storage.getString(StorageKeys.ROOT_TUN_DEVICE, RuntimeOverrideBuilder.DEFAULT_TUN_DEVICE)
                 RootHelper.cleanupOrphanedMihomo(tunDevice = residualTun)
                 // 孤儿进程已死，先把 provider 缓存回写 imported/，再删 runtime/
-                RootRuntimeCache.releaseAll(this@MishkaTunService, subscriptionRepository, transformWriter)
+                RootRuntimeCache.releaseAll(this@MishkaTunService, subscriptionRepository)
                 storage.putString(StorageKeys.ROOT_MIHOMO_PID, "")
                 storage.putString(StorageKeys.ROOT_MIHOMO_SECRET, "")
                 storage.putString(StorageKeys.ROOT_ACTIVE_SUBSCRIPTION_ID, "")

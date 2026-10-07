@@ -86,20 +86,3 @@ func mishkaValidateTransform(cWorkDir, cTransform, cKey *C.char) *C.char {
 		return string(data)
 	})
 }
-
-// 不碰 age 全局密钥：停机回写可能和订阅 fetch 并发，全局密钥由 processLock 独占。
-//
-//export mishkaProviderCachePaths
-func mishkaProviderCachePaths(cWorkDir, cTransform, cKey *C.char) *C.char {
-	return guardString(func() string {
-		paths, err := listProviderCachePaths(C.GoString(cWorkDir), C.GoString(cTransform), C.GoString(cKey))
-		if err != nil {
-			return "error: " + err.Error()
-		}
-		data, err := json.Marshal(paths)
-		if err != nil {
-			return "error: " + err.Error()
-		}
-		return string(data)
-	})
-}
