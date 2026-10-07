@@ -339,7 +339,8 @@ object RootHelper {
      * 但 mkdir、chown -h、cp -P、chcon 之前再查一次。chown 用 -h，避免跟随链接。
      * mtime 用 stat %y 的纳秒比较（toybox 的 %N 是长文件名）。相等则 cmp，内容不同才拷源；
      * 解析不出纳秒就失败，不用秒级 -ge/-gt。结果 chown 到 [uid]、chmod 0644，并用 bound 的
-     * SELinux 标签标记。保留源 mtime。任一文件失败返回 false，已成功的不回滚。
+     * SELinux 标签标记。标签没打上就不发布该文件，避免 app 读不了的替换盖掉旧缓存。
+     * 保留源 mtime；mtime 没保住仍发布。任一文件失败返回 false，已成功的不回滚。
      */
     fun syncRegularFiles(uid: Int, srcBound: String, bound: String, pairs: List<Pair<String, String>>): Boolean {
         if (pairs.isEmpty() || uid <= 0) return pairs.isEmpty()
@@ -376,9 +377,9 @@ object RootHelper {
           lb_target=${'$'}1
           if [ -L "${'$'}lb_target" ]; then
             fail=1
-            return 0
+            return 1
           fi
-          guard "${'$'}bound" "${'$'}lb_target" || { fail=1; return 0; }
+          guard "${'$'}bound" "${'$'}lb_target" || { fail=1; return 1; }
           if chcon --reference="${'$'}bound" "${'$'}lb_target" 2>/dev/null; then
             return 0
           fi
@@ -387,7 +388,7 @@ object RootHelper {
             restorecon "${'$'}lb_target" 2>/dev/null && return 0
           fi
           fail=1
-          return 0
+          return 1
         }
         own_parents() {
           op_dir=${'$'}1
@@ -402,7 +403,7 @@ object RootHelper {
             fi
             phys_inside "${'$'}bound" "${'$'}op_dir" || { fail=1; return 0; }
             chown -h "${'$'}uid:${'$'}uid" "${'$'}op_dir" || { fail=1; return 0; }
-            label_as_bound "${'$'}op_dir"
+            label_as_bound "${'$'}op_dir" || true
             op_dir=${'$'}(dirname "${'$'}op_dir")
           done
         }
@@ -569,7 +570,8 @@ object RootHelper {
           fi
           chown -h "${'$'}uid:${'$'}uid" "${'$'}tmp" || { fail=1; rm -f "${'$'}tmp"; return 0; }
           chmod 0644 "${'$'}tmp" || { fail=1; rm -f "${'$'}tmp"; return 0; }
-          label_as_bound "${'$'}tmp"
+          # 只看这次标注。全局 fail 含其它文件和 touch -r，不能拿来决定是否 mv。
+          label_as_bound "${'$'}tmp" || { fail=1; rm -f "${'$'}tmp"; return 0; }
           touch -r "${'$'}src" "${'$'}tmp" || fail=1
           if [ -L "${'$'}dst" ] || [ -d "${'$'}dst" ]; then
             fail=1
