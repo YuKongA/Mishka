@@ -5,6 +5,9 @@ import android.os.Process
 import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import top.yukonga.mishka.data.repository.ProfileProcessor
 import top.yukonga.mishka.data.repository.SubscriptionRepositoryImpl
@@ -12,34 +15,90 @@ import java.io.File
 import java.nio.file.Files
 import java.nio.file.LinkOption
 import java.security.MessageDigest
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * ROOT 停机前把 mihomo 写在 runtime/ 里的 provider 缓存回写到 imported/。
  * 进程已死才能调：cache.db 与 provider 文件还在被写时拷贝会留下半截文件。
  * 与 VPN 一样按工作目录里实际落下的文件回写，不重跑覆写脚本，也不删除 imported/ 里不再引用的旧文件。
  * config.yaml 变了就整单跳过，避免把旧沙箱写进运行期间的新提交。回写失败仍删除沙箱。
+ *
+ * 回写、删除、prepare 共用 [sandboxLock]。清理只认启动时记下的代次：监控的 release 在
+ * NonCancellable 里，cancel 停不掉，代次已经被新 prepare 或删除订阅取代就不再 rm -rf。
+ * 锁顺序是 processLock → sandboxLock → profileLock，别反着取。
  */
 internal object RootRuntimeCache {
 
     private const val TAG = "RootRuntimeCache"
 
+    private val sandboxLock = Mutex()
+    private val epochs = ConcurrentHashMap<String, Long>()
+
+    fun epochOf(uuid: String): Long = epochs[uuid] ?: 0L
+
+    /**
+     * 新鲜启动准备沙箱。代次在创建目录前递增，已经记下旧代次的清理不会删掉这份新目录。
+     * 返回值就是这次代次，调用方要把它交给进程监控，不要事后再读 [epochOf]。
+     */
+    suspend fun prepare(context: Context, uuid: String): Long = sandboxLock.withLock {
+        val next = epochOf(uuid) + 1L
+        epochs[uuid] = next
+        ProfileFileOps.prepareRootRuntime(context, uuid)
+        next
+    }
+
+    /**
+     * 删除订阅时清 runtime/。与 prepare 同一把锁，并废掉旧代次。
+     * 调用方有的持着 processLock、有的在普通函数里，所以这里阻塞等锁；锁内不挂起。
+     */
+    fun discard(context: Context, uuid: String) {
+        if (!isRuntimeUuid(uuid)) return
+        runBlocking {
+            sandboxLock.withLock {
+                epochs[uuid] = epochOf(uuid) + 1L
+                ProfileFileOps.cleanupRootRuntime(context, uuid)
+            }
+        }
+    }
+
+    /** @return 这次清理仍拥有该代次并已删除沙箱。false 表示沙箱已换代，调用方不得再改全局状态。 */
     suspend fun release(
         context: Context,
         uuid: String,
         repository: SubscriptionRepositoryImpl,
-    ) = withContext(NonCancellable) {
-        flushQuietly(context, uuid, repository)
-        ProfileFileOps.cleanupRootRuntime(context, uuid)
+        ownedEpoch: Long,
+    ): Boolean = withContext(NonCancellable) {
+        if (!isRuntimeUuid(uuid)) return@withContext false
+        ProfileProcessor.withProcessLock {
+            sandboxLock.withLock {
+                if (epochOf(uuid) != ownedEpoch) {
+                    Log.i(TAG, "skip stale runtime cleanup for $uuid")
+                    return@withLock false
+                }
+                flushQuietly(context, uuid, repository)
+                ProfileFileOps.cleanupRootRuntime(context, uuid)
+                epochs[uuid] = ownedEpoch + 1L
+                true
+            }
+        }
     }
 
     suspend fun releaseAll(
         context: Context,
         repository: SubscriptionRepositoryImpl,
     ) = withContext(NonCancellable) {
-        for (uuid in ProfileFileOps.listRuntimeUuids(context)) {
-            flushQuietly(context, uuid, repository)
+        ProfileProcessor.withProcessLock {
+            sandboxLock.withLock {
+                val uuids = ProfileFileOps.listRuntimeUuids(context).filter { isRuntimeUuid(it) }
+                for (uuid in uuids) {
+                    flushQuietly(context, uuid, repository)
+                }
+                for (uuid in epochs.keys + uuids) {
+                    epochs[uuid] = epochOf(uuid) + 1L
+                }
+                ProfileFileOps.cleanupAllRootRuntime(context)
+            }
         }
-        ProfileFileOps.cleanupAllRootRuntime(context)
     }
 
     private suspend fun flushQuietly(
@@ -64,32 +123,30 @@ internal object RootRuntimeCache {
         val imported = ProfileFileOps.peekImportedDir(context, uuid)
         if (!runtime.isDirectory || !imported.isDirectory) return
         withContext(Dispatchers.IO) {
+            // 调用方已持 processLock，再持 sandboxLock。这里只取 profileLock。
             // ProfileWorker 另建仓库，只持本实例的 profileLock 挡不住它换入 imported/。
-            // 先 processLock 再 profileLock，与导入提交同一顺序。Mutex 不可重入，
-            // 锁内不能再调 loadRuntimeSubscription。
-            ProfileProcessor.withProcessLock {
-                repository.withProfileLock {
-                    if (!runtime.isDirectory || !imported.isDirectory) return@withProfileLock
-                    if (repository.queryImported(uuid) == null) return@withProfileLock
-                    val runtimeConfig = File(runtime, "config.yaml")
-                    val importedConfig = File(imported, "config.yaml")
-                    if (!sameFileContent(runtimeConfig, importedConfig)) {
-                        Log.i(TAG, "skip provider cache sync for $uuid: subscription config changed")
-                        return@withProfileLock
-                    }
-                    val pairs = cachePairs(runtime, imported, providerCacheRels(runtime))
-                    if (pairs.isEmpty()) return@withProfileLock
-                    val copied = RootHelper.syncRegularFiles(
-                        Process.myUid(),
-                        runtime.absolutePath,
-                        imported.absolutePath,
-                        pairs,
-                    )
-                    if (!copied) {
-                        Log.w(TAG, "provider cache sync incomplete for $uuid (${pairs.size} files)")
-                    } else {
-                        Log.i(TAG, "synced provider cache for $uuid (${pairs.size} files)")
-                    }
+            // Mutex 不可重入，锁内不能再调 loadRuntimeSubscription。
+            repository.withProfileLock {
+                if (!runtime.isDirectory || !imported.isDirectory) return@withProfileLock
+                if (repository.queryImported(uuid) == null) return@withProfileLock
+                val runtimeConfig = File(runtime, "config.yaml")
+                val importedConfig = File(imported, "config.yaml")
+                if (!sameFileContent(runtimeConfig, importedConfig)) {
+                    Log.i(TAG, "skip provider cache sync for $uuid: subscription config changed")
+                    return@withProfileLock
+                }
+                val pairs = cachePairs(runtime, imported, providerCacheRels(runtime))
+                if (pairs.isEmpty()) return@withProfileLock
+                val copied = RootHelper.syncRegularFiles(
+                    Process.myUid(),
+                    runtime.absolutePath,
+                    imported.absolutePath,
+                    pairs,
+                )
+                if (!copied) {
+                    Log.w(TAG, "provider cache sync incomplete for $uuid (${pairs.size} files)")
+                } else {
+                    Log.i(TAG, "synced provider cache for $uuid (${pairs.size} files)")
                 }
             }
         }

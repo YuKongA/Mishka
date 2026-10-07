@@ -186,16 +186,12 @@ object ProfileFileOps {
     fun deleteProfileDirs(context: Context, uuid: String) {
         val imported = File(getWorkDir(context), "imported/$uuid")
         val pending = File(getWorkDir(context), "pending/$uuid")
-        val runtime = File(getWorkDir(context), "runtime/$uuid")
         if (imported.exists() && !imported.deleteRecursively()) {
             RootHelper.rmRfAsRoot(imported.absolutePath)
         }
         if (pending.exists()) pending.deleteRecursively()
-        // runtime/{uuid} 通常在 ROOT 停止时已被 cleanupRootRuntime 清掉；
-        // 此处是兜底：若 app 崩溃未走正常 stop 路径，会有 root:root 残留，Kotlin 删不掉。
-        if (runtime.exists() && !runtime.deleteRecursively()) {
-            RootHelper.rmRfAsRoot(runtime.absolutePath)
-        }
+        // 与 prepare/release 同一把锁。直接 rm -rf 会在新沙箱建好后补删。
+        RootRuntimeCache.discard(context, uuid)
     }
 
     /**
@@ -220,6 +216,7 @@ object ProfileFileOps {
     /**
      * ROOT 启动前准备：清残留 → 从 imported/{uuid}/ 复制一份到 runtime/{uuid}/（app UID 写入）→ 重建 geodata 链接。
      * 复制保留 mtime：Fetcher.Initial 用它和 interval 比较，重置成「现在」会让 ROOT 每次都显得刚更新过。
+     * 调用方必须是 [RootRuntimeCache.prepare]，由它持沙箱锁并递增代次。
      */
     fun prepareRootRuntime(context: Context, uuid: String): File {
         val imported = File(getWorkDir(context), "imported/$uuid")
