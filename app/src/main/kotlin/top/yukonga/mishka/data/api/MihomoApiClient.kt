@@ -16,6 +16,7 @@ import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.contentType
+import io.ktor.http.encodeURLParameter
 import io.ktor.http.encodeURLPath
 import io.ktor.http.isSuccess
 import io.ktor.serialization.kotlinx.json.json
@@ -217,11 +218,16 @@ class MihomoApiClient(
         }.getOrNull()
     }
 
+    /**
+     * `secret` 只能走 query——mihomo 的 WS 分支只认 `?token=`，没有 REST 那样的 `Authorization` 头可回落。
+     * 必须百分号编码：`&` 会被当 query 分隔符截断、`#` 之后整段不发送、`+` 解码成空格，
+     * 任一都让服务端鉴权失败回 401，而 WS 握手失败是静默重连（内存/网速一直停在占位值）。
+     */
     fun getWebSocketUrl(path: String): String {
         val wsBase = baseUrl.replace("http://", "ws://").replace("https://", "wss://")
         return if (secret.isNotEmpty()) {
             val separator = if ("?" in path) "&" else "?"
-            "$wsBase$path${separator}token=$secret"
+            "$wsBase$path${separator}token=${secret.encodeURLParameter()}"
         } else {
             "$wsBase$path"
         }
