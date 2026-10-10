@@ -336,7 +336,7 @@ object RootHelper {
     /**
      * 单次 su 把 root 写入的普通文件从 [srcBound] 拷回 [bound]。
      * 源和目标的祖先符号链接都拒绝，物理路径必须仍在对应根下；缺尾可以 mkdir，
-     * 但 mkdir、chown -h、cp -P、chcon 之前再查一次。chown 用 -h，避免跟随链接。
+     * 但 mkdir、chown -h、cp -P、chcon、mv 之前再查一次。chown 用 -h，避免跟随链接。
      * mtime 用 stat %y 的纳秒比较（toybox 的 %N 是长文件名）。相等则 cmp，内容不同才拷源；
      * 解析不出纳秒就失败，不用秒级 -ge/-gt。结果 chown 到 [uid]、chmod 0644，并把 SELinux
      * 标签改成与 bound 相同。从 bound 读出上下文字符串再 chcon：toybox 的 chcon 没有
@@ -629,9 +629,12 @@ object RootHelper {
           touch -r "${'$'}src" "${'$'}tmp" || fail=1
           # 只看这次标注的返回值。全局 fail 含 touch -r 和其它文件，不能拿来决定是否 mv。
           label_as_bound "${'$'}tmp" || { fail=1; rm -f "${'$'}tmp"; return 0; }
-          if [ -L "${'$'}dst" ] || [ -d "${'$'}dst" ]; then
+          # cp 到 mv 之间祖先可能被换成链接。这里的 mv 才会把文件写出 bound。
+          if [ -L "${'$'}dst" ] || [ -d "${'$'}dst" ] || ! guard "${'$'}bound" "${'$'}dst" || ! guard "${'$'}bound" "${'$'}tmp"; then
             fail=1
-            rm -f "${'$'}tmp"
+            if guard "${'$'}bound" "${'$'}tmp"; then
+              rm -f "${'$'}tmp"
+            fi
             return 0
           fi
           mv -f "${'$'}tmp" "${'$'}dst" || { fail=1; rm -f "${'$'}tmp"; return 0; }
