@@ -37,7 +37,6 @@ data class CoreFetchResult(
 @Serializable
 private data class TransformCheck(val valid: Boolean = false)
 
-
 class MishkaCoreError(message: String) : RuntimeException(message)
 
 object MishkaCoreBridge {

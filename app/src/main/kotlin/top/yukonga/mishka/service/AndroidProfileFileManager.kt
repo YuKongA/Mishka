@@ -69,11 +69,11 @@ class AndroidProfileFileManager(private val context: Context) : ProfileFileManag
         ProfileFileOps.writeImportedFile(context, uuid, relativePath, content)
     }
 
-    override fun deleteDirs(uuid: String) {
+    override suspend fun deleteDirs(uuid: String) {
         ProfileFileOps.deleteProfileDirs(context, uuid)
     }
 
-    override fun deleteOrphanDirs(knownUuids: Set<String>): List<String> {
+    override suspend fun deleteOrphanDirs(knownUuids: Set<String>): List<String> {
         return ProfileFileOps.deleteOrphanProfileDirs(context, knownUuids)
     }
 }

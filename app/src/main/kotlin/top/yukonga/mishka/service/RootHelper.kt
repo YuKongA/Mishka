@@ -332,4 +332,313 @@ object RootHelper {
             false
         }
     }
+
+    /**
+     * 单次 su 把 root 写入的普通文件从 [srcBound] 拷回 [bound]。
+     * 源和目标的祖先符号链接都拒绝，物理路径必须仍在对应根下；缺尾可以 mkdir，
+     * 但 mkdir、chown -h、cp -P、chcon、mv 之前再查一次。chown 用 -h，避免跟随链接。
+     * mtime 用 stat %y 的纳秒比较（toybox 的 %N 是长文件名）。相等则 cmp，内容不同才拷源；
+     * 解析不出纳秒就失败，不用秒级 -ge/-gt。结果 chown 到 [uid]、chmod 0644，并把 SELinux
+     * 标签改成与 bound 相同。从 bound 读出上下文字符串再 chcon：toybox 的 chcon 没有
+     * --reference；restorecon 不带 -D 会跳过 /data/data 仍返回成功，-D 也只会标成
+     * file_contexts 的 system_data_file，不是 installd 的 app_data_file。读回不一致就不发布。
+     * SELinux 关闭且读不到上下文时，DAC chown 即可。父目录 chown 或标签失败则不发布该文件，
+     * 不拦其它文件。chcon 失败仍读回：上下文已经一致就当成功，避免误伤已标好的目录。
+     * 保留源 mtime；mtime 没保住仍发布。任一文件失败返回 false，已成功的不回滚。
+     */
+    fun syncRegularFiles(uid: Int, srcBound: String, bound: String, pairs: List<Pair<String, String>>): Boolean {
+        if (pairs.isEmpty() || uid <= 0) return pairs.isEmpty()
+        if (bound.isEmpty() || srcBound.isEmpty()) return false
+        if (bound.any { it == '\n' || it == '\r' || it == '\u0000' }) return false
+        if (srcBound.any { it == '\n' || it == '\r' || it == '\u0000' }) return false
+        val script = buildString {
+            appendLine("uid=$uid")
+            appendLine("src_bound=${escapeShellSingleQuoted(srcBound)}")
+            appendLine("bound=${escapeShellSingleQuoted(bound)}")
+            appendLine("fail=0")
+            appendLine(syncRegularFile)
+            pairs.forEach { (src, dst) ->
+                if (src.any { it == '\n' || it == '\r' || it == '\u0000' } ||
+                    dst.any { it == '\n' || it == '\r' || it == '\u0000' }
+                ) {
+                    appendLine("fail=1")
+                    return@forEach
+                }
+                append("sync_one ")
+                append(escapeShellSingleQuoted(src))
+                append(' ')
+                append(escapeShellSingleQuoted(dst))
+                appendLine()
+            }
+            appendLine("exit ${'$'}fail")
+        }
+        return runRootScriptHeredoc(script, timeoutSeconds = 120) == 0
+    }
+
+    // POSIX sh 没有局部变量，辅助函数的临时名必须带前缀，否则会盖掉 sync_one 的 parent。
+    private val syncRegularFile = """
+        read_context() {
+          rc_path=${'$'}1
+          if [ -L "${'$'}rc_path" ]; then
+            return 1
+          fi
+          rc_ctx=${'$'}(stat -c %C "${'$'}rc_path" 2>/dev/null) || rc_ctx=
+          rc_ctx=${'$'}{rc_ctx%%[[:space:]]*}
+          case "${'$'}rc_ctx" in
+            ""|"?"|unlabeled|*[!A-Za-z0-9_:.,-]*) rc_ctx= ;;
+            *:*:*) ;;
+            *) rc_ctx= ;;
+          esac
+          if [ -z "${'$'}rc_ctx" ]; then
+            rc_line=${'$'}(ls -dZ "${'$'}rc_path" 2>/dev/null) || rc_line=
+            for rc_field in ${'$'}rc_line; do
+              case "${'$'}rc_field" in
+                *[!A-Za-z0-9_:.,-]*) continue ;;
+                *:*:*) rc_ctx=${'$'}rc_field; break ;;
+              esac
+            done
+          fi
+          case "${'$'}rc_ctx" in
+            *:*:*) printf '%s\n' "${'$'}rc_ctx" ;;
+            *) return 1 ;;
+          esac
+        }
+        selinux_off() {
+          se_mode=${'$'}(getenforce 2>/dev/null) || return 1
+          case "${'$'}se_mode" in
+            Disabled|disabled) return 0 ;;
+            *) return 1 ;;
+          esac
+        }
+        ensure_bound_ctx() {
+          if [ -n "${'$'}bound_ctx_state" ]; then
+            return 0
+          fi
+          if [ -L "${'$'}bound" ] || [ ! -d "${'$'}bound" ]; then
+            bound_ctx_state=bad
+            return 0
+          fi
+          bound_ctx=${'$'}(read_context "${'$'}bound") || bound_ctx=
+          if [ -n "${'$'}bound_ctx" ]; then
+            bound_ctx_state=ok
+          elif selinux_off; then
+            bound_ctx_state=off
+          else
+            bound_ctx_state=bad
+          fi
+        }
+        # 不写全局 fail。目录重标失败不能拦住其它文件；文件发布只看返回值。
+        label_as_bound() {
+          lb_target=${'$'}1
+          if [ -L "${'$'}lb_target" ]; then
+            return 1
+          fi
+          guard "${'$'}bound" "${'$'}lb_target" || return 1
+          ensure_bound_ctx
+          case "${'$'}bound_ctx_state" in
+            off) return 0 ;;
+            ok) ;;
+            *) return 1 ;;
+          esac
+          # chcon 失败也读回。已经是目标上下文时不要当成失败，否则已标好的目录会挡住回写。
+          chcon -h "${'$'}bound_ctx" "${'$'}lb_target" 2>/dev/null || true
+          lb_now=${'$'}(read_context "${'$'}lb_target") || return 1
+          [ "${'$'}lb_now" = "${'$'}bound_ctx" ]
+        }
+        # 返回非 0 只表示这个父目录 app 用不了。调用方放弃该文件，不写全局 fail。
+        own_parents() {
+          op_dir=${'$'}1
+          while [ "${'$'}op_dir" != "${'$'}bound" ]; do
+            case "${'$'}op_dir" in
+              "${'$'}bound"/*) ;;
+              *) return 1 ;;
+            esac
+            if [ -L "${'$'}op_dir" ] || [ ! -d "${'$'}op_dir" ]; then
+              return 1
+            fi
+            phys_inside "${'$'}bound" "${'$'}op_dir" || return 1
+            chown -h "${'$'}uid:${'$'}uid" "${'$'}op_dir" || return 1
+            label_as_bound "${'$'}op_dir" || return 1
+            op_dir=${'$'}(dirname "${'$'}op_dir")
+          done
+          return 0
+        }
+        reject_dots() {
+          rd_root=${'$'}1
+          rd_cur=${'$'}2
+          while [ "${'$'}rd_cur" != "${'$'}rd_root" ]; do
+            rd_base=${'$'}(basename "${'$'}rd_cur")
+            case "${'$'}rd_base" in
+              ""|.|..) return 1 ;;
+            esac
+            rd_parent=${'$'}(dirname "${'$'}rd_cur")
+            if [ "${'$'}rd_parent" = "${'$'}rd_cur" ]; then
+              return 1
+            fi
+            rd_cur=${'$'}rd_parent
+          done
+          return 0
+        }
+        reject_links() {
+          rl_root=${'$'}1
+          rl_cur=${'$'}2
+          while :; do
+            if [ -L "${'$'}rl_cur" ]; then
+              return 1
+            fi
+            if [ "${'$'}rl_cur" = "${'$'}rl_root" ]; then
+              return 0
+            fi
+            rl_parent=${'$'}(dirname "${'$'}rl_cur")
+            if [ "${'$'}rl_parent" = "${'$'}rl_cur" ]; then
+              return 1
+            fi
+            rl_cur=${'$'}rl_parent
+          done
+        }
+        phys_inside() {
+          pi_root=${'$'}1
+          pi_cur=${'$'}2
+          pi_root_real=${'$'}(readlink -f "${'$'}pi_root") || return 1
+          while [ ! -e "${'$'}pi_cur" ] && [ ! -L "${'$'}pi_cur" ]; do
+            pi_parent=${'$'}(dirname "${'$'}pi_cur")
+            if [ "${'$'}pi_parent" = "${'$'}pi_cur" ]; then
+              return 1
+            fi
+            pi_cur=${'$'}pi_parent
+          done
+          if [ -L "${'$'}pi_cur" ]; then
+            return 1
+          fi
+          pi_real=${'$'}(readlink -f "${'$'}pi_cur") || return 1
+          case "${'$'}pi_real" in
+            "${'$'}pi_root_real"|"${'$'}pi_root_real"/*) return 0 ;;
+            *) return 1 ;;
+          esac
+        }
+        guard() {
+          g_root=${'$'}1
+          g_path=${'$'}2
+          case "${'$'}g_path" in
+            "${'$'}g_root"|"${'$'}g_root"/*) ;;
+            *) return 1 ;;
+          esac
+          reject_dots "${'$'}g_root" "${'$'}g_path" || return 1
+          reject_links "${'$'}g_root" "${'$'}g_path" || return 1
+          phys_inside "${'$'}g_root" "${'$'}g_path" || return 1
+        }
+        parse_mtime() {
+          mt_stamp=${'$'}1
+          case "${'$'}mt_stamp" in
+            [0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]" "[0-9][0-9]:[0-9][0-9]:[0-9][0-9].[0-9]*) ;;
+            *) return 1 ;;
+          esac
+          _sec=${'$'}{mt_stamp%%.*}
+          mt_rest=${'$'}{mt_stamp#*.}
+          _nsec=${'$'}{mt_rest%%[!0-9]*}
+          case "${'$'}_nsec" in
+            [0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]) ;;
+            *) return 1 ;;
+          esac
+          return 0
+        }
+        dst_not_older() {
+          mt_src=${'$'}1
+          mt_dst=${'$'}2
+          src_y=${'$'}(stat -c %y "${'$'}mt_src" 2>/dev/null) || return 2
+          dst_y=${'$'}(stat -c %y "${'$'}mt_dst" 2>/dev/null) || return 2
+          parse_mtime "${'$'}src_y" || return 2
+          src_sec=${'$'}_sec
+          src_nsec=${'$'}_nsec
+          parse_mtime "${'$'}dst_y" || return 2
+          dst_sec=${'$'}_sec
+          dst_nsec=${'$'}_nsec
+          if [ "${'$'}dst_sec" = "${'$'}src_sec" ] && [ "${'$'}dst_nsec" = "${'$'}src_nsec" ]; then
+            cmp -s "${'$'}mt_src" "${'$'}mt_dst"
+            cmp_rc=${'$'}?
+            if [ "${'$'}cmp_rc" -eq 0 ]; then
+              return 0
+            fi
+            if [ "${'$'}cmp_rc" -eq 1 ]; then
+              return 1
+            fi
+            return 2
+          fi
+          if [ "${'$'}dst_sec" != "${'$'}src_sec" ]; then
+            first=${'$'}(printf '%s\n%s\n' "${'$'}dst_sec" "${'$'}src_sec" | LC_ALL=C sort | head -n 1)
+            if [ "${'$'}first" = "${'$'}dst_sec" ]; then
+              return 1
+            fi
+            return 0
+          fi
+          if [ "${'$'}dst_nsec" -gt "${'$'}src_nsec" ]; then
+            return 0
+          fi
+          return 1
+        }
+        sync_one() {
+          src=${'$'}1
+          dst=${'$'}2
+          case "${'$'}dst" in
+            "${'$'}bound"/*) ;;
+            *) fail=1; return 0 ;;
+          esac
+          case "${'$'}src" in
+            "${'$'}src_bound"/*) ;;
+            *) fail=1; return 0 ;;
+          esac
+          if [ -L "${'$'}src" ] || [ ! -f "${'$'}src" ] || [ -L "${'$'}dst" ] || [ -d "${'$'}dst" ]; then
+            return 0
+          fi
+          if [ -f "${'$'}dst" ]; then
+            dst_not_older "${'$'}src" "${'$'}dst"
+            rc=${'$'}?
+            if [ "${'$'}rc" -eq 0 ]; then
+              return 0
+            fi
+            if [ "${'$'}rc" -eq 2 ]; then
+              fail=1
+              return 0
+            fi
+          fi
+          guard "${'$'}src_bound" "${'$'}src" || { fail=1; return 0; }
+          guard "${'$'}bound" "${'$'}dst" || { fail=1; return 0; }
+          parent=${'$'}(dirname "${'$'}dst")
+          guard "${'$'}bound" "${'$'}parent" || { fail=1; return 0; }
+          mkdir -p "${'$'}parent" || { fail=1; return 0; }
+          guard "${'$'}bound" "${'$'}parent" || { fail=1; return 0; }
+          own_parents "${'$'}parent" || { fail=1; return 0; }
+          if [ -L "${'$'}src" ] || [ ! -f "${'$'}src" ] || ! guard "${'$'}src_bound" "${'$'}src"; then
+            fail=1
+            return 0
+          fi
+          if [ -L "${'$'}dst" ] || [ -d "${'$'}dst" ] || ! guard "${'$'}bound" "${'$'}dst"; then
+            fail=1
+            return 0
+          fi
+          tmp="${'$'}dst.tmp.${'$'}${'$'}"
+          rm -f "${'$'}tmp"
+          cp -P "${'$'}src" "${'$'}tmp" || { fail=1; rm -f "${'$'}tmp"; return 0; }
+          if [ -L "${'$'}tmp" ]; then
+            fail=1
+            rm -f "${'$'}tmp"
+            return 0
+          fi
+          chown -h "${'$'}uid:${'$'}uid" "${'$'}tmp" || { fail=1; rm -f "${'$'}tmp"; return 0; }
+          chmod 0644 "${'$'}tmp" || { fail=1; rm -f "${'$'}tmp"; return 0; }
+          touch -r "${'$'}src" "${'$'}tmp" || fail=1
+          # 只看这次标注的返回值。全局 fail 含 touch -r 和其它文件，不能拿来决定是否 mv。
+          label_as_bound "${'$'}tmp" || { fail=1; rm -f "${'$'}tmp"; return 0; }
+          # cp 到 mv 之间祖先可能被换成链接。这里的 mv 才会把文件写出 bound。
+          if [ -L "${'$'}dst" ] || [ -d "${'$'}dst" ] || ! guard "${'$'}bound" "${'$'}dst" || ! guard "${'$'}bound" "${'$'}tmp"; then
+            fail=1
+            if guard "${'$'}bound" "${'$'}tmp"; then
+              rm -f "${'$'}tmp"
+            fi
+            return 0
+          fi
+          mv -f "${'$'}tmp" "${'$'}dst" || { fail=1; rm -f "${'$'}tmp"; return 0; }
+        }
+    """.trimIndent()
+
 }

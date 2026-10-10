@@ -1,9 +1,12 @@
 package top.yukonga.mishka.service
 
 import android.content.Context
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
+import java.nio.file.Files
 
 /**
  * 订阅文件操作。三阶段目录：pending → processing → imported。
@@ -58,6 +61,15 @@ object ProfileFileOps {
      */
     fun getRuntimeDir(context: Context, uuid: String): File =
         File(getWorkDir(context), "runtime/$uuid")
+
+    /** 不创建目录。回写缓存时不能把已删除的订阅目录又 mkdir 出来。 */
+    fun peekImportedDir(context: Context, uuid: String): File =
+        File(getWorkDir(context), "imported/$uuid")
+
+    fun listRuntimeUuids(context: Context): List<String> {
+        val runtime = File(getWorkDir(context), "runtime")
+        return runtime.listFiles()?.filter { it.isDirectory }?.map { it.name }.orEmpty()
+    }
 
     // === pending 写入 ===
 
@@ -173,19 +185,19 @@ object ProfileFileOps {
 
     // === 删除与复制 ===
 
-    fun deleteProfileDirs(context: Context, uuid: String) {
+    /**
+     * 删除 imported/、pending/ 与 ROOT runtime/。
+     * 调用方可能在主线程协程里：等沙箱锁和 rm 都不能占住那个线程。
+     */
+    suspend fun deleteProfileDirs(context: Context, uuid: String) = withContext(Dispatchers.IO) {
         val imported = File(getWorkDir(context), "imported/$uuid")
         val pending = File(getWorkDir(context), "pending/$uuid")
-        val runtime = File(getWorkDir(context), "runtime/$uuid")
         if (imported.exists() && !imported.deleteRecursively()) {
             RootHelper.rmRfAsRoot(imported.absolutePath)
         }
         if (pending.exists()) pending.deleteRecursively()
-        // runtime/{uuid} 通常在 ROOT 停止时已被 cleanupRootRuntime 清掉；
-        // 此处是兜底：若 app 崩溃未走正常 stop 路径，会有 root:root 残留，Kotlin 删不掉。
-        if (runtime.exists() && !runtime.deleteRecursively()) {
-            RootHelper.rmRfAsRoot(runtime.absolutePath)
-        }
+        // 与 prepare/release 同一把锁。直接 rm -rf 会在新沙箱建好后补删。
+        RootRuntimeCache.discard(context, uuid)
     }
 
     /**
@@ -194,7 +206,7 @@ object ProfileFileOps {
      * 删除订阅是「先删 DB 行 → 再删目录」两步，中间进程死亡就留下永远无人认领的目录；
      * 只有 DB 才知道哪些还算数，故按现存 uuid 反扫。
      */
-    fun deleteOrphanProfileDirs(context: Context, knownUuids: Set<String>): List<String> {
+    suspend fun deleteOrphanProfileDirs(context: Context, knownUuids: Set<String>): List<String> {
         val workDir = getWorkDir(context)
         val orphans = listOf("imported", "pending")
             .flatMap { sub -> File(workDir, sub).listFiles()?.filter { it.isDirectory }.orEmpty() }
@@ -209,7 +221,8 @@ object ProfileFileOps {
 
     /**
      * ROOT 启动前准备：清残留 → 从 imported/{uuid}/ 复制一份到 runtime/{uuid}/（app UID 写入）→ 重建 geodata 链接。
-     * imported/ 里已包含 -prefetch 落盘的 provider 文件，copy 一并带过去，mihomo 启动可跳过 HTTP 拉取。
+     * 复制保留 mtime：Fetcher.Initial 用它和 interval 比较，重置成「现在」会让 ROOT 每次都显得刚更新过。
+     * 调用方必须是 [RootRuntimeCache.prepare]，由它持沙箱锁并递增代次。
      */
     fun prepareRootRuntime(context: Context, uuid: String): File {
         val imported = File(getWorkDir(context), "imported/$uuid")
@@ -223,9 +236,19 @@ object ProfileFileOps {
         runtime.mkdirs()
         if (imported.exists()) {
             imported.copyRecursively(runtime, overwrite = true)
+            preserveCopiedMtimes(imported, runtime)
         }
         ensureGeodataLinks(context, runtime)
         return runtime
+    }
+
+    private fun preserveCopiedMtimes(source: File, dest: File) {
+        source.walkTopDown().forEach { file ->
+            if (Files.isSymbolicLink(file.toPath()) || !file.isFile) return@forEach
+            val copied = File(dest, file.relativeTo(source).path)
+            if (Files.isSymbolicLink(copied.toPath()) || !copied.isFile) return@forEach
+            copied.setLastModified(file.lastModified())
+        }
     }
 
     /**

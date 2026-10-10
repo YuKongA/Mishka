@@ -44,8 +44,12 @@ interface ProfileFileManager {
     fun listImportedFiles(uuid: String): List<String>
     fun readImportedFile(uuid: String, relativePath: String): String?
     fun writeImportedFile(uuid: String, relativePath: String, content: String)
-    fun deleteDirs(uuid: String)
+    /**
+     * 删除 imported/、pending/ 与 ROOT runtime/。
+     * 会挂起等待沙箱锁，不阻塞调用线程。
+     */
+    suspend fun deleteDirs(uuid: String)
 
     /** 删除 imported/ 与 pending/ 下不属于 [knownUuids] 的目录（启动时清孤儿），返回被删的 uuid。 */
-    fun deleteOrphanDirs(knownUuids: Set<String>): List<String>
+    suspend fun deleteOrphanDirs(knownUuids: Set<String>): List<String>
 }
