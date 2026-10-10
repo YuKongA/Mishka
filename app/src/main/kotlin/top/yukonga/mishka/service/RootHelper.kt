@@ -342,7 +342,8 @@ object RootHelper {
      * 标签改成与 bound 相同。从 bound 读出上下文字符串再 chcon：toybox 的 chcon 没有
      * --reference；restorecon 不带 -D 会跳过 /data/data 仍返回成功，-D 也只会标成
      * file_contexts 的 system_data_file，不是 installd 的 app_data_file。读回不一致就不发布。
-     * SELinux 关闭且读不到上下文时，DAC chown 即可。目录重标失败不计入 fail。
+     * SELinux 关闭且读不到上下文时，DAC chown 即可。父目录 chown 或标签失败则不发布该文件，
+     * 不拦其它文件。chcon 失败仍读回：上下文已经一致就当成功，避免误伤已标好的目录。
      * 保留源 mtime；mtime 没保住仍发布。任一文件失败返回 false，已成功的不回滚。
      */
     fun syncRegularFiles(uid: Int, srcBound: String, bound: String, pairs: List<Pair<String, String>>): Boolean {
@@ -439,26 +440,28 @@ object RootHelper {
             ok) ;;
             *) return 1 ;;
           esac
-          chcon -h "${'$'}bound_ctx" "${'$'}lb_target" 2>/dev/null || return 1
+          # chcon 失败也读回。已经是目标上下文时不要当成失败，否则已标好的目录会挡住回写。
+          chcon -h "${'$'}bound_ctx" "${'$'}lb_target" 2>/dev/null || true
           lb_now=${'$'}(read_context "${'$'}lb_target") || return 1
           [ "${'$'}lb_now" = "${'$'}bound_ctx" ]
         }
+        # 返回非 0 只表示这个父目录 app 用不了。调用方放弃该文件，不写全局 fail。
         own_parents() {
           op_dir=${'$'}1
           while [ "${'$'}op_dir" != "${'$'}bound" ]; do
             case "${'$'}op_dir" in
               "${'$'}bound"/*) ;;
-              *) fail=1; return 0 ;;
+              *) return 1 ;;
             esac
             if [ -L "${'$'}op_dir" ] || [ ! -d "${'$'}op_dir" ]; then
-              fail=1
-              return 0
+              return 1
             fi
-            phys_inside "${'$'}bound" "${'$'}op_dir" || { fail=1; return 0; }
-            chown -h "${'$'}uid:${'$'}uid" "${'$'}op_dir" || { fail=1; return 0; }
-            label_as_bound "${'$'}op_dir" || true
+            phys_inside "${'$'}bound" "${'$'}op_dir" || return 1
+            chown -h "${'$'}uid:${'$'}uid" "${'$'}op_dir" || return 1
+            label_as_bound "${'$'}op_dir" || return 1
             op_dir=${'$'}(dirname "${'$'}op_dir")
           done
+          return 0
         }
         reject_dots() {
           rd_root=${'$'}1
@@ -604,7 +607,7 @@ object RootHelper {
           guard "${'$'}bound" "${'$'}parent" || { fail=1; return 0; }
           mkdir -p "${'$'}parent" || { fail=1; return 0; }
           guard "${'$'}bound" "${'$'}parent" || { fail=1; return 0; }
-          own_parents "${'$'}parent"
+          own_parents "${'$'}parent" || { fail=1; return 0; }
           if [ -L "${'$'}src" ] || [ ! -f "${'$'}src" ] || ! guard "${'$'}src_bound" "${'$'}src"; then
             fail=1
             return 0
@@ -624,7 +627,7 @@ object RootHelper {
           chown -h "${'$'}uid:${'$'}uid" "${'$'}tmp" || { fail=1; rm -f "${'$'}tmp"; return 0; }
           chmod 0644 "${'$'}tmp" || { fail=1; rm -f "${'$'}tmp"; return 0; }
           touch -r "${'$'}src" "${'$'}tmp" || fail=1
-          # 只看这次标注的返回值。目录重标失败不写 fail，全局 fail 含 touch -r 和其它文件。
+          # 只看这次标注的返回值。全局 fail 含 touch -r 和其它文件，不能拿来决定是否 mv。
           label_as_bound "${'$'}tmp" || { fail=1; rm -f "${'$'}tmp"; return 0; }
           if [ -L "${'$'}dst" ] || [ -d "${'$'}dst" ]; then
             fail=1
