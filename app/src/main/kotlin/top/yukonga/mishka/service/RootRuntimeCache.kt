@@ -211,16 +211,20 @@ private fun isRuntimeUuid(uuid: String): Boolean {
     return uuid.none { it == '/' || it == '\\' || it == '\u0000' || it == '\n' || it == '\r' }
 }
 
+/**
+ * 排除工作目录根上要保护的相对路径，不是 basename。
+ * `rules/config.yaml` 是合法 provider 缓存；按文件名排除会让 ROOT 停机后 imported 留着旧文件。
+ */
 internal fun isProviderCacheRel(path: String): Boolean {
     if (path.isEmpty() || path.length > 4096) return false
     if (path.any { it == '\\' || it == '\u0000' || it == '\n' || it == '\r' }) return false
     if (path.startsWith("/")) return false
     val parts = path.split('/')
     if (parts.any { it.isEmpty() || it == "." || it == ".." }) return false
-    return parts.last() !in PROVIDER_CACHE_DENY_BASES
+    return path !in PROVIDER_CACHE_DENY_RELS
 }
 
-private val PROVIDER_CACHE_DENY_BASES = setOf(
+private val PROVIDER_CACHE_DENY_RELS = setOf(
     ".mishka-provider-cache.json",
     "config.yaml",
     "mihomo.log",
