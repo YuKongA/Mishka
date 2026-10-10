@@ -338,8 +338,11 @@ object RootHelper {
      * 源和目标的祖先符号链接都拒绝，物理路径必须仍在对应根下；缺尾可以 mkdir，
      * 但 mkdir、chown -h、cp -P、chcon 之前再查一次。chown 用 -h，避免跟随链接。
      * mtime 用 stat %y 的纳秒比较（toybox 的 %N 是长文件名）。相等则 cmp，内容不同才拷源；
-     * 解析不出纳秒就失败，不用秒级 -ge/-gt。结果 chown 到 [uid]、chmod 0644，并用 bound 的
-     * SELinux 标签标记。标签没打上就不发布该文件，避免 app 读不了的替换盖掉旧缓存。
+     * 解析不出纳秒就失败，不用秒级 -ge/-gt。结果 chown 到 [uid]、chmod 0644，并把 SELinux
+     * 标签改成与 bound 相同。从 bound 读出上下文字符串再 chcon：toybox 的 chcon 没有
+     * --reference；restorecon 不带 -D 会跳过 /data/data 仍返回成功，-D 也只会标成
+     * file_contexts 的 system_data_file，不是 installd 的 app_data_file。读回不一致就不发布。
+     * SELinux 关闭且读不到上下文时，DAC chown 即可。目录重标失败不计入 fail。
      * 保留源 mtime；mtime 没保住仍发布。任一文件失败返回 false，已成功的不回滚。
      */
     fun syncRegularFiles(uid: Int, srcBound: String, bound: String, pairs: List<Pair<String, String>>): Boolean {
@@ -373,22 +376,72 @@ object RootHelper {
 
     // POSIX sh 没有局部变量，辅助函数的临时名必须带前缀，否则会盖掉 sync_one 的 parent。
     private val syncRegularFile = """
+        read_context() {
+          rc_path=${'$'}1
+          if [ -L "${'$'}rc_path" ]; then
+            return 1
+          fi
+          rc_ctx=${'$'}(stat -c %C "${'$'}rc_path" 2>/dev/null) || rc_ctx=
+          rc_ctx=${'$'}{rc_ctx%%[[:space:]]*}
+          case "${'$'}rc_ctx" in
+            ""|"?"|unlabeled|*[!A-Za-z0-9_:.,-]*) rc_ctx= ;;
+            *:*:*) ;;
+            *) rc_ctx= ;;
+          esac
+          if [ -z "${'$'}rc_ctx" ]; then
+            rc_line=${'$'}(ls -dZ "${'$'}rc_path" 2>/dev/null) || rc_line=
+            for rc_field in ${'$'}rc_line; do
+              case "${'$'}rc_field" in
+                *[!A-Za-z0-9_:.,-]*) continue ;;
+                *:*:*) rc_ctx=${'$'}rc_field; break ;;
+              esac
+            done
+          fi
+          case "${'$'}rc_ctx" in
+            *:*:*) printf '%s\n' "${'$'}rc_ctx" ;;
+            *) return 1 ;;
+          esac
+        }
+        selinux_off() {
+          se_mode=${'$'}(getenforce 2>/dev/null) || return 1
+          case "${'$'}se_mode" in
+            Disabled|disabled) return 0 ;;
+            *) return 1 ;;
+          esac
+        }
+        ensure_bound_ctx() {
+          if [ -n "${'$'}bound_ctx_state" ]; then
+            return 0
+          fi
+          if [ -L "${'$'}bound" ] || [ ! -d "${'$'}bound" ]; then
+            bound_ctx_state=bad
+            return 0
+          fi
+          bound_ctx=${'$'}(read_context "${'$'}bound") || bound_ctx=
+          if [ -n "${'$'}bound_ctx" ]; then
+            bound_ctx_state=ok
+          elif selinux_off; then
+            bound_ctx_state=off
+          else
+            bound_ctx_state=bad
+          fi
+        }
+        # 不写全局 fail。目录重标失败不能拦住其它文件；文件发布只看返回值。
         label_as_bound() {
           lb_target=${'$'}1
           if [ -L "${'$'}lb_target" ]; then
-            fail=1
             return 1
           fi
-          guard "${'$'}bound" "${'$'}lb_target" || { fail=1; return 1; }
-          if chcon --reference="${'$'}bound" "${'$'}lb_target" 2>/dev/null; then
-            return 0
-          fi
-          if command -v restorecon >/dev/null 2>&1; then
-            restorecon -F "${'$'}lb_target" 2>/dev/null && return 0
-            restorecon "${'$'}lb_target" 2>/dev/null && return 0
-          fi
-          fail=1
-          return 1
+          guard "${'$'}bound" "${'$'}lb_target" || return 1
+          ensure_bound_ctx
+          case "${'$'}bound_ctx_state" in
+            off) return 0 ;;
+            ok) ;;
+            *) return 1 ;;
+          esac
+          chcon -h "${'$'}bound_ctx" "${'$'}lb_target" 2>/dev/null || return 1
+          lb_now=${'$'}(read_context "${'$'}lb_target") || return 1
+          [ "${'$'}lb_now" = "${'$'}bound_ctx" ]
         }
         own_parents() {
           op_dir=${'$'}1
@@ -570,9 +623,9 @@ object RootHelper {
           fi
           chown -h "${'$'}uid:${'$'}uid" "${'$'}tmp" || { fail=1; rm -f "${'$'}tmp"; return 0; }
           chmod 0644 "${'$'}tmp" || { fail=1; rm -f "${'$'}tmp"; return 0; }
-          # 只看这次标注。全局 fail 含其它文件和 touch -r，不能拿来决定是否 mv。
-          label_as_bound "${'$'}tmp" || { fail=1; rm -f "${'$'}tmp"; return 0; }
           touch -r "${'$'}src" "${'$'}tmp" || fail=1
+          # 只看这次标注的返回值。目录重标失败不写 fail，全局 fail 含 touch -r 和其它文件。
+          label_as_bound "${'$'}tmp" || { fail=1; rm -f "${'$'}tmp"; return 0; }
           if [ -L "${'$'}dst" ] || [ -d "${'$'}dst" ]; then
             fail=1
             rm -f "${'$'}tmp"
