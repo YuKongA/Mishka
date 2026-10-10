@@ -1,6 +1,8 @@
 package top.yukonga.mishka.service
 
 import android.content.Context
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
@@ -183,7 +185,11 @@ object ProfileFileOps {
 
     // === 删除与复制 ===
 
-    fun deleteProfileDirs(context: Context, uuid: String) {
+    /**
+     * 删除 imported/、pending/ 与 ROOT runtime/。
+     * 调用方可能在主线程协程里：等沙箱锁和 rm 都不能占住那个线程。
+     */
+    suspend fun deleteProfileDirs(context: Context, uuid: String) = withContext(Dispatchers.IO) {
         val imported = File(getWorkDir(context), "imported/$uuid")
         val pending = File(getWorkDir(context), "pending/$uuid")
         if (imported.exists() && !imported.deleteRecursively()) {
@@ -200,7 +206,7 @@ object ProfileFileOps {
      * 删除订阅是「先删 DB 行 → 再删目录」两步，中间进程死亡就留下永远无人认领的目录；
      * 只有 DB 才知道哪些还算数，故按现存 uuid 反扫。
      */
-    fun deleteOrphanProfileDirs(context: Context, knownUuids: Set<String>): List<String> {
+    suspend fun deleteOrphanProfileDirs(context: Context, knownUuids: Set<String>): List<String> {
         val workDir = getWorkDir(context)
         val orphans = listOf("imported", "pending")
             .flatMap { sub -> File(workDir, sub).listFiles()?.filter { it.isDirectory }.orEmpty() }

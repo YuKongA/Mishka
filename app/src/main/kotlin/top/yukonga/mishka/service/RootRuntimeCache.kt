@@ -5,7 +5,6 @@ import android.os.Process
 import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -49,11 +48,12 @@ internal object RootRuntimeCache {
 
     /**
      * 删除订阅时清 runtime/。与 prepare 同一把锁，并废掉旧代次。
-     * 调用方有的持着 processLock、有的在普通函数里，所以这里阻塞等锁；锁内不挂起。
+     * 必须挂起等锁：删除从主线程协程进来，回写持锁期间有最长 120s 的 shell。
+     * 锁内不挂起，阻塞的 rm 放到 IO。
      */
-    fun discard(context: Context, uuid: String) {
+    suspend fun discard(context: Context, uuid: String) {
         if (!isRuntimeUuid(uuid)) return
-        runBlocking {
+        withContext(Dispatchers.IO) {
             sandboxLock.withLock {
                 epochs[uuid] = epochOf(uuid) + 1L
                 ProfileFileOps.cleanupRootRuntime(context, uuid)
