@@ -5,6 +5,8 @@ import android.os.Process
 import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -22,8 +24,8 @@ import java.util.concurrent.ConcurrentHashMap
  * 与 VPN 一样按工作目录里实际落下的文件回写，不重跑覆写脚本，也不删除 imported/ 里不再引用的旧文件。
  * config.yaml 变了就整单跳过，避免把旧沙箱写进运行期间的新提交。回写失败仍删除沙箱。
  *
- * 回写、删除、prepare 共用 [sandboxLock]。清理只认启动时记下的代次：监控的 release 在
- * NonCancellable 里，cancel 停不掉，代次已经被新 prepare 或删除订阅取代就不再 rm -rf。
+ * 回写、删除、prepare 共用 [sandboxLock]。等锁可取消，实际回写与清理在 NonCancellable 里。
+ * 清理只认启动时记下的代次，代次已经被新 prepare 或删除订阅取代就不再 rm -rf。
  * 锁顺序是 processLock → sandboxLock → profileLock，别反着取。
  */
 internal object RootRuntimeCache {
@@ -67,18 +69,21 @@ internal object RootRuntimeCache {
         uuid: String,
         repository: SubscriptionRepositoryImpl,
         ownedEpoch: Long,
-    ): Boolean = withContext(NonCancellable) {
-        if (!isRuntimeUuid(uuid)) return@withContext false
-        ProfileProcessor.withProcessLock {
+    ): Boolean {
+        if (!isRuntimeUuid(uuid)) return false
+        return ProfileProcessor.withProcessLock {
             sandboxLock.withLock {
+                currentCoroutineContext().ensureActive()
                 if (epochOf(uuid) != ownedEpoch) {
                     Log.i(TAG, "skip stale runtime cleanup for $uuid")
                     return@withLock false
                 }
-                flushQuietly(context, uuid, repository)
-                ProfileFileOps.cleanupRootRuntime(context, uuid)
-                epochs[uuid] = ownedEpoch + 1L
-                true
+                withContext(NonCancellable) {
+                    flushQuietly(context, uuid, repository)
+                    ProfileFileOps.cleanupRootRuntime(context, uuid)
+                    epochs[uuid] = ownedEpoch + 1L
+                    true
+                }
             }
         }
     }
@@ -86,9 +91,10 @@ internal object RootRuntimeCache {
     suspend fun releaseAll(
         context: Context,
         repository: SubscriptionRepositoryImpl,
-    ) = withContext(NonCancellable) {
-        ProfileProcessor.withProcessLock {
-            sandboxLock.withLock {
+    ) = ProfileProcessor.withProcessLock {
+        sandboxLock.withLock {
+            currentCoroutineContext().ensureActive()
+            withContext(NonCancellable) {
                 val uuids = ProfileFileOps.listRuntimeUuids(context).filter { isRuntimeUuid(it) }
                 for (uuid in uuids) {
                     flushQuietly(context, uuid, repository)
@@ -137,12 +143,19 @@ internal object RootRuntimeCache {
                 }
                 val pairs = cachePairs(runtime, imported, providerCacheRels(runtime))
                 if (pairs.isEmpty()) return@withProfileLock
-                val copied = RootHelper.syncRegularFiles(
-                    Process.myUid(),
-                    runtime.absolutePath,
-                    imported.absolutePath,
-                    pairs,
-                )
+                // updatedAt 取订阅根目录的 mtime；缓存文件的创建和 rename 不能冒充订阅更新。
+                val importedPath = imported.toPath()
+                val modifiedTime = Files.getLastModifiedTime(importedPath, LinkOption.NOFOLLOW_LINKS)
+                val copied = try {
+                    RootHelper.syncRegularFiles(
+                        Process.myUid(),
+                        runtime.absolutePath,
+                        imported.absolutePath,
+                        pairs,
+                    )
+                } finally {
+                    Files.setLastModifiedTime(importedPath, modifiedTime)
+                }
                 if (!copied) {
                     Log.w(TAG, "provider cache sync incomplete for $uuid (${pairs.size} files)")
                 } else {
