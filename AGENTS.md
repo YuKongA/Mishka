@@ -177,7 +177,7 @@ CMake `dependsOn(buildMihomo)`，产两个轻量件链 libmihomo.so（IMPORTED +
 
 **Mishka 自身包名必须绕过 TUN/VPN**：`ProcessBuilder` 子进程 HTTP 被代理捕获会永久阻塞。ROOT 三种 AppProxyMode 都把 `packageName` 从 include 剔除或塞进 exclude；VPN `AllowSelected` 分支先过滤 self 再 addAllowed，过滤后空列表退化到 `addDisallowedApplication(self)`。
 
-**协程锁规则**：`kotlinx.coroutines.sync.Mutex` **不可重入**。`updateImported`/`commitPending`/`queryImported`/`queryPending` 被 `ProfileProcessor` 在 `withProfileLock{}` 内调用，**不能自己加锁**；`create`/`patch`/`release`/`delete` 直接被 ViewModel 调用，**保留自身锁**。锁顺序 processLock → profileLock。commit、恢复与 ROOT 缓存回写都按这个顺序嵌套，锁内不得再调会重入这两把锁的函数。
+**协程锁规则**：`kotlinx.coroutines.sync.Mutex` **不可重入**。`updateImported`/`commitPending`/`queryImported`/`queryPending` 被 `ProfileProcessor` 在 `withProfileLock{}` 内调用，**不能自己加锁**；`create`/`patch`/`release`/`delete` 直接被 ViewModel 调用，**保留自身锁**。锁顺序 processLock → profileLock；ROOT 缓存回写在两者之间还夹一把 `RootRuntimeCache` 的沙箱锁（processLock → 沙箱锁 → profileLock）。commit、恢复与 ROOT 缓存回写都按这个顺序嵌套，锁内不得再调会重入这些锁的函数。
 
 **processing/ 单例目录必须进程级串行**：`processing/` 是进程内单例沙箱（路径不带 uuid），`prepareProcessing` 每次清空后重填、`commitProcessingToImported(uuid)` 再换入 imported/。因此 `ProfileProcessor.processLock` 必须是 **companion 进程级** Mutex——前台 `SubscriptionViewModel.processor` 与后台 `ProfileWorker.processor`（每个 `ACTION_UPDATE_PROFILE` 都新建）是不同实例；锁若实例级，两个并发 update 会交错清空同一 `processing/`，把 B 下载的 config 提交进 `imported/A/`，造成「界面显示订阅 A、点击启动实际运行 B」的偶发 Bug。启动清理走 `ProfileProcessor.cleanupResidual()`（持同一把锁），不能直接 `ProfileFileOps.cleanupProcessing`；它同时按 DB 现存 uuid 反扫 `imported/`、`pending/` 删孤儿目录（删除订阅是「先删 DB 行 → 再删目录」两步，中间进程死亡会留下无人认领的目录），顺序必须排在 `cleanupProcessing` 之后——后者会把 `commit.old.{uuid}` 还原回 imported/。
 
