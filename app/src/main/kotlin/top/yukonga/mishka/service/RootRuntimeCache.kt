@@ -25,7 +25,9 @@ import java.util.concurrent.ConcurrentHashMap
  * config.yaml 变了就整单跳过，避免把旧沙箱写进运行期间的新提交。回写失败仍删除沙箱。
  *
  * 回写、删除、prepare 共用 [sandboxLock]。等锁可取消，实际回写与清理在 NonCancellable 里。
- * 清理只认启动时记下的代次，代次已经被新 prepare 或删除订阅取代就不再 rm -rf。
+ * 等锁可取消是为了让 stop/restart 不必等下载；进程已死后的调用必须放在 Service
+ * onDestroy 取消不了的 scope 里，否则这次回写会丢。清理只认启动时记下的代次，
+ * 代次已经被新 prepare 或删除订阅取代就不再 rm -rf。
  * 锁顺序是 processLock → sandboxLock → profileLock，别反着取。
  */
 internal object RootRuntimeCache {

@@ -16,6 +16,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.koin.android.ext.android.inject
+import java.util.concurrent.atomic.AtomicInteger
 import top.yukonga.mishka.MishkaApplication
 import top.yukonga.mishka.R
 import top.yukonga.mishka.data.repository.OverrideJsonStore
@@ -89,6 +90,19 @@ class MishkaRootService : Service() {
     @Volatile
     private var startJobAttachOnly = false
 
+    // onDestroy 不取消。进程已死后的回写放这里，等 processLock 时不会被 scope.cancel() 丢掉。
+    private val cleanupScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val monitorLock = Any()
+    private val monitorGeneration = AtomicInteger(0)
+
+    @Volatile
+    private var monitorCleanup: Job? = null
+
+    @Volatile
+    private var destroyed = false
+
+    private var createdSerial = 0
+
     // 当前正在运行的 submode；由 onStartCommand 的 EXTRA_SUBMODE 设定
     @Volatile
     private var currentSubmode: Submode = Submode.Tun
@@ -96,6 +110,7 @@ class MishkaRootService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onCreate() {
+        createdSerial = bumpInstanceSerial()
         super.onCreate()
         NotificationHelper.createChannels(this)
         try {
@@ -309,9 +324,9 @@ class MishkaRootService : Service() {
             // 2. 清理残留进程（上次的进程已失效，确保干净启动）
             // 先停自身 runner（Service 实例被复用时可能仍持有旧状态），再 pkill 孤儿进程
             // 同时清理 TUN 接口防止下次启动 sing-tun EEXIST（silent failure 源头）
-            // 监控若已离开 delay()，cancel 打断不了读日志，更停不掉 NonCancellable 的 release。
+            // 监控若已离开 delay()，cancel 打断不了读日志，更停不掉已进入 NonCancellable 的回写。
             // 等它收敛后再 prepare，避免它随后 rm -rf 掉新沙箱，或 stopSelf 掉这次启动。
-            supersedeMonitor()?.join()
+            joinSuperseded(supersedeMonitor())
             if (runner.isRunning) {
                 runner.stop()
             }
@@ -531,47 +546,83 @@ class MishkaRootService : Service() {
      */
     private suspend fun startProcessMonitor(workDir: File, subscriptionId: String?) {
         // 旧监控可能已在 NonCancellable 的 release 里。只 cancel 会让它在新沙箱建好后补删。
-        val monitor = supersedeMonitor()
-        monitor?.join()
+        joinSuperseded(supersedeMonitor())
+        val generation = monitorGeneration.get()
         val ownedEpoch = runtimeEpoch
         val watchedId = subscriptionId
+        val serial = createdSerial
         monitorJob = scope.launch {
             delay(10_000)
             while (runner.isRunning) {
                 delay(5_000)
             }
-            // ROOT 进程异常退出。离开 delay() 之后读日志没有挂起点，cancel 要等 release 结束才生效。
+            // 离开 delay() 之后读日志没有挂起点。监控已被 stop/restart 接手就不要再启动清理。
             val logContent = RootHelper.readLogFile(File(workDir, "mihomo.log").absolutePath)
+            if (monitorGeneration.get() != generation) return@launch
             val errorMsg = if (logContent.isNotBlank()) {
                 getString(R.string.error_mihomo_start_failed, logContent)
             } else {
                 getString(R.string.error_mihomo_exited)
             }
             Log.e(TAG, "mihomo process died unexpectedly (ROOT): $errorMsg")
-            val storage = PlatformStorage(this@MishkaRootService)
-            teardownAllRootRules()
-            // 用启动时记下的 uuid 和代次。此时 storage 里可能已是下一轮启动的订阅。
-            val cleaned = if (watchedId != null) {
-                RootRuntimeCache.release(this@MishkaRootService, watchedId, subscriptionRepository, ownedEpoch)
-            } else {
-                true
+            // 进程已死。清理放到 onDestroy 取消不了的 scope；stop/restart 仍可 cancel 等锁阶段。
+            val cleanup = cleanupScope.launch {
+                if (!isCurrentInstance(serial)) return@launch
+                teardownAllRootRules()
+                val cleaned = if (watchedId != null) {
+                    RootRuntimeCache.release(this@MishkaRootService, watchedId, subscriptionRepository, ownedEpoch)
+                } else {
+                    true
+                }
+                // 被接手、换代，或已有新 Service：不要改全局状态，也不要 stopSelf 掉新沙箱。
+                if (!isActive || !cleaned || !isCurrentInstance(serial)) return@launch
+                val storage = PlatformStorage(this@MishkaRootService)
+                clearPersistedState(storage)
+                storage.putString(StorageKeys.SERVICE_WAS_RUNNING, "false")
+                ProxyServiceBridge.updateState(
+                    ProxyServiceStatus(ProxyState.Error, errorMessage = errorMsg, tunMode = currentSubmode.tunMode)
+                )
+                dynamicNotification.stop()
+                stopServiceQuietly()
             }
-            // 被取消、换代，或已有新的启动/停止接手：不要改全局状态，也不要 stopSelf 掉新沙箱。
-            if (!isActive || !cleaned) return@launch
-            clearPersistedState(storage)
-            storage.putString(StorageKeys.SERVICE_WAS_RUNNING, "false")
-            ProxyServiceBridge.updateState(ProxyServiceStatus(ProxyState.Error, errorMessage = errorMsg, tunMode = currentSubmode.tunMode))
-            dynamicNotification.stop()
-            stopForeground(STOP_FOREGROUND_REMOVE)
-            stopSelf()
+            synchronized(monitorLock) {
+                if (monitorGeneration.get() != generation) {
+                    cleanup.cancel()
+                } else {
+                    monitorCleanup = cleanup
+                }
+            }
+            // 本协程可能已被 onDestroy cancel。这里仍要等清理结束，接手方的 join 才不会提前返回。
+            withContext(NonCancellable) {
+                cleanup.join()
+            }
         }
     }
 
+    private fun supersedeMonitor(): List<Job> = synchronized(monitorLock) {
+        monitorGeneration.incrementAndGet()
+        val jobs = listOfNotNull(monitorJob, monitorCleanup)
+        monitorJob?.cancel()
+        monitorCleanup?.cancel()
+        monitorJob = null
+        monitorCleanup = null
+        jobs
+    }
 
-    private fun supersedeMonitor(): Job? {
-        val monitor = monitorJob
-        monitor?.cancel()
-        return monitor
+    private suspend fun joinSuperseded(jobs: List<Job>) {
+        jobs.forEach { it.join() }
+    }
+
+    private fun isCurrentInstance(serial: Int): Boolean = instanceSerial == serial
+
+    private fun stopServiceQuietly() {
+        if (destroyed) return
+        try {
+            stopForeground(STOP_FOREGROUND_REMOVE)
+            stopSelf()
+        } catch (e: Exception) {
+            Log.w(TAG, "stop after destroy: ${e.message}")
+        }
     }
 
     private fun bindRuntimeEpoch(epoch: Long) {
@@ -628,24 +679,17 @@ class MishkaRootService : Service() {
 
     private fun restartProxy(subscriptionId: String?) {
         Log.i(TAG, "Restarting proxy (ROOT)...")
-        val monitor = supersedeMonitor()
+        val superseded = supersedeMonitor()
         ProxyServiceBridge.updateState(ProxyServiceStatus(ProxyState.Stopping, tunMode = currentSubmode.tunMode))
         dynamicNotification.stop()
-        scope.launch {
-            // 代次在 join 前记下。join 会等已进入 NonCancellable 的 release 跑完，不能改读它退休后的代次。
-            val ownedEpoch = ownedRuntimeEpoch()
-            monitor?.join()
-            // 先让进行中的启动协程收敛，否则下面的 startProxy 会被幂等检查挡掉
-            startJob?.cancelAndJoin()
-            val storage = PlatformStorage(this@MishkaRootService)
-            val runningSubscriptionId = storage.getString(StorageKeys.ROOT_ACTIVE_SUBSCRIPTION_ID, "").ifEmpty { null }
-            runner.stop()
-            teardownAllRootRules()
-            // 回写缓存后再清沙箱，下轮 startProxy 从 imported/ 复制才能跳过未过期的 HTTP 拉取
-            runningSubscriptionId?.let {
-                RootRuntimeCache.release(this@MishkaRootService, it, subscriptionRepository, ownedEpoch)
-            }
+        // 代次在 join 前记下。join 会等已进入 NonCancellable 的 release 跑完，不能改读它退休后的代次。
+        val ownedEpoch = ownedRuntimeEpoch()
+        launchPostDeathCleanup(superseded, ownedEpoch) { storage ->
             clearPersistedState(storage)
+            if (destroyed) {
+                storage.putString(StorageKeys.SERVICE_WAS_RUNNING, "false")
+                return@launchPostDeathCleanup
+            }
             withContext(Dispatchers.Main) {
                 startProxy(subscriptionId)
             }
@@ -654,32 +698,52 @@ class MishkaRootService : Service() {
 
     private fun stopProxy() {
         Log.i(TAG, "Stopping proxy (ROOT)...")
-        val monitor = supersedeMonitor()
+        val superseded = supersedeMonitor()
         ProxyServiceBridge.updateState(ProxyServiceStatus(ProxyState.Stopping, tunMode = currentSubmode.tunMode))
         dynamicNotification.stop()
-        scope.launch {
-            val ownedEpoch = ownedRuntimeEpoch()
-            monitor?.join()
+        val ownedEpoch = ownedRuntimeEpoch()
+        launchPostDeathCleanup(superseded, ownedEpoch) { storage ->
+            clearPersistedState(storage)
+            storage.putString(StorageKeys.SERVICE_WAS_RUNNING, "false")
+            if (destroyed) return@launchPostDeathCleanup
+            ProxyServiceBridge.markStopped(currentSubmode.tunMode)
+            stopServiceQuietly()
+        }
+    }
+
+    /**
+     * 确认要停掉 mihomo 之后的回写。挂在 [cleanupScope]，onDestroy 的 cancel 丢不掉。
+     * 新实例出现后不再改全局状态，避免把后一次启动的 PID 清掉。
+     */
+    private fun launchPostDeathCleanup(
+        superseded: List<Job>,
+        ownedEpoch: Long,
+        afterRelease: suspend (PlatformStorage) -> Unit,
+    ) {
+        val serial = createdSerial
+        cleanupScope.launch {
+            superseded.forEach { it.join() }
             // 用户在启动过程中按停止：先中止启动协程，避免它继续把状态写回 Running
             startJob?.cancelAndJoin()
+            if (!isCurrentInstance(serial)) return@launch
             val storage = PlatformStorage(this@MishkaRootService)
             val runningSubscriptionId = storage.getString(StorageKeys.ROOT_ACTIVE_SUBSCRIPTION_ID, "").ifEmpty { null }
             runner.stop()
             teardownAllRootRules()
+            // 回写缓存后再清沙箱，下轮 start 从 imported/ 复制才能跳过未过期的 HTTP 拉取
             runningSubscriptionId?.let {
                 RootRuntimeCache.release(this@MishkaRootService, it, subscriptionRepository, ownedEpoch)
             }
-            clearPersistedState(storage)
-            storage.putString(StorageKeys.SERVICE_WAS_RUNNING, "false")
-            ProxyServiceBridge.markStopped(currentSubmode.tunMode)
-            stopForeground(STOP_FOREGROUND_REMOVE)
-            stopSelf()
+            if (!isCurrentInstance(serial)) return@launch
+            afterRelease(storage)
         }
     }
 
     override fun onDestroy() {
+        destroyed = true
         notificationRefreshJob?.cancel()
-        supersedeMonitor()
+        // 只停还在轮询的监控。已经确认进程死亡的回写在 cleanupScope，不能在这里 cancel。
+        monitorJob?.cancel()
         dynamicNotification.stop()
         // 注意：onDestroy 不 kill mihomo，让它继续运行以便重连。
         // 也不在主线程 join 监控：已进入 NonCancellable 的 release 会活过 scope.cancel()，
@@ -692,6 +756,12 @@ class MishkaRootService : Service() {
 
     companion object {
         private const val TAG = "MishkaRootService"
+
+        @Volatile
+        private var instanceSerial = 0
+
+        private fun bumpInstanceSerial(): Int = synchronized(this) { ++instanceSerial }
+
         const val ACTION_START = "top.yukonga.mishka.ROOT_START"
         const val ACTION_STOP = "top.yukonga.mishka.ROOT_STOP"
         const val ACTION_RESTART = "top.yukonga.mishka.ROOT_RESTART"
