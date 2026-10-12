@@ -569,13 +569,12 @@ class MishkaRootService : Service() {
             val cleanup = cleanupScope.launch {
                 if (!isCurrentInstance(serial)) return@launch
                 teardownAllRootRules()
-                val cleaned = if (watchedId != null) {
-                    RootRuntimeCache.release(this@MishkaRootService, watchedId, subscriptionRepository, ownedEpoch)
-                } else {
-                    true
-                }
-                // 被接手、换代，或已有新 Service：不要改全局状态，也不要 stopSelf 掉新沙箱。
-                if (!isActive || !cleaned || !isCurrentInstance(serial)) return@launch
+                // 被接手、换代（删除订阅、切 VPN 的 releaseAll），或已有新 Service：
+                // 不要改全局状态，也不要 stopSelf 掉新沙箱。
+                if (!isActive || !isCurrentInstance(serial)) return@launch
+                if (watchedId != null && RootRuntimeCache.epochOf(watchedId) != ownedEpoch) return@launch
+                // 先报 Error 再回写：回写要等 processLock，订阅下载可能占它几分钟，
+                // 期间界面不能还显示 Running。
                 val storage = PlatformStorage(this@MishkaRootService)
                 clearPersistedState(storage)
                 storage.putString(StorageKeys.SERVICE_WAS_RUNNING, "false")
@@ -584,6 +583,9 @@ class MishkaRootService : Service() {
                 )
                 dynamicNotification.stop()
                 stopServiceQuietly()
+                if (watchedId != null) {
+                    RootRuntimeCache.release(this@MishkaRootService, watchedId, subscriptionRepository, ownedEpoch)
+                }
             }
             synchronized(monitorLock) {
                 if (monitorGeneration.get() != generation) {
@@ -684,7 +686,7 @@ class MishkaRootService : Service() {
         dynamicNotification.stop()
         // 代次在 join 前记下。join 会等已进入 NonCancellable 的 release 跑完，不能改读它退休后的代次。
         val ownedEpoch = ownedRuntimeEpoch()
-        launchPostDeathCleanup(superseded, ownedEpoch) { storage ->
+        launchPostDeathCleanup(superseded, ownedEpoch, afterRelease = { storage ->
             clearPersistedState(storage)
             if (destroyed) {
                 storage.putString(StorageKeys.SERVICE_WAS_RUNNING, "false")
@@ -693,7 +695,7 @@ class MishkaRootService : Service() {
             withContext(Dispatchers.Main) {
                 startProxy(subscriptionId)
             }
-        }
+        })
     }
 
     private fun stopProxy() {
@@ -702,23 +704,27 @@ class MishkaRootService : Service() {
         ProxyServiceBridge.updateState(ProxyServiceStatus(ProxyState.Stopping, tunMode = currentSubmode.tunMode))
         dynamicNotification.stop()
         val ownedEpoch = ownedRuntimeEpoch()
-        launchPostDeathCleanup(superseded, ownedEpoch) { storage ->
+        // mihomo 已死、规则已撤就算停完。回写要等 processLock，订阅下载可能占它几分钟，
+        // 「停止中」不能陪着等；回写没做完进程就被回收的话，下一次启动的 releaseAll 会补上。
+        launchPostDeathCleanup(superseded, ownedEpoch, beforeRelease = { storage ->
             clearPersistedState(storage)
             storage.putString(StorageKeys.SERVICE_WAS_RUNNING, "false")
             if (destroyed) return@launchPostDeathCleanup
             ProxyServiceBridge.markStopped(currentSubmode.tunMode)
             stopServiceQuietly()
-        }
+        })
     }
 
     /**
      * 确认要停掉 mihomo 之后的回写。挂在 [cleanupScope]，onDestroy 的 cancel 丢不掉。
      * 新实例出现后不再改全局状态，避免把后一次启动的 PID 清掉。
+     * [beforeRelease] 在杀进程、撤规则之后、等锁回写之前执行；[afterRelease] 等回写完成。
      */
     private fun launchPostDeathCleanup(
         superseded: List<Job>,
         ownedEpoch: Long,
-        afterRelease: suspend (PlatformStorage) -> Unit,
+        beforeRelease: suspend (PlatformStorage) -> Unit = {},
+        afterRelease: suspend (PlatformStorage) -> Unit = {},
     ) {
         val serial = createdSerial
         cleanupScope.launch {
@@ -730,7 +736,9 @@ class MishkaRootService : Service() {
             val runningSubscriptionId = storage.getString(StorageKeys.ROOT_ACTIVE_SUBSCRIPTION_ID, "").ifEmpty { null }
             runner.stop()
             teardownAllRootRules()
-            // 回写缓存后再清沙箱，下轮 start 从 imported/ 复制才能跳过未过期的 HTTP 拉取
+            beforeRelease(storage)
+            // 回写缓存后再清沙箱，下轮 start 从 imported/ 复制才能跳过未过期的 HTTP 拉取。
+            // beforeRelease 可能已 stopSelf，新实例的 prepare 由沙箱代次挡住，不会被这里删掉。
             runningSubscriptionId?.let {
                 RootRuntimeCache.release(this@MishkaRootService, it, subscriptionRepository, ownedEpoch)
             }

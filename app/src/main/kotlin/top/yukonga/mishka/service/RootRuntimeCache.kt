@@ -95,18 +95,23 @@ internal object RootRuntimeCache {
     suspend fun releaseAll(
         context: Context,
         repository: SubscriptionRepositoryImpl,
-    ) = ProfileProcessor.withProcessLock {
-        sandboxLock.withLock {
-            currentCoroutineContext().ensureActive()
-            withContext(NonCancellable) {
-                val uuids = ProfileFileOps.listRuntimeUuids(context).filter { isRuntimeUuid(it) }
-                for (uuid in uuids) {
-                    flushQuietly(context, uuid, repository)
+    ) {
+        // 每次 ROOT 新鲜启动、root 设备上每次 VPN 启动都会走这里，而 runtime/ 绝大多数时候是空的。
+        // 先看一眼再取 processLock：订阅下载会占这把锁几分钟，启动不该无条件排在它后面。
+        if (ProfileFileOps.listRuntimeUuids(context).none { isRuntimeUuid(it) }) return
+        ProfileProcessor.withProcessLock {
+            sandboxLock.withLock {
+                currentCoroutineContext().ensureActive()
+                withContext(NonCancellable) {
+                    val uuids = ProfileFileOps.listRuntimeUuids(context).filter { isRuntimeUuid(it) }
+                    for (uuid in uuids) {
+                        flushQuietly(context, uuid, repository)
+                    }
+                    for (uuid in epochs.keys + uuids) {
+                        epochs[uuid] = epochOf(uuid) + 1L
+                    }
+                    ProfileFileOps.cleanupAllRootRuntime(context)
                 }
-                for (uuid in epochs.keys + uuids) {
-                    epochs[uuid] = epochOf(uuid) + 1L
-                }
-                ProfileFileOps.cleanupAllRootRuntime(context)
             }
         }
     }
