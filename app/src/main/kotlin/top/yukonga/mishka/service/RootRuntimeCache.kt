@@ -256,7 +256,6 @@ internal fun isProviderCacheRel(path: String): Boolean {
 }
 
 private val PROVIDER_CACHE_DENY_RELS = setOf(
-    ".mishka-provider-cache.json",
     "config.yaml",
     "mihomo.log",
     "geoip.metadb",
