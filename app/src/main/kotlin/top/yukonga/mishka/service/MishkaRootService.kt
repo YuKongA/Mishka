@@ -13,6 +13,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.koin.android.ext.android.inject
@@ -80,6 +81,12 @@ class MishkaRootService : Service() {
 
     @Volatile
     private var runtimeEpochBound: Boolean = false
+
+    private class PreparedRuntime(val job: Job, val uuid: String, val epoch: Long)
+
+    // 最近一次全新启动 prepare 出的沙箱，按启动协程认领。见 launchPostDeathCleanup。
+    @Volatile
+    private var preparedRuntime: PreparedRuntime? = null
 
 
     // 自动连接与补发 BOOT_COMPLETED 的 BootReceiver 会各发一次 ACTION_START，两条启动协程
@@ -365,7 +372,9 @@ class MishkaRootService : Service() {
             //     不污染 imported/，保证更新/删除始终在 app UID 下工作
             if (subscriptionId != null) {
                 try {
-                    bindRuntimeEpoch(RootRuntimeCache.prepare(this@MishkaRootService, subscriptionId))
+                    val epoch = RootRuntimeCache.prepare(this@MishkaRootService, subscriptionId)
+                    bindRuntimeEpoch(epoch)
+                    preparedRuntime = PreparedRuntime(coroutineContext.job, subscriptionId, epoch)
                 } catch (e: Exception) {
                     Log.e(TAG, "Failed to prepare runtime sandbox", e)
                     ProxyServiceBridge.updateState(
@@ -730,17 +739,25 @@ class MishkaRootService : Service() {
         cleanupScope.launch {
             superseded.forEach { it.join() }
             // 用户在启动过程中按停止：先中止启动协程，避免它继续把状态写回 Running
-            startJob?.cancelAndJoin()
+            val start = startJob
+            start?.cancelAndJoin()
             if (!isCurrentInstance(serial)) return@launch
             val storage = PlatformStorage(this@MishkaRootService)
             val runningSubscriptionId = storage.getString(StorageKeys.ROOT_ACTIVE_SUBSCRIPTION_ID, "").ifEmpty { null }
+            // ownedEpoch 是调用方在 cancel 前记下的；被取消的启动若已 prepare，那份沙箱的代次更新，
+            // 订阅 ID 也可能还没来得及持久化。按 job 认领，不读全局代次，免得认领别的启动。
+            val prepared = preparedRuntime?.takeIf { start != null && it.job === start }
+            val targets = buildMap {
+                runningSubscriptionId?.let { put(it, ownedEpoch) }
+                prepared?.let { put(it.uuid, it.epoch) }
+            }
             runner.stop()
             teardownAllRootRules()
             beforeRelease(storage)
             // 回写缓存后再清沙箱，下轮 start 从 imported/ 复制才能跳过未过期的 HTTP 拉取。
             // beforeRelease 可能已 stopSelf，新实例的 prepare 由沙箱代次挡住，不会被这里删掉。
-            runningSubscriptionId?.let {
-                RootRuntimeCache.release(this@MishkaRootService, it, subscriptionRepository, ownedEpoch)
+            targets.forEach { (uuid, epoch) ->
+                RootRuntimeCache.release(this@MishkaRootService, uuid, subscriptionRepository, epoch)
             }
             if (!isCurrentInstance(serial)) return@launch
             afterRelease(storage)
