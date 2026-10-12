@@ -15,6 +15,8 @@ import top.yukonga.mishka.data.repository.SubscriptionRepositoryImpl
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.LinkOption
+import java.nio.file.Path
+import java.nio.file.attribute.FileTime
 import java.security.MessageDigest
 import java.util.concurrent.ConcurrentHashMap
 
@@ -156,7 +158,7 @@ internal object RootRuntimeCache {
                         pairs,
                     )
                 } finally {
-                    Files.setLastModifiedTime(importedPath, modifiedTime)
+                    restoreModifiedTime(importedPath, modifiedTime)
                 }
                 if (!copied) {
                     Log.w(TAG, "provider cache sync incomplete for $uuid (${pairs.size} files)")
@@ -164,6 +166,15 @@ internal object RootRuntimeCache {
                     Log.i(TAG, "synced provider cache for $uuid (${pairs.size} files)")
                 }
             }
+        }
+    }
+
+    private fun restoreModifiedTime(path: Path, modifiedTime: FileTime) {
+        try {
+            // setLastModifiedTime 会跟随链接，把订阅根的时间写到链接目标上。
+            Files.setAttribute(path, "basic:lastModifiedTime", modifiedTime, LinkOption.NOFOLLOW_LINKS)
+        } catch (e: Exception) {
+            Log.w(TAG, "restore subscription mtime failed: ${e.message}")
         }
     }
 
