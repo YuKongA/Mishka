@@ -17,7 +17,6 @@ import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.koin.android.ext.android.inject
-import java.util.concurrent.atomic.AtomicInteger
 import top.yukonga.mishka.MishkaApplication
 import top.yukonga.mishka.R
 import top.yukonga.mishka.data.repository.OverrideJsonStore
@@ -36,6 +35,7 @@ import top.yukonga.mishka.platform.TunMode
 import top.yukonga.mishka.service.MishkaRootService.Companion.EXTRA_SUBMODE
 import top.yukonga.mishka.viewmodel.AppProxyMode
 import java.io.File
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.time.Clock
 
 /**
@@ -87,7 +87,6 @@ class MishkaRootService : Service() {
     // 最近一次全新启动 prepare 出的沙箱，按启动协程认领。见 launchPostDeathCleanup。
     @Volatile
     private var preparedRuntime: PreparedRuntime? = null
-
 
     // 自动连接与补发 BOOT_COMPLETED 的 BootReceiver 会各发一次 ACTION_START，两条启动协程
     // 并发跑 iptables 会互抢 xtables.lock。@Volatile：主线程写，stop/restart 在 IO 协程读
