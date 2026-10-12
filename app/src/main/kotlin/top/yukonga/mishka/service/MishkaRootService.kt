@@ -4,6 +4,7 @@ import android.app.Service
 import android.content.Intent
 import android.os.IBinder
 import android.util.Log
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -374,6 +375,9 @@ class MishkaRootService : Service() {
                     val epoch = RootRuntimeCache.prepare(this@MishkaRootService, subscriptionId)
                     bindRuntimeEpoch(epoch)
                     preparedRuntime = PreparedRuntime(coroutineContext.job, subscriptionId, epoch)
+                } catch (e: CancellationException) {
+                    // 停止抢占了启动。吞掉会发布 Error 并 stopSelf，用户点停止却看到「启动失败」
+                    throw e
                 } catch (e: Exception) {
                     Log.e(TAG, "Failed to prepare runtime sandbox", e)
                     ProxyServiceBridge.updateState(
@@ -412,6 +416,8 @@ class MishkaRootService : Service() {
             val viaProxy = storage.getString(StorageKeys.SUBSCRIPTION_UPDATE_VIA_PROXY, "true") == "true"
             val transformPlan = try {
                 prepareRuntimeTransform(this@MishkaRootService, subscriptionId, subscriptionRepository, transformWriter)
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to prepare subscription transform", e)
                 ProxyServiceBridge.updateState(
