@@ -309,16 +309,16 @@ class MainActivity : ComponentActivity() {
     // nonce 去重：进程死亡恢复会经 onCreate 重放旧深链 intent（需跳过），而「任务存活但进程
     // 被杀」时新深链可能带着恢复态送达（需接受），savedInstanceState 判空无法区分这两种情况
     private fun acceptDeepLinkImport(intent: Intent?) {
-        if (intent?.action != ExternalImportActivity.ACTION_IMPORT_SUBSCRIPTION) return
-        val nonce = intent.getStringExtra(ExternalImportActivity.EXTRA_IMPORT_NONCE) ?: return
+        if (intent?.action != ExternalControlActivity.ACTION_IMPORT_SUBSCRIPTION) return
+        val nonce = intent.getStringExtra(ExternalControlActivity.EXTRA_IMPORT_NONCE) ?: return
         if (nonce == consumedDeepLinkNonce) return
-        val url = intent.getStringExtra(ExternalImportActivity.EXTRA_IMPORT_URL)
+        val url = intent.getStringExtra(ExternalControlActivity.EXTRA_IMPORT_URL)
         if (url.isNullOrBlank()) return
         consumedDeepLinkNonce = nonce
         pendingDeepLinkImport.value = DeepLinkImportRequest(
             url = url,
-            name = intent.getStringExtra(ExternalImportActivity.EXTRA_IMPORT_NAME).orEmpty(),
-            intervalMinutes = intent.getLongExtra(ExternalImportActivity.EXTRA_IMPORT_INTERVAL_MINUTES, 0L),
+            name = intent.getStringExtra(ExternalControlActivity.EXTRA_IMPORT_NAME).orEmpty(),
+            intervalMinutes = intent.getLongExtra(ExternalControlActivity.EXTRA_IMPORT_INTERVAL_MINUTES, 0L),
         )
     }
 

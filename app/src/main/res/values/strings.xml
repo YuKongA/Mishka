@@ -49,6 +49,13 @@
     <!-- Deep Link Import -->
     <string name="deep_link_invalid">Invalid subscription import link</string>
 
+    <!-- Automation -->
+    <string name="external_proxy_started">Proxy started</string>
+    <string name="external_proxy_stopped">Proxy stopped</string>
+    <string name="external_proxy_already_running">Proxy is already running</string>
+    <string name="external_proxy_restarted">Proxy restarted</string>
+    <string name="external_proxy_not_running">Proxy is not running</string>
+
     <!-- Service Errors -->
     <string name="error_vpn_failed">VPN establishment failed: %1$s</string>
     <string name="error_vpn_denied">VPN permission denied</string>

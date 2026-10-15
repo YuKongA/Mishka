@@ -27,10 +27,16 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.Mishka">
 
+        <!-- singleTask 照 CMFA（PR #665，singleTop -> singleTask）。桌面入口仍留在本体上：上游那套
+             把 LAUNCHER 挂到 activity-alias 的做法不构成 task 隔离 —— alias 的 taskAffinity/launchMode
+             按文档从 target 继承 —— 却会让 aapt2 的 launchable-activity 变成 alias 名，直接撞上
+             build-ci.yml 里「启动类必须是 top.yukonga.mishka.MainActivity」那道门禁。
+             单 Activity 架构下 clear top 无事可做，深链的 NEW_TASK|SINGLE_TOP|CLEAR_TOP 与它兼容。 -->
         <activity
             android:name=".MainActivity"
             android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|mnc|colorMode|density|fontScale|fontWeightAdjustment|keyboard|layoutDirection|locale|mcc|navigation|smallestScreenSize|touchscreen|uiMode"
             android:exported="true"
+            android:launchMode="singleTask"
             android:theme="@style/Theme.Mishka.Starting"
             android:windowSoftInputMode="adjustResize">
             <intent-filter>
@@ -42,13 +48,20 @@
             </intent-filter>
         </activity>
 
-        <!-- clash:// / clashmeta:// 订阅一键导入深链入口 -->
+        <!-- 外部入口跳板：clash:// / clashmeta:// 订阅导入深链 + Automation 的代理启停，照 CMFA 的做法。
+             必须有窗口（透明主题）：Android 12 起后台应用不能启动前台服务，而「应用有一个 Activity
+             被启动」正是拿到该豁免的条件 —— 换成 Theme.NoDisplay 或改走 BroadcastReceiver（处理广播
+             时应用仍在后台）都会让「启动」静默失败。主题也沿用上游那支系统透明全屏变体。
+             空 taskAffinity 是官方文档给定的隔离手段（声明「不属于任何 task」）：以 NEW_TASK 启动时
+             系统找不到可复用的 task，只能新建，主界面那条不会被前置。上游没写这条，而只照抄上游那套
+             声明实测仍会被前置（已装包复现），因此这里保留这条、不再靠 alias 或 singleTask 去顶。 -->
         <activity
-            android:name=".ExternalImportActivity"
+            android:name=".ExternalControlActivity"
             android:excludeFromRecents="true"
             android:exported="true"
             android:noHistory="true"
-            android:theme="@style/Theme.Mishka.Transparent">
+            android:taskAffinity=""
+            android:theme="@android:style/Theme.Translucent.NoTitleBar.Fullscreen">
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
 
@@ -58,6 +71,26 @@
                 <data android:scheme="clash" />
                 <data android:scheme="clashmeta" />
                 <data android:host="install-config" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="top.yukonga.mishka.action.START_PROXY" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="top.yukonga.mishka.action.STOP_PROXY" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="top.yukonga.mishka.action.TOGGLE_PROXY" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="top.yukonga.mishka.action.RESTART_PROXY" />
+
+                <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </activity>
 

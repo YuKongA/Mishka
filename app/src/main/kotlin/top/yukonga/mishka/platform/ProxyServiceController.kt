@@ -39,6 +39,27 @@ data class ProxyServiceStatus(
     val errorNotified: Boolean = false,
 )
 
+/** Automation（外部 intent）与磁贴请求的启停动作。 */
+enum class ExternalProxyAction { Start, Stop, Toggle, Restart }
+
+/**
+ * 外部启停的结果。除 [ExternalProxyOutcome.NeedVpnPermission] 外都已在 Controller 内落地，调用方
+ * 按结果播报即可；授权对话框要求 Activity 上下文，故把订阅 id 交回调用方自己拉 —— 磁贴要
+ * startActivityAndCollapse、Activity 直接 startActivity，手法不同。
+ */
+sealed interface ExternalProxyOutcome {
+    data object Started : ExternalProxyOutcome
+    data object Stopped : ExternalProxyOutcome
+    data object Restarted : ExternalProxyOutcome
+    data object AlreadyRunning : ExternalProxyOutcome
+
+    /** 重启只在运行中成立 —— 界面上的重启按钮同样只在运行中出现。 */
+    data object NotRunning : ExternalProxyOutcome
+    data object Busy : ExternalProxyOutcome
+    data object NoSubscription : ExternalProxyOutcome
+    data class NeedVpnPermission(val subscriptionId: String) : ExternalProxyOutcome
+}
+
 class ProxyServiceController(private val context: Context) {
 
     private val storage by lazy { PlatformStorage(context) }
@@ -78,6 +99,48 @@ class ProxyServiceController(private val context: Context) {
         val mode = activeModeOrStored()
         val intent = buildServiceIntent(mode, Op.Stop)
         context.startService(intent)
+    }
+
+    /**
+     * 磁贴与 Automation intent 共用的启停决策：状态判定只写这一份，两个入口各判一套迟早漂移。
+     * 过渡态直接忽略 —— 再发一次 start 会与 Service 内进行中的那轮启动协程并发，现象是同一个
+     * Service 里出现两条 `Starting proxy`。
+     */
+    fun applyExternalAction(action: ExternalProxyAction): ExternalProxyOutcome {
+        val state = ProxyServiceBridge.state.value.state
+        if (state == ProxyState.Starting || state == ProxyState.Stopping) {
+            return ExternalProxyOutcome.Busy
+        }
+        val running = state == ProxyState.Running
+        when (action) {
+            // 无条件发 STOP，不做「已经停了就跳过」的短路：ROOT 模式下 app 可能与仍在跑的 mihomo
+            // 进程失联（bridge 停在 Stopped），跳过等于把「停掉残留进程」这条能力静默拿掉
+            ExternalProxyAction.Stop -> {
+                stop()
+                return ExternalProxyOutcome.Stopped
+            }
+
+            ExternalProxyAction.Start ->
+                if (running) return ExternalProxyOutcome.AlreadyRunning
+
+            ExternalProxyAction.Toggle ->
+                if (running) {
+                    stop()
+                    return ExternalProxyOutcome.Stopped
+                }
+
+            // 未运行不顺手拉起：界面上的重启按钮同样只在运行中出现，外部入口保持同一语义
+            ExternalProxyAction.Restart ->
+                if (!running) return ExternalProxyOutcome.NotRunning
+        }
+        val id = resolveStartSubscriptionId() ?: return ExternalProxyOutcome.NoSubscription
+        if (!hasVpnPermission()) return ExternalProxyOutcome.NeedVpnPermission(id)
+        if (action == ExternalProxyAction.Restart) {
+            restart(id)
+            return ExternalProxyOutcome.Restarted
+        }
+        start(id)
+        return ExternalProxyOutcome.Started
     }
 
     /**

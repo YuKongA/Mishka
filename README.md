@@ -47,6 +47,31 @@
 - **Wi-Fi 自动切换** —— 匹配指定 SSID 时自动停止代理或切换 Direct 模式
 - 开机自启、隐藏最近任务卡片等实用开关
 
+## 自动化
+
+外部工具（Tasker、自动化 App、快捷方式、adb）可经 intent 直接控制代理，无需打开 Mishka。向 `ExternalControlActivity` 发送以下 action 之一：
+
+- `top.yukonga.mishka.action.START_PROXY` —— 启动代理
+- `top.yukonga.mishka.action.STOP_PROXY` —— 停止代理
+- `top.yukonga.mishka.action.TOGGLE_PROXY` —— 在启动 / 停止之间切换
+- `top.yukonga.mishka.action.RESTART_PROXY` —— 重启代理
+
+```bash
+adb shell am start -a top.yukonga.mishka.action.TOGGLE_PROXY \
+    -n top.yukonga.mishka/.ExternalControlActivity
+```
+
+入口是一个透明、不显示的 Activity：执行完动作立即结束，**不会把 Mishka 的界面带到前台**，也不影响你正在使用的应用。是否已在运行、订阅是否可用等判定与界面按钮完全一致（已在运行时再发 `START_PROXY` 不会重复启动）。
+
+`RESTART_PROXY` 与界面上的重启按钮同条件：代理运行时才生效，未运行时只提示、不会顺手启动。
+
+订阅也可经 URL Scheme 导入：
+
+- `clash://install-config?url=<encoded URI>`
+- `clashmeta://install-config?url=<encoded URI>`
+
+可选参数：`name`（订阅名称）、`update-interval`（自动更新间隔，单位分钟）。
+
 ## 构建
 
 ### 环境要求

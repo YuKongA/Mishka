@@ -47,6 +47,13 @@
     <!-- Deep Link Import -->
     <string name="deep_link_invalid">无效的订阅导入链接</string>
 
+    <!-- Automation -->
+    <string name="external_proxy_started">代理已启动</string>
+    <string name="external_proxy_stopped">代理已停止</string>
+    <string name="external_proxy_already_running">代理已在运行</string>
+    <string name="external_proxy_restarted">代理已重启</string>
+    <string name="external_proxy_not_running">代理未运行</string>
+
     <!-- Service Errors -->
     <string name="error_vpn_failed">VPN 建立失败: %1$s</string>
     <string name="error_vpn_denied">VPN 权限被拒绝</string>

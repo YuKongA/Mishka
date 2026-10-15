@@ -47,6 +47,13 @@
     <!-- Deep Link Import -->
     <string name="deep_link_invalid">Недопустимая ссылка для импорта подписки</string>
 
+    <!-- Automation -->
+    <string name="external_proxy_started">Прокси запущен</string>
+    <string name="external_proxy_stopped">Прокси остановлен</string>
+    <string name="external_proxy_already_running">Прокси уже запущен</string>
+    <string name="external_proxy_restarted">Прокси перезапущен</string>
+    <string name="external_proxy_not_running">Прокси не запущен</string>
+
     <!-- Service Errors -->
     <string name="error_vpn_failed">Сбой создания VPN: %1$s</string>
     <string name="error_vpn_denied">В доступе к VPN отказано</string>
