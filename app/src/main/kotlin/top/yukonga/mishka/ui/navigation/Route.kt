@@ -50,6 +50,9 @@ sealed interface Route : NavKey {
     data object ExternalControl : Route
 
     @Serializable
+    data object Automation : Route
+
+    @Serializable
     data object FileManager : Route
 
     @Serializable

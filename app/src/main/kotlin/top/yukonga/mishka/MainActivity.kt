@@ -48,6 +48,7 @@ import top.yukonga.mishka.ui.theme.resolveIsDark
 import top.yukonga.mishka.viewmodel.AppProxyViewModel
 import top.yukonga.mishka.viewmodel.ConnectionViewModel
 import top.yukonga.mishka.viewmodel.DnsQueryViewModel
+import top.yukonga.mishka.viewmodel.AutomationViewModel
 import top.yukonga.mishka.viewmodel.ExternalControlViewModel
 import top.yukonga.mishka.viewmodel.HomeViewModel
 import top.yukonga.mishka.viewmodel.LogViewModel
@@ -74,6 +75,7 @@ class MainActivity : ComponentActivity() {
     private lateinit var networkSettingsViewModel: NetworkSettingsViewModel
     private lateinit var metaSettingsViewModel: MetaSettingsViewModel
     private lateinit var externalControlViewModel: ExternalControlViewModel
+    private lateinit var automationViewModel: AutomationViewModel
     private lateinit var appProxyViewModel: AppProxyViewModel
     private lateinit var filePicker: FilePicker
     private lateinit var scanQrLauncher: ActivityResultLauncher<ScannerConfig>
@@ -197,6 +199,7 @@ class MainActivity : ComponentActivity() {
         networkSettingsViewModel = get()
         metaSettingsViewModel = get()
         externalControlViewModel = get()
+        automationViewModel = get()
         appProxyViewModel = get()
         subscriptionViewModel = get()
         overrideProfileViewModel = get()
@@ -256,6 +259,7 @@ class MainActivity : ComponentActivity() {
                 networkSettingsViewModel = networkSettingsViewModel,
                 metaSettingsViewModel = metaSettingsViewModel,
                 externalControlViewModel = externalControlViewModel,
+                automationViewModel = automationViewModel,
                 appProxyViewModel = appProxyViewModel,
                 filePicker = filePicker,
                 storage = storage,

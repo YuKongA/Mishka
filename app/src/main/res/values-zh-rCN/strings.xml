@@ -47,6 +47,13 @@
     <!-- Deep Link Import -->
     <string name="deep_link_invalid">无效的订阅导入链接</string>
 
+    <!-- Automation -->
+    <string name="external_proxy_started">代理已启动</string>
+    <string name="external_proxy_stopped">代理已停止</string>
+    <string name="external_proxy_already_running">代理已在运行</string>
+    <string name="external_proxy_restarted">代理已重启</string>
+    <string name="external_proxy_not_running">代理未运行</string>
+
     <!-- Service Errors -->
     <string name="error_vpn_failed">VPN 建立失败: %1$s</string>
     <string name="error_vpn_denied">VPN 权限被拒绝</string>
@@ -512,6 +519,13 @@
     <string name="external_control_controller_hint">HTTP API 的监听地址（例如 127.0.0.1:9090）。0.0.0.0 将被自动覆写为 127.0.0.1。</string>
     <string name="external_control_secret">API 密钥</string>
     <string name="external_control_secret_hint">HTTP API 的 Bearer 鉴权令牌。留空时优先使用订阅配置中的 secret；若订阅未设置则随机生成。</string>
+    <string name="automation_title">自动化</string>
+    <string name="settings_automation_summary">允许其他应用控制代理</string>
+    <string name="automation_allow_external">允许外部应用控制</string>
+    <string name="automation_allow_external_summary">允许其他应用通过 intent 启动、停止、切换和重启代理</string>
+    <string name="automation_actions_hint">支持的动作：START_PROXY / STOP_PROXY / TOGGLE_PROXY / RESTART_PROXY。</string>
+    <string name="automation_result_hint">动作完成时调用方收到 RESULT_OK；请求被拒绝、代理处于过渡态或无可用订阅时收到 RESULT_CANCELED。</string>
+    <string name="automation_scope_hint">关闭后，快捷设置磁贴与应用内控制照常工作，它们不经过此开关。</string>
     <string name="settings_external_control_summary">覆写外部控制器配置</string>
 
     <!-- File Manager -->

@@ -87,6 +87,7 @@ import top.yukonga.mishka.ui.screen.proxy.ProxyScreen
 import top.yukonga.mishka.ui.screen.settings.AboutScreen
 import top.yukonga.mishka.ui.screen.settings.AppProxyScreen
 import top.yukonga.mishka.ui.screen.settings.BackupRestoreScreen
+import top.yukonga.mishka.ui.screen.settings.AutomationScreen
 import top.yukonga.mishka.ui.screen.settings.ExternalControlScreen
 import top.yukonga.mishka.ui.screen.settings.FileManagerEditorScreen
 import top.yukonga.mishka.ui.screen.settings.FileManagerScreen
@@ -111,6 +112,7 @@ import top.yukonga.mishka.viewmodel.AppProxyViewModel
 import top.yukonga.mishka.viewmodel.BackupViewModel
 import top.yukonga.mishka.viewmodel.ConnectionViewModel
 import top.yukonga.mishka.viewmodel.DnsQueryViewModel
+import top.yukonga.mishka.viewmodel.AutomationViewModel
 import top.yukonga.mishka.viewmodel.ExternalControlViewModel
 import top.yukonga.mishka.viewmodel.HomeUiState
 import top.yukonga.mishka.viewmodel.HomeViewModel
@@ -198,6 +200,7 @@ fun AppNavigation(
     networkSettingsViewModel: NetworkSettingsViewModel? = null,
     metaSettingsViewModel: MetaSettingsViewModel? = null,
     externalControlViewModel: ExternalControlViewModel? = null,
+    automationViewModel: AutomationViewModel? = null,
     appProxyViewModel: AppProxyViewModel? = null,
     filePicker: FilePicker? = null,
     storage: PlatformStorage? = null,
@@ -484,6 +487,14 @@ fun AppNavigation(
                     )
                 }
             }
+            entry<Route.Automation>(swipeDismiss = swipeDismiss) {
+                automationViewModel?.let {
+                    AutomationScreen(
+                        viewModel = it,
+                        onBack = { navigator.pop() },
+                    )
+                }
+            }
             entry<Route.BackupRestore>(swipeDismiss = swipeDismiss) {
                 if (backupViewModel != null && storage != null) {
                     BackupRestoreScreen(
@@ -605,6 +616,7 @@ private fun MainPage(
                     onNavigateNetworkSettings = { navigator.push(Route.NetworkSettings) },
                     onNavigateMetaSettings = { navigator.push(Route.MetaSettings) },
                     onNavigateExternalControl = { navigator.push(Route.ExternalControl) },
+                    onNavigateAutomation = { navigator.push(Route.Automation) },
                     onNavigateAppProxy = { navigator.push(Route.AppProxy) },
                     onNavigateWifiPolicy = { navigator.push(Route.WifiPolicy) },
                     onNavigateThemeSettings = { navigator.push(Route.ThemeSettings) },

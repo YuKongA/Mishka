@@ -50,6 +50,25 @@
 - **Wi-Fi 自动切换** —— 匹配指定 SSID 时自动停止代理或切换 Direct 模式
 - 开机自启、隐藏最近任务卡片等实用开关
 
+## 自动化
+
+Tasker、快捷方式、adb 等外部工具可经 intent 启停代理，无需打开 Mishka。
+
+**默认关闭**：需在 设置 → 自动化 打开「允许外部应用控制」，否则下面这些 intent 一律静默返回 `RESULT_CANCELED`（不弹提示，避免被调用方轮询时反复打扰）。开关只作用于四个导出 action —— 磁贴、通知等用户主动操作的入口不经过它，关掉也不受影响。
+
+- **启动 / 停止 / 切换 / 重启代理** —— 向 `ExternalControlActivity` 发送显式 intent，action 取以下之一：
+  - `top.yukonga.mishka.action.START_PROXY`
+  - `top.yukonga.mishka.action.STOP_PROXY`
+  - `top.yukonga.mishka.action.TOGGLE_PROXY`
+  - `top.yukonga.mishka.action.RESTART_PROXY` —— 仅在代理运行中生效（与界面上的重启按钮一致）；未运行时只提示、不顺手启动
+
+```bash
+adb shell am start -a top.yukonga.mishka.action.TOGGLE_PROXY \
+    -n top.yukonga.mishka/.ExternalControlActivity
+```
+
+跳板不显示界面，也不会把 Mishka 的界面带到前台。是否已在运行、订阅是否可用等判定与界面按钮完全一致。
+
 ## 构建
 
 ### 环境要求

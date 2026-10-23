@@ -795,9 +795,13 @@ class MishkaRootService : Service() {
         val ownedEpoch = ownedRuntimeEpoch()
         // mihomo 已死、规则已撤就算停完。回写要等 processLock，订阅下载可能占它几分钟，
         // 「停止中」不能陪着等；回写没做完进程就被回收的话，下一次启动的 releaseAll 会补上。
-        launchPostDeathCleanup(superseded, ownedEpoch, beforeRelease = { storage ->
-            clearPersistedState(storage)
-            storage.putString(StorageKeys.SERVICE_WAS_RUNNING, "false")
+        launchPostDeathCleanup(superseded, ownedEpoch, beforeRelease = { storage, confirmedDead ->
+            // 没确认杀掉就保留 PID/secret 与 was-running 标记：清掉之后残留进程再也定位不到，
+            // 下次 TOGGLE 还会把「有进程在跑」误判成「没在跑」而去启一个新的
+            if (confirmedDead) {
+                clearPersistedState(storage)
+                storage.putString(StorageKeys.SERVICE_WAS_RUNNING, "false")
+            }
             if (destroyed) return@launchPostDeathCleanup
             ProxyServiceBridge.markStopped(currentSubmode.tunMode)
             stopServiceQuietly()
@@ -812,7 +816,7 @@ class MishkaRootService : Service() {
     private fun launchPostDeathCleanup(
         superseded: List<Job>,
         ownedEpoch: Long,
-        beforeRelease: suspend (PlatformStorage) -> Unit = {},
+        beforeRelease: suspend (PlatformStorage, Boolean) -> Unit = { _, _ -> },
         afterRelease: suspend (PlatformStorage) -> Unit = {},
     ) {
         val serial = createdSerial
@@ -831,9 +835,13 @@ class MishkaRootService : Service() {
                 runningSubscriptionId?.let { put(it, ownedEpoch) }
                 prepared?.let { put(it.uuid, it.epoch) }
             }
-            runner.stop()
+            // app 进程被杀后 root mihomo 仍存活，本实例的 runner 从没 start 也没 attach，
+            // childPid 为空会让 stop() 整段跳过 —— 先按持久化 PID 认领，否则杀不掉还会清掉线索
+            storage.getString(StorageKeys.ROOT_MIHOMO_PID, "").toIntOrNull()
+                ?.let { runner.adoptForStop(it) }
+            val confirmedDead = runner.stop()
             if (!teardownRootRulesOrReport(currentSubmode.tunMode)) return@launch
-            beforeRelease(storage)
+            beforeRelease(storage, confirmedDead)
             // 回写缓存后再清沙箱，下轮 start 从 imported/ 复制才能跳过未过期的 HTTP 拉取。
             // beforeRelease 可能已 stopSelf，新实例的 prepare 由沙箱代次挡住，不会被这里删掉。
             targets.forEach { (uuid, epoch) ->

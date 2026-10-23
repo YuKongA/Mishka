@@ -47,6 +47,13 @@
     <!-- Deep Link Import -->
     <string name="deep_link_invalid">Недопустимая ссылка для импорта подписки</string>
 
+    <!-- Automation -->
+    <string name="external_proxy_started">Прокси запущен</string>
+    <string name="external_proxy_stopped">Прокси остановлен</string>
+    <string name="external_proxy_already_running">Прокси уже запущен</string>
+    <string name="external_proxy_restarted">Прокси перезапущен</string>
+    <string name="external_proxy_not_running">Прокси не запущен</string>
+
     <!-- Service Errors -->
     <string name="error_vpn_failed">Сбой создания VPN: %1$s</string>
     <string name="error_vpn_denied">В доступе к VPN отказано</string>
@@ -512,6 +519,13 @@
     <string name="external_control_controller_hint">Адрес привязки для HTTP API (например, 127.0.0.1:9090). Значение 0.0.0.0 будет автоматически заменено на 127.0.0.1.</string>
     <string name="external_control_secret">Секретный ключ API</string>
     <string name="external_control_secret_hint">Bearer-токен для авторизации в HTTP API. Если поле пустое, используется secret из конфигурации подписки, либо генерируется случайный.</string>
+    <string name="automation_title">Автоматизация</string>
+    <string name="settings_automation_summary">Разрешить другим приложениям управлять прокси</string>
+    <string name="automation_allow_external">Разрешить внешнее управление</string>
+    <string name="automation_allow_external_summary">Разрешить другим приложениям запускать, останавливать, переключать и перезапускать прокси через intent</string>
+    <string name="automation_actions_hint">Поддерживаемые действия: START_PROXY / STOP_PROXY / TOGGLE_PROXY / RESTART_PROXY.</string>
+    <string name="automation_result_hint">Приложение-вызыватель получает RESULT_OK после выполнения действия и RESULT_CANCELED, если запрос отклонён, прокси не завершил переход или нет доступной подписки.</string>
+    <string name="automation_scope_hint">Плитка быстрых настроек и элементы управления в приложении продолжают работать при выключенном параметре — они не проходят через этот переключатель.</string>
     <string name="settings_external_control_summary">Переопределение конфигурации внешнего контроллера</string>
 
     <!-- File Manager -->

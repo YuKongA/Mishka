@@ -50,6 +50,10 @@ object StorageKeys {
     const val VPN_SYSTEM_PROXY = "vpn_system_proxy"
     const val VPN_ALLOW_IPV6 = "vpn_allow_ipv6"
 
+    // 外部应用能否通过 intent 控制代理，默认关。四个导出 action 没有调用方校验，任何应用都能发；
+    // 磁贴由系统绑定、内部跳板走应用内调用，两者都不经过此开关
+    const val EXTERNAL_CONTROL_ALLOWED = "external_control_allowed"
+
     // 分应用代理
     const val APP_PROXY_MODE = "app_proxy_mode"
     const val APP_PROXY_PACKAGES = "app_proxy_packages"

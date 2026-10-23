@@ -47,6 +47,7 @@ fun SettingsScreen(
     onNavigateNetworkSettings: () -> Unit = {},
     onNavigateMetaSettings: () -> Unit = {},
     onNavigateExternalControl: () -> Unit = {},
+    onNavigateAutomation: () -> Unit = {},
     onNavigateAppProxy: () -> Unit = {},
     onNavigateWifiPolicy: () -> Unit = {},
     onNavigateThemeSettings: () -> Unit = {},
@@ -193,6 +194,13 @@ fun SettingsScreen(
                                 title = stringResource(R.string.external_control_title),
                                 summary = stringResource(R.string.settings_external_control_summary),
                                 onClick = onNavigateExternalControl,
+                            )
+                        })
+                        add(CardItem("automation") {
+                            ArrowPreference(
+                                title = stringResource(R.string.automation_title),
+                                summary = stringResource(R.string.settings_automation_summary),
+                                onClick = onNavigateAutomation,
                             )
                         })
                         add(CardItem("appProxy") {

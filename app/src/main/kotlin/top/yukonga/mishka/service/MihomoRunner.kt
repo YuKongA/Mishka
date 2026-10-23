@@ -89,6 +89,23 @@ class MihomoRunner(private val context: Context) {
         return true
     }
 
+    /**
+     * 停机前认领 app 进程死亡后残留的 root 进程。本实例从未 start 也没 attach 过（attach-only
+     * 只由重新打开 app 触发，外部 intent 不经过），childPid 为空会让 [stop] 整段跳过、进程杀不掉。
+     *
+     * 只校验 PID 存活与 cmdline，不查 API 授权：停机不需要进程响应 API，而残留进程的授权状态
+     * 可能已经不可用。cmdline 校验用于挡住 PID 复用后误杀无关进程。
+     */
+    fun adoptForStop(pid: Int): Boolean {
+        if (childPid > 0) return true
+        if (pid <= 0 || !RootHelper.isAliveAsRoot(pid)) return false
+        if (!RootHelper.readRootCmdline(pid).contains("libmihomo_runner.so")) return false
+        childPid = pid
+        isRootMode = true
+        Log.i(TAG, "Adopted persisted mihomo pid=$pid for stop")
+        return true
+    }
+
     suspend fun start(
         subscriptionId: String? = null,
         useRoot: Boolean = false,
@@ -224,39 +241,49 @@ class MihomoRunner(private val context: Context) {
         }
     }
 
-    fun stop() {
-        if (isRootMode) {
-            stopOwnedProcess()
-        } else {
-            synchronized(processLock) { stopOwnedProcess() }
-        }
+    /** 返回是否确认进程已死：未确认时调用方必须保留持久化 PID，否则残留进程再也定位不到。 */
+    fun stop(): Boolean = if (isRootMode) {
+        stopOwnedProcess()
+    } else {
+        synchronized(processLock) { stopOwnedProcess() }
     }
 
-    private fun stopOwnedProcess() {
+    private fun stopOwnedProcess(): Boolean {
+        var confirmedDead = true
         if (childPid > 0) {
-            Log.i(TAG, "Stopping mihomo pid=$childPid (root=$isRootMode)")
+            val target = childPid
+            Log.i(TAG, "Stopping mihomo pid=$target (root=$isRootMode)")
             if (isRootMode) {
                 val tunDevice = PlatformStorage(context).getString(StorageKeys.ROOT_TUN_DEVICE, "Mishka")
-                val killed = RootHelper.killAsRoot(childPid, tunDevice)
+                val killed = RootHelper.killAsRoot(target, tunDevice)
                 if (!killed) {
                     RootHelper.killMihomoByName(tunDevice)
                 }
+                // pkill 兜底后不复查的话，杀掉与否无从得知
+                confirmedDead = !RootHelper.isAliveAsRoot(target)
             } else {
-                val result = ProcessHelper.nativeStop(childPid, GRACEFUL_STOP_TIMEOUT_MS, FORCE_STOP_TIMEOUT_MS)
-                check(result >= 0 || result == ProcessHelper.STOP_NOT_CHILD) {
-                    if (result == ProcessHelper.STOP_TIMEOUT) {
-                        "mihomo pid=$childPid did not exit after SIGKILL; process ownership retained"
-                    } else {
-                        "Failed to stop mihomo pid=$childPid (errno=${ProcessHelper.STOP_ERROR_BASE - result}); process ownership retained"
-                    }
+                val result = ProcessHelper.nativeStop(target, GRACEFUL_STOP_TIMEOUT_MS, FORCE_STOP_TIMEOUT_MS)
+                confirmedDead = result >= 0 || result == ProcessHelper.STOP_NOT_CHILD
+                if (!confirmedDead) {
+                    // 未确认死亡时保留所有权，调用方据此保留持久化 PID
+                    Log.w(
+                        TAG,
+                        if (result == ProcessHelper.STOP_TIMEOUT) {
+                            "mihomo pid=$target did not exit after SIGKILL; process ownership retained"
+                        } else {
+                            "Failed to stop mihomo pid=$target (errno=${ProcessHelper.STOP_ERROR_BASE - result}); process ownership retained"
+                        },
+                    )
                 }
             }
+            if (!confirmedDead) return false
             childPid = -1
         }
         secret = ""
         isRootMode = false
         vpnReadyFile?.delete()
         vpnReadyFile = null
+        return true
     }
 
     /**

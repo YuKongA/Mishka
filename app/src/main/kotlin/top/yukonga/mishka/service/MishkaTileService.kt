@@ -12,6 +12,8 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import top.yukonga.mishka.R
+import top.yukonga.mishka.platform.ExternalProxyAction
+import top.yukonga.mishka.platform.ExternalProxyOutcome
 import top.yukonga.mishka.platform.ProxyServiceBridge
 import top.yukonga.mishka.platform.ProxyServiceController
 import top.yukonga.mishka.platform.ProxyState
@@ -58,23 +60,15 @@ class MishkaTileService : TileService() {
 
     override fun onClick() {
         super.onClick()
-        val currentState = ProxyServiceBridge.state.value
-        // 启动中时忽略点击，防止重复操作
-        if (currentState.state == ProxyState.Starting) return
-
         val controller = ProxyServiceController(applicationContext)
-        if (currentState.state == ProxyState.Running) {
-            controller.stop()
-            return
+        // Tile 不是 Activity，VPN 授权对话框拉不了，只能由这一支自己起透明跳板；其余结果
+        // Controller 内已落地（过渡态忽略、订阅校验都算在内），这里不再重复判一次状态
+        when (val outcome = controller.applyExternalAction(ExternalProxyAction.Toggle)) {
+            is ExternalProxyOutcome.NeedVpnPermission ->
+                launchVpnPermissionActivity(outcome.subscriptionId)
+
+            else -> Unit
         }
-        // VPN 授权对话框要求调用方是 Activity，Tile 自身不是，需透明 Activity 跳板。
-        // 跳板前先 resolve 订阅，避免授权后又被 controller 拒绝。
-        if (!controller.hasVpnPermission()) {
-            val id = controller.resolveStartSubscriptionId() ?: return
-            launchVpnPermissionActivity(id)
-            return
-        }
-        controller.start()
     }
 
     private fun launchVpnPermissionActivity(subscriptionId: String) {
