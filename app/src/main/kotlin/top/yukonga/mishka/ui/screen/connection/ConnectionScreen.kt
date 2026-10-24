@@ -381,7 +381,6 @@ private fun ConnectionItem(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            // 网络类型标签（TCP/UDP）
             Box(
                 modifier = Modifier
                     .squircleBackground(MiuixTheme.colorScheme.onSurface.copy(alpha = 0.08f), 3.dp)
@@ -395,24 +394,6 @@ private fun ConnectionItem(
                     fontFamily = FontFamily.Monospace,
                     color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                 )
-            }
-            // 代理类型标签（TUN/TPROXY/EBPF 等）——仅在内核走特定入口时显示
-            val proxyType = meta.type.trim().uppercase()
-            if (proxyType.isNotEmpty() && !proxyType.equals(meta.network.uppercase())) {
-                Box(
-                    modifier = Modifier
-                        .squircleBackground(MiuixTheme.colorScheme.primary.copy(alpha = 0.12f), 3.dp)
-                        .padding(horizontal = 5.dp, vertical = 1.dp),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(
-                        text = proxyType,
-                        fontSize = 9.sp,
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.Monospace,
-                        color = MiuixTheme.colorScheme.primary,
-                    )
-                }
             }
             Text(
                 text = meta.host.ifEmpty { "${meta.destinationIP}:${meta.destinationPort}" },

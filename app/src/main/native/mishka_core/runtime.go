@@ -13,13 +13,10 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
-	"strings"
 	"syscall"
-	"time"
 	"unsafe"
 
 	"github.com/metacubex/mihomo/component/age"
-	"github.com/metacubex/mihomo/component/process"
 	"github.com/metacubex/mihomo/component/updater"
 	"github.com/metacubex/mihomo/config"
 	Const "github.com/metacubex/mihomo/constant"
@@ -63,8 +60,7 @@ func runMihomo() int {
 		vpnHTTPFD           int
 		vpnPlatformSocket   string
 		vpnReadyFile        string
-		rootDNS                bool
-		androidProcessResolver string
+		rootDNS             bool
 	)
 	fs.StringVar(&homeDir, "d", "", "set configuration directory")
 	fs.StringVar(&configFile, "f", "", "specify configuration file")
@@ -80,7 +76,6 @@ func runMihomo() int {
 	fs.StringVar(&vpnPlatformSocket, "vpn-platform-socket", "", "Android VPN platform abstract socket")
 	fs.StringVar(&vpnReadyFile, "vpn-ready-file", "", "publish VPN readiness after listeners start")
 	fs.BoolVar(&rootDNS, "root-dns", false, "serve transparent ROOT DNS on UDP and TCP port 53")
-	fs.StringVar(&androidProcessResolver, "android-process-resolver", "", "Mishka Android socket-owner bridge address")
 	if err := fs.Parse(os.Args[1:]); err != nil {
 		return 2
 	}
@@ -140,10 +135,6 @@ func runMihomo() int {
 
 	if overrideJSON != "" {
 		config.OverrideJSONPath = overrideJSON
-	}
-
-	if androidProcessResolver != "" {
-		installAndroidProcessResolver(androidProcessResolver)
 	}
 
 	// age armor 加密的订阅配置在磁盘上保持加密，运行时用此密钥解密（hub.Parse 内部调
@@ -302,42 +293,6 @@ func runMihomo() int {
 				return 1
 			}
 		}
-	}
-}
-
-// installAndroidProcessResolver bridges the standalone mihomo process back to VpnService's
-// ConnectivityManager.getConnectionOwnerUid. Native /proc lookup remains the fallback for ROOT
-// mode and for the brief interval where Android is recreating the service.
-func installAndroidProcessResolver(address string) {
-	previous := process.DefaultPackageNameResolver
-	process.DefaultPackageNameResolver = func(metadata *Const.Metadata) (string, error) {
-		if metadata.RawSrcAddr != nil && metadata.RawDstAddr != nil {
-			network := metadata.RawSrcAddr.Network()
-			if strings.HasPrefix(network, "tcp") {
-				network = "tcp"
-			} else if strings.HasPrefix(network, "udp") {
-				network = "udp"
-			}
-			request := network + "\t" + metadata.RawSrcAddr.String() + "\t" + metadata.RawDstAddr.String()
-			if conn, err := net.DialTimeout("udp", address, 100*time.Millisecond); err == nil {
-				_ = conn.SetDeadline(time.Now().Add(150 * time.Millisecond))
-				if _, err = conn.Write([]byte(request)); err == nil {
-					buffer := make([]byte, 256)
-					if n, readErr := conn.Read(buffer); readErr == nil {
-						pkg := strings.TrimSpace(string(buffer[:n]))
-						if pkg != "" {
-							_ = conn.Close()
-							return pkg, nil
-						}
-					}
-				}
-				_ = conn.Close()
-			}
-		}
-		if previous != nil {
-			return previous(metadata)
-		}
-		return "", process.ErrNotFound
 	}
 }
 

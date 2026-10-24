@@ -4,10 +4,10 @@ import org.koin.android.ext.koin.androidContext
 import org.koin.dsl.module
 import top.yukonga.mishka.domain.repository.SubscriptionRepository
 import top.yukonga.mishka.viewmodel.AppProxyViewModel
-import top.yukonga.mishka.viewmodel.AutomationViewModel
 import top.yukonga.mishka.viewmodel.BackupViewModel
 import top.yukonga.mishka.viewmodel.ConnectionViewModel
 import top.yukonga.mishka.viewmodel.DnsQueryViewModel
+import top.yukonga.mishka.viewmodel.AutomationViewModel
 import top.yukonga.mishka.viewmodel.ExternalControlViewModel
 import top.yukonga.mishka.viewmodel.HomeViewModel
 import top.yukonga.mishka.viewmodel.LogViewModel
@@ -30,13 +30,12 @@ val viewModelModule = module {
             connectionManager = get(),
             latencyTester = get(),
             systemInfo = get(),
-            context = androidContext(),
             getActiveSubscriptionId = { get<SubscriptionRepository>().getActive()?.id },
             activeSubscription = get<SubscriptionRepository>().activeSubscription,
             onLiveProviderInfo = get<SubscriptionRepository>()::setLiveProviderInfo,
         )
     }
-    single { SubscriptionViewModel(get(), get(), get(), get(), get(), androidContext()) }
+    single { SubscriptionViewModel(get(), get(), get(), get(), androidContext()) }
     single { OverrideProfileViewModel(get(), get(), get(), androidContext()) }
     single {
         ProxyViewModel(

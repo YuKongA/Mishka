@@ -21,7 +21,6 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import kotlinx.coroutines.withContext
 import top.yukonga.mishka.data.database.AppDatabase
 import top.yukonga.mishka.data.database.ImportedDao
 import top.yukonga.mishka.data.database.ImportedEntity
@@ -118,20 +117,6 @@ class SubscriptionRepositoryImpl(
             // 目录 mtime 是阻塞 stat，appScope 跑在 Default
         }.flowOn(Dispatchers.IO).collect { subs ->
             _subscriptions.value = subs
-        }
-    }
-
-    /**
-     * 直接读 DB 的订阅快照（不经 subscriptions Flow）。给「内置免流配置对账」用：Flow 的首个值是
-     * 构造时的空列表，DB 回填前不能拿它判断订阅是否已被删除。resolveProfile 里有目录 stat，
-     * 和 collectProfiles 一样放到 IO 上。
-     */
-    override suspend fun snapshot(): List<Subscription> = withContext(Dispatchers.IO) {
-        profileLock.withLock {
-            val activeId = _activeUuid.value
-            val live = _liveProvider.value
-            val pendingMap = pendingDao.queryAll().associateBy { it.uuid }
-            importedDao.queryAll().map { resolveProfile(it, pendingMap[it.uuid], activeId, live) }
         }
     }
 

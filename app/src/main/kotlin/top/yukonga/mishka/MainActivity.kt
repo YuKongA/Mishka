@@ -31,7 +31,6 @@ import io.github.g00fy2.quickie.config.ScannerConfig
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import org.koin.android.ext.android.get
-import top.yukonga.mishka.custom.panel.WebViewPreloader
 import top.yukonga.mishka.data.api.MihomoConnectionManager
 import top.yukonga.mishka.data.repository.ProfileProcessor
 import top.yukonga.mishka.data.repository.SubscriptionProxyResolver
@@ -43,7 +42,6 @@ import top.yukonga.mishka.platform.ProxyServiceController
 import top.yukonga.mishka.platform.StorageKeys
 import top.yukonga.mishka.platform.WifiPolicyController
 import top.yukonga.mishka.service.RootHelper
-import top.yukonga.mishka.service.SystemIpv6
 import top.yukonga.mishka.ui.theme.ThemeConfig
 import top.yukonga.mishka.ui.theme.readThemeConfig
 import top.yukonga.mishka.ui.theme.resolveIsDark
@@ -106,9 +104,6 @@ class MainActivity : ComponentActivity() {
         val splashScreen = installSplashScreen()
         super.onCreate(savedInstanceState)
         splashScreen.setKeepOnScreenCondition { !contentReady }
-        // 面板 WebView 预热（box.app 同款）：后台加载 Chromium provider + 空闲时预建实例，
-        // 面板每次进入都新建 WebView，预热把 new WebView() 的 ~500ms 冷启压掉
-        WebViewPreloader.preload(this)
 
         consumedDeepLinkNonce = savedInstanceState?.getString(STATE_DEEPLINK_NONCE)
         acceptDeepLinkImport(intent)
@@ -234,13 +229,11 @@ class MainActivity : ComponentActivity() {
             // ROOT 不可用时自动回退到 VPN 模式，防止卡在错误状态
             if (!hasRoot) {
                 val current = storage.getString(StorageKeys.TUN_MODE, "vpn")
-                if (current.startsWith("root_")) {
+                if (current == "root_tun" || current == "root_tproxy") {
                     storage.putString(StorageKeys.TUN_MODE, "vpn")
                 }
             }
             hasRootState.value = hasRoot
-            // ROOT 可用即按系统 IPv6 开关立即生效（默认关闭 → 立即禁用系统 IPv6）
-            if (hasRoot) SystemIpv6.onRootReady(this@MainActivity, storage)
         }
 
         if (storage.getString(StorageKeys.HIDE_TASK_CARD, "false") == "true") {

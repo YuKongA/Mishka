@@ -116,9 +116,6 @@
     <string name="home_inbound">Входящие</string>
     <string name="home_inbound_tproxy">TPROXY:%1$d</string>
     <string name="home_switch_mode">Сменить режим прокси</string>
-    <string name="home_mode_rule">Правила</string>
-    <string name="home_mode_global">Глобальный</string>
-    <string name="home_mode_direct">Прямой</string>
     <string name="home_switch_tun_stack">Сменить стек TUN</string>
     <string name="home_uptime_seconds">%1$d с</string>
     <string name="home_uptime_minutes">%1$d мин</string>
@@ -156,24 +153,6 @@
     <string name="home_speed_detail">Скорость соединений в реальном времени</string>
     <string name="home_speed_no_active_connection">Нет активных соединений</string>
     <string name="home_tools">Инструменты</string>
-    <string name="home_panel">Панель</string>
-    <string name="home_panel_subtitle">Веб-интерфейс</string>
-    <string name="panel_title">Панель</string>
-    <string name="panel_sheet_add_title">Добавить панель</string>
-    <string name="panel_field_name">Название</string>
-    <string name="panel_field_url">Ссылка</string>
-    <string name="panel_local_name">Локальная</string>
-    <string name="panel_local_subtitle">Отдаётся ядром по пути /ui</string>
-    <string name="panel_local_not_running">Локальная панель требует запущенного прокси; либо выберите онлайн-панель в списке панелей.</string>
-    <string name="panel_proxy_unavailable">Прокси запущен, но внешние запросы панели не могут его использовать (нет mixed-port или WebView не поддерживает настройку прокси), поэтому идут напрямую. Нажмите, чтобы закрыть.</string>
-    <string name="panel_error_name_required">Введите название</string>
-    <string name="panel_error_url_invalid">Неверный формат ссылки</string>
-    <string name="panel_add">Добавить</string>
-    <string name="panel_clear_cache">Очистить данные панели</string>
-    <string name="panel_clear_cache_message">Очищает кэш, cookie и хранилище панели. Настройки и вход, сохранённые внутри панели, будут сброшены.</string>
-    <string name="panel_clear_cache_failed">Не удалось очистить данные панели</string>
-    <string name="panel_save_failed">Не удалось сохранить файл</string>
-    <string name="panel_no_file_picker">Нет приложения для выбора файла</string>
     <string name="home_address">Адрес</string>
     <string name="home_interface">Интерфейс</string>
     <string name="home_speed">Скорость</string>
@@ -200,10 +179,6 @@
     <string name="proxy_start_first">Сначала запустите службу прокси</string>
     <string name="proxy_mode_direct_hint">Активен прямой режим (Direct): весь трафик идет в обход прокси. Выбор групп сохраняется, но вступит в силу только после переключения в режим правил (Rule).</string>
     <string name="proxy_mode_global_hint">Активен глобальный режим (Global): весь трафик направляется через группу GLOBAL. Выбор в остальных группах вступит в силу после переключения в режим правил (Rule).</string>
-    <string name="proxy_refresh_icon">Обновить значки</string>
-    <string name="proxy_show_icons">Показывать значки</string>
-    <string name="proxy_hide_unavailable">Скрывать недоступные</string>
-    <string name="proxy_close_connections_on_switch">Закрывать соединения при смене узла</string>
     <string name="proxy_single_column">В один столбец</string>
     <string name="proxy_show_group_icons">Показывать значки</string>
     <string name="proxy_timeout">Тайм-аут</string>
@@ -214,11 +189,6 @@
     <string name="proxy_sort_reverse">В обратном порядке</string>
     <string name="proxy_test_group_delay">Проверить задержку</string>
     <string name="proxy_test_node_delay">Проверить задержку узла</string>
-    <string name="proxy_delay_failed_node">Проверка задержки %1$s не удалась: узел не смог открыть тестовый URL</string>
-    <string name="proxy_delay_failed_timeout">Проверка задержки %1$s: ядро не ответило вовремя</string>
-    <string name="proxy_delay_failed_network">Проверка задержки не удалась: API ядра недоступно (прокси запущен?)</string>
-    <string name="proxy_delay_failed_unknown">Проверка задержки %1$s не удалась: %2$s</string>
-    <string name="proxy_delay_group_summary">Группа %1$s: %2$d из %3$d узлов не прошли проверку</string>
     <string name="proxy_fixed">Зафиксировано на этом узле</string>
     <string name="proxy_unfix">Открепить, вернуть автовыбор</string>
 
@@ -320,7 +290,6 @@
     <string name="provider_updating_single">Обновление %1$s…</string>
     <string name="provider_updating_progress">%1$d / %2$d</string>
     <string name="provider_update_failed">Не удалось обновить %1$s: %2$s</string>
-    <string name="provider_upload_file">Загрузить файл</string>
 
     <!-- Settings -->
     <string name="settings_title">Настройки</string>
@@ -330,11 +299,9 @@
     <string name="settings_tun_vpn_summary">через VpnService</string>
     <string name="settings_tun_root_tun_summary">собственное TUN-устройство</string>
     <string name="settings_tun_root_tproxy_summary">iptables TPROXY</string>
-    <string name="settings_tun_root_ebpf_summary">eBPF авто-редирект (нужен ebpf listener)</string>
     <string name="settings_tun_mode_vpn">VPN</string>
     <string name="settings_tun_mode_root_tun">ROOT TUN</string>
     <string name="settings_tun_mode_root_tproxy">ROOT TPROXY</string>
-    <string name="settings_tun_mode_root_ebpf">ROOT EBPF</string>
     <string name="settings_vpn_settings">Настройки VPN</string>
     <string name="settings_vpn_summary">Обход локальной сети, перехват DNS, IPv6</string>
     <string name="settings_tun_device">Имя устройства TUN</string>
@@ -376,7 +343,7 @@
     <string name="settings_theme_blur_style_gaussian_summary">Равномерное матовое размытие по всей верхней панели</string>
     <string name="settings_theme_blur_style_progressive_summary">Градиентное размытие с усилением к верхнему краю</string>
     <string name="settings_theme_density_scale">Масштаб интерфейса</string>
-    <string name="settings_theme_density_scale_summary" formatted="false">Настройка общего масштаба отображения (80% – 110%)</string>
+    <string name="settings_theme_density_scale_summary">Настройка общего масштаба отображения (80% – 110%)</string>
     <string name="settings_theme_floating_bottom_bar">Плавающая нижняя панель</string>
     <string name="settings_theme_floating_bottom_bar_summary">Использовать парящую нижнюю панель на смартфонах</string>
     <string name="settings_theme_floating_bottom_bar_style">Стиль плавающей нижней панели</string>
@@ -449,22 +416,10 @@
     <string name="root_tether_scan_result_title">Обнаруженные интерфейсы</string>
     <string name="root_tether_tproxy_unavailable_warning">В ядре отсутствует модуль xt_TPROXY. Используется резервный режим (меньшая скорость, но соединения работают). Для максимальной производительности TPROXY используйте ядро с поддержкой xt_TPROXY.</string>
     <string name="root_tproxy_tether_note">В режиме TPROXY весь трафик точки доступа направляется через ядро автоматически; переключение «В обход / Через прокси» не требуется.</string>
-    <string name="root_ebpf_tether_note">В режиме EBPF трафик точки доступа перенаправляется eBPF-слушателями mihomo; переключение «В обход / Через прокси» не требуется.</string>
     <string name="root_tun_jumbo_mtu_title">Jumbo MTU и GSO</string>
     <string name="root_tun_jumbo_mtu_summary">Агрегация больших пакетов (mtu=9000, gso=on) уменьшает системные вызовы на пакет для максимальной пропускной способности. Отключите, если восходящий канал отбрасывает фрагментированные пакеты.</string>
-    <string name="tun_profile_encrypted_override">Активный профиль зашифрован; параметр будет сохранён как переопределение Mishka.</string>
-    <string name="root_tun_device_profile_summary">Используется tun.device из активного профиля: %1$s</string>
-    <string name="root_tun_device_override_summary">Используется переопределение Mishka tun.device: %1$s</string>
     <string name="root_attach_force_reapply_title">Принудительно применять правила при переподключении</string>
     <string name="root_attach_force_reapply_summary">Диагностика: повторно применять правила iptables при каждом подключении приложения к работающему mihomo. Включайте только если правила раздачи пропадают после переподключения.</string>
-    <string name="root_section_system">Система</string>
-    <string name="root_system_ipv6_title">Системный IPv6</string>
-    <string name="root_system_ipv6_summary_off">Выкл. (по умолчанию): отключает IPv6 на не сотовых интерфейсах (Wi-Fi) и переводит протокол APN интернета на IPv4. IPv6-переключатели в активной конфигурации тоже выключаются. IMS-звонки и SMS не затрагиваются. Если прокси запущен, он автоматически перезапустится, чтобы применить изменения конфигурации.</string>
-    <string name="root_system_ipv6_summary_on">Вкл.: системный IPv6 восстановлен, протокол APN интернета возвращён, IPv6-переключатели в конфигурации включены. Если прокси запущен, он автоматически перезапустится, чтобы применить изменения конфигурации.</string>
-    <string name="root_system_ipv6_apn_line">Основная APN «%1$s»: протокол %2$s, роуминг %3$s</string>
-    <string name="root_system_ipv6_apn_none">Основная APN не найдена (можно вручную установить протокол APN на IPv4)</string>
-    <string name="root_system_ipv6_no_root">Требуется root-доступ</string>
-    <string name="root_system_ipv6_apply_failed">Не удалось применить настройку системного IPv6. Проверьте лог модуля.</string>
 
     <!-- Network Settings -->
     <string name="network_settings_title">Параметры переопределения</string>
@@ -561,10 +516,9 @@
     <!-- External Control -->
     <string name="external_control_title">Внешний контроллер</string>
     <string name="external_control_ip">Адрес API</string>
-    <string name="external_control_controller_hint">В первую очередь используется external-controller активного профиля; это поле служит запасным значением. Адрес привязки из профиля, включая 0.0.0.0, сохраняется без принудительной замены на loopback.</string>
+    <string name="external_control_controller_hint">Адрес привязки для HTTP API (например, 127.0.0.1:9090). Значение 0.0.0.0 будет автоматически заменено на 127.0.0.1.</string>
     <string name="external_control_secret">Секретный ключ API</string>
-    <string name="external_control_secret_hint">Секрет активного профиля имеет приоритет; это поле используется как запасное. Если секрет не задан ни в одном источнике, ключ не генерируется и API остаётся без пароля. При привязке к 0.0.0.0 устройства, доступные по этой сети, смогут управлять API.</string>
-
+    <string name="external_control_secret_hint">Bearer-токен для авторизации в HTTP API. Если поле пустое, используется secret из конфигурации подписки, либо генерируется случайный.</string>
     <string name="automation_title">Автоматизация</string>
     <string name="settings_automation_summary">Разрешить другим приложениям управлять прокси</string>
     <string name="automation_allow_external">Разрешить внешнее управление</string>
@@ -659,6 +613,8 @@
     <string name="override_url_placeholder">Введите URL</string>
     <string name="override_local_file">Локальный файл</string>
     <string name="override_format">Формат</string>
+    <string name="override_move_up">Выше</string>
+    <string name="override_move_down">Ниже</string>
     <string name="override_format_yaml">YAML</string>
     <string name="override_format_javascript">JavaScript</string>
     <string name="override_delete_title">Удалить переопределение</string>
@@ -676,6 +632,4 @@
         <item quantity="other">Выбрано %1$d переопределения</item>
     </plurals>
     <string name="subscription_overrides">Переопределения</string>
-    <string name="subscription_visual_config">Визуальная настройка</string>
-    <string name="subscription_visual_config_summary">Редактировать YAML этой подписки с помощью структурированных форм</string>
 </resources>

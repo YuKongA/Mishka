@@ -25,7 +25,6 @@ dependencies {
     implementation(libs.bundles.ktor)
     implementation(libs.bundles.miuix)
     implementation(libs.androidx.activity)
-    implementation(libs.androidx.webkit)
     implementation(libs.androidx.core.splashscreen)
     implementation(libs.androidx.profileinstaller)
     implementation(libs.material.icons.extended)
@@ -214,10 +213,7 @@ tasks.matching { it.name.startsWith("merge") && it.name.endsWith("Assets") }.con
 
 val mihomoSubmoduleDir = rootProject.layout.projectDirectory.dir("mihomo")
 val mishkaCoreSourceDir = rootProject.layout.projectDirectory.dir("app/src/main/native/mishka_core")
-// Mishka runs mihomo as a standalone child/root process and does not install CMFA's
-// package-name callback. The cmfa tag would therefore skip Linux socket-owner lookup and leave
-// metadata.Uid=0, making PROCESS-NAME rules miss in both VPN and ROOT modes.
-val mihomoBuildTags = listOf("mishka", "with_gvisor", "with_ebpf")
+val mihomoBuildTags = listOf("cmfa", "mishka", "with_gvisor")
 val mihomoVersion = providers.gradleProperty("mihomo.version").orElse("dev").get()
 val mihomoVersionPath = "github.com/metacubex/mihomo/constant.Version"
 val ndkDirectoryProvider = androidComponents.sdkComponents.ndkDirectory

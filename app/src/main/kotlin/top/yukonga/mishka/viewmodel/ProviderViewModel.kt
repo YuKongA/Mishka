@@ -22,7 +22,8 @@ import top.yukonga.mishka.util.describe
 
 data class ProviderItemUi(
     val name: String,
-    // provider 来源类型（HTTP/File/Inline），主页统一显示为代理/规则（http/file/inline）。
+    // 技术类型原值（proxy provider 取 type，rule provider 取 vehicleType）；
+    // 展示成「代理(…)/规则(…)」由屏幕按 isRuleProvider 本地化拼装
     val type: String,
     val vehicleType: String,
     val updatedAt: String,
@@ -88,12 +89,12 @@ class ProviderViewModel : ViewModel() {
 
             repo.getProviders().onSuccess { response ->
                 response.providers.values
-                    .filter { !it.vehicleType.equals("Compatible", ignoreCase = true) }
+                    .filter { it.vehicleType != "Compatible" }
                     .forEach { info ->
                         items.add(
                             ProviderItemUi(
                                 name = info.name,
-                                type = info.vehicleType.ifBlank { "unknown" },
+                                type = info.type,
                                 vehicleType = info.vehicleType,
                                 updatedAt = info.updatedAt,
                                 isRuleProvider = false,
@@ -104,12 +105,12 @@ class ProviderViewModel : ViewModel() {
 
             repo.getRuleProviders().onSuccess { response ->
                 response.providers.values
-                    .filter { !it.vehicleType.equals("Compatible", ignoreCase = true) }
+                    .filter { it.vehicleType != "Compatible" }
                     .forEach { info ->
                         items.add(
                             ProviderItemUi(
                                 name = info.name,
-                                type = info.vehicleType.ifBlank { "unknown" },
+                                type = info.vehicleType,
                                 vehicleType = info.vehicleType,
                                 updatedAt = info.updatedAt,
                                 isRuleProvider = true,
@@ -165,11 +166,7 @@ class ProviderViewModel : ViewModel() {
 
     fun updateAll() {
         val repo = repository ?: return
-        // File proxy providers are managed by file upload in the row; Inline providers have no
-        // refresh operation. Keep the global refresh button consistent with the per-row actions.
-        val snapshot = _uiState.value.providers.filterNot {
-            !it.isRuleProvider && (it.type.equals("file", ignoreCase = true) || it.vehicleType.equals("Inline", ignoreCase = true))
-        }
+        val snapshot = _uiState.value.providers
         if (snapshot.isEmpty()) return
         if (_uiState.value.refresh != null) return
 

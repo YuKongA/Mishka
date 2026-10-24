@@ -2,41 +2,27 @@ package top.yukonga.mishka.viewmodel
 
 import android.content.Context
 import androidx.annotation.StringRes
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.decodeFromJsonElement
-import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 import androidx.compose.runtime.Immutable
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import java.io.File
 import top.yukonga.mishka.R
-import top.yukonga.mishka.data.bridge.MishkaCoreBridge
-import top.yukonga.mishka.data.store.ProfileTransformWriter
 import top.yukonga.mishka.data.repository.ConfigValidationException
 import top.yukonga.mishka.data.repository.ImportError
 import top.yukonga.mishka.data.repository.ImportProgress
 import top.yukonga.mishka.data.repository.ProfileProcessor
 import top.yukonga.mishka.domain.model.ProfileType
 import top.yukonga.mishka.domain.model.Subscription
-import top.yukonga.mishka.domain.model.TunOverride
 import top.yukonga.mishka.domain.repository.SubscriptionRepository
 import top.yukonga.mishka.platform.ProfileFileManager
 import top.yukonga.mishka.platform.ProxyServiceController
-import top.yukonga.mishka.platform.showToast
-import top.yukonga.mishka.service.ConfigGenerator
-import top.yukonga.mishka.service.ProfileFileOps
 import top.yukonga.mishka.util.describe
 
 /**
@@ -68,23 +54,11 @@ data class UpdateAllProgress(
     val currentStep: ImportProgress? = null,
 )
 
-@Immutable
-data class ProxyProviderFileSource(
-    val type: String,
-    val path: String,
-    val format: String? = null,
-    /** The app-owned source directory where uploads and edits must persist. */
-    val profileWorkDir: String,
-    /** The directory currently used by mihomo; ROOT profiles use runtime/{uuid}. */
-    val runtimeWorkDir: String,
-)
-
 class SubscriptionViewModel(
     private val repository: SubscriptionRepository,
     val fileManager: ProfileFileManager,
     private val processor: ProfileProcessor,
     private val serviceController: ProxyServiceController,
-    private val transformWriter: ProfileTransformWriter,
     private val context: Context,
 ) : ViewModel() {
 
@@ -101,95 +75,8 @@ class SubscriptionViewModel(
         viewModelScope.launch {
             repository.subscriptions.collect { subs ->
                 _uiState.value = _uiState.value.copy(subscriptions = subs)
-                // [mishka-custom] 内置「免流」配置：列表每次刷新对一次账（见 ensureBuiltinMianliu）
-                ensureBuiltinMianliu(subs)
             }
         }
-    }
-
-    // [mishka-custom] 内置「免流」配置：导入任务；同时用于防止对账重复触发导入
-    private var builtinMianliuJob: Job? = null
-
-    // [mishka-custom] 本轮导入失败过：停下等下次进程启动 / 列表刷新，别在失败与重试之间打转
-    private var builtinMianliuImportFailed = false
-
-    /**
-     * [mishka-custom] 内置「免流」配置（res/raw/builtin_mianliu.yaml）对账：上次导入出来的那条订阅还在
-     * 库里就什么都不做；被删掉过（或从未导入）才重新导入一份包内版本——即「删掉后自动恢复」。顺带也是
-     * 把包内新配置刷进 App 的途径：删掉内置订阅，它会带着包内版本回来。
-     *
-     * 只认「上次导入的那条 id」，用户自己建的同名订阅不算数（改内容 / 改名都不影响，id 不变）；
-     * 导入不走 runPipeline、不弹导入进度框；失败本轮不再重试（下次进程启动再试），pendingOnFailure
-     * 会释放半成品。
-     *
-     * 判断「还在不在」以 DB 快照为准（repository.snapshot()），不能只看列表：subscriptions 的首个值
-     * 是构造时的空列表，DB 回填前按它判断会把「刚启动」当成「被删了」，于是每次冷启动又生成一份默认配置。
-     */
-    private fun ensureBuiltinMianliu(subs: List<Subscription>) {
-        if (builtinMianliuImportFailed) return
-        if (builtinMianliuJob?.isActive == true) return
-        val prefs = context.getSharedPreferences(BUILTIN_PREFS_NAME, Context.MODE_PRIVATE)
-        val recorded = prefs.getString(BUILTIN_MIANLIU_ID_KEY, null)
-        // 快路径：记录里的那条还在列表里（列表已回填的常见情况），不查库
-        if (recorded != null && subs.any { it.id == recorded }) return
-        builtinMianliuJob = viewModelScope.launch {
-            val stored = prefs.getString(BUILTIN_MIANLIU_ID_KEY, null)
-            val legacy = prefs.getBoolean(BUILTIN_MIANLIU_KEY, false)
-            val snapshot = repository.snapshot()
-            // 还在库里（列表只是还没回填，或订阅被改过名 / 改过内容）→ 什么都不做；
-            // 老装机只记过布尔标记：按「名字 + 文件类型」认领一次并补记 id，免得凭空多出一条
-            val existing = snapshot.firstOrNull { it.id == stored }
-                ?: if (stored == null && legacy) {
-                    snapshot.firstOrNull { it.name == BUILTIN_MIANLIU_NAME && it.type == ProfileType.File }
-                } else {
-                    null
-                }
-            if (existing != null) {
-                if (stored == null) prefs.edit().putString(BUILTIN_MIANLIU_ID_KEY, existing.id).apply()
-                return@launch
-            }
-            val sub = importBuiltinMianliu()
-            if (sub == null) {
-                builtinMianliuImportFailed = true
-                return@launch
-            }
-            prefs.edit()
-                .putString(BUILTIN_MIANLIU_ID_KEY, sub.id)
-                .putBoolean(BUILTIN_MIANLIU_KEY, true)
-                .apply()
-            // 记过 id 或老版本的布尔标记 = 之前导入过，这次是「删掉后恢复」；首次导入不弹提示
-            if (stored != null || legacy) showToast(BUILTIN_MIANLIU_RESTORED)
-        }
-    }
-
-    /**
-     * 把包内的免流配置导入为一个文件订阅，成功返回新订阅，失败返回 null（静默：下次再试，不打扰首页）。
-     */
-    private suspend fun importBuiltinMianliu(): Subscription? {
-        return try {
-            val content = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                context.resources.openRawResource(R.raw.builtin_mianliu).bufferedReader().use { it.readText() }
-            }
-            val sub = repository.create(ProfileType.File, BUILTIN_MIANLIU_NAME, "")
-            pendingOnFailure(sub.id) {
-                fileManager.savePendingConfig(sub.id, content)
-                processor.apply(sub.id)
-            }
-            sub
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Throwable) {
-            null
-        }
-    }
-
-    private companion object {
-        const val BUILTIN_MIANLIU_NAME = "免流"
-        const val BUILTIN_PREFS_NAME = "mishka_builtin_profiles"
-        // 老版本的「已导入」布尔标记（保留：一是兼容老装机，二是判断这次是首次导入还是删掉后恢复）
-        const val BUILTIN_MIANLIU_KEY = "mianliu_imported"
-        const val BUILTIN_MIANLIU_ID_KEY = "mianliu_subscription_id"
-        const val BUILTIN_MIANLIU_RESTORED = "内置「免流」配置已自动恢复"
     }
 
     fun showAddDialog() {
@@ -202,121 +89,6 @@ class SubscriptionViewModel(
 
     fun clearError() {
         _uiState.value = _uiState.value.copy(error = "")
-    }
-
-    /** Read the active profile's effective tun mapping, including age decryption and transforms. */
-    suspend fun readProfileTunConfig(subscriptionId: String): TunOverride? = withContext(Dispatchers.IO) {
-        val subscription = repository.subscriptions.value.firstOrNull { it.id == subscriptionId }
-            ?: repository.getActive()?.takeIf { it.id == subscriptionId }
-            ?: return@withContext null
-        runCatching {
-            val transformPath = transformWriter.write(subscription, ProfileTransformWriter.RUNTIME_PATH)
-            val runtime = MishkaCoreBridge.readRuntimeConfigValues(
-                ProfileFileOps.getSubscriptionDir(context, subscriptionId).absolutePath,
-                transformPath,
-                subscription.ageSecretKey,
-            )
-            val decoded = runtime.tun?.let { element ->
-                runCatching {
-                    Json { ignoreUnknownKeys = true }.decodeFromJsonElement<TunOverride>(element)
-                }.getOrNull()
-            }
-            decoded?.copy(device = decoded.device ?: runtime.tunDevice)
-                ?: runtime.tunDevice?.let { TunOverride(device = it) }
-        }.getOrNull()
-    }
-
-    /** Read only the effective device name when a caller does not need the full tun mapping. */
-    suspend fun readProfileTunDevice(subscriptionId: String): String? =
-        readProfileTunConfig(subscriptionId)?.device?.trim()?.takeIf { it.isNotEmpty() }
-
-    /**
-     * Resolve a file proxy provider from the live effective profile rather than guessing its path
-     * from a form default. Native inspection follows the same age-decryption and transform chain as
-     * mihomo. The returned profile directory is always app-owned; ROOT's runtime directory is
-     * returned separately so file operations can explicitly mirror changes into runtime/{uuid}.
-     */
-    suspend fun readProxyProviderFileSource(
-        name: String,
-        subscriptionId: String?,
-        useRootRuntime: Boolean,
-    ): ProxyProviderFileSource? = withContext(Dispatchers.IO) {
-        val subscription = if (subscriptionId.isNullOrBlank()) {
-            repository.subscriptions.value.firstOrNull { it.isActive } ?: repository.getActive()
-        } else {
-            repository.subscriptions.value.firstOrNull { it.id == subscriptionId }
-                ?: repository.getActive()?.takeIf { it.id == subscriptionId }
-                ?: return@withContext null
-        }
-        val profileWorkDir = if (subscription != null) {
-            ProfileFileOps.getSubscriptionDir(context, subscription.id)
-        } else {
-            ConfigGenerator.getWorkDir(context)
-        }
-        val runtimeWorkDir = if (useRootRuntime && subscription != null) {
-            ProfileFileOps.getRuntimeDir(context, subscription.id)
-        } else {
-            profileWorkDir
-        }
-        // While ROOT is running, inspect the copied config that mihomo actually started from. If
-        // runtime/ has not been prepared yet, use imported/ so a stopped service can still resolve.
-        val configWorkDir = if (useRootRuntime && subscription != null && File(runtimeWorkDir, "config.yaml").isFile) {
-            runtimeWorkDir
-        } else {
-            profileWorkDir
-        }
-        val transformPath = try {
-            transformWriter.write(subscription, ProfileTransformWriter.RUNTIME_PATH)
-        } catch (_: Exception) {
-            return@withContext null
-        }
-        val runtime = try {
-            MishkaCoreBridge.readRuntimeConfigValues(
-                configWorkDir.absolutePath,
-                transformPath,
-                subscription?.ageSecretKey.orEmpty(),
-            )
-        } catch (_: Exception) {
-            return@withContext null
-        }
-        val provider = runCatching { runtime.proxyProviders?.jsonObject?.get(name)?.jsonObject }.getOrNull()
-            ?: return@withContext null
-        val type = runCatching { provider["type"]?.jsonPrimitive?.contentOrNull }.getOrNull()
-            ?.trim()
-            ?.takeIf { it.isNotEmpty() }
-            ?: return@withContext null
-        if (!type.equals("file", ignoreCase = true)) return@withContext null
-        val path = runCatching { provider["path"]?.jsonPrimitive?.contentOrNull }.getOrNull()
-            ?.trim()
-            ?.takeIf { it.isNotEmpty() }
-            ?: return@withContext null
-        val format = runCatching { provider["format"]?.jsonPrimitive?.contentOrNull }.getOrNull()
-            ?.trim()
-            ?.takeIf { it.isNotEmpty() }
-        ProxyProviderFileSource(
-            type = type.lowercase(),
-            path = path,
-            format = format,
-            profileWorkDir = profileWorkDir.absolutePath,
-            runtimeWorkDir = runtimeWorkDir.absolutePath,
-        )
-    }
-
-    /** App tun edits take priority only when the source cannot be edited or a transform may rewrite it. */
-    suspend fun shouldPreferUserTunOverrides(subscriptionId: String): Boolean = withContext(Dispatchers.IO) {
-        val subscription = repository.subscriptions.value.firstOrNull { it.id == subscriptionId }
-            ?: repository.getActive()?.takeIf { it.id == subscriptionId }
-            ?: return@withContext false
-        val configFile = ProfileFileOps.getSubscriptionConfigFile(context, subscriptionId)
-        val encrypted = runCatching {
-            configFile.isFile && configFile.bufferedReader(Charsets.UTF_8).use { reader ->
-                reader.readLine()?.trim()?.startsWith("-----BEGIN AGE ENCRYPTED FILE-----") == true
-            }
-        }.getOrDefault(false)
-        val transformed = runCatching {
-            transformWriter.write(subscription, ProfileTransformWriter.RUNTIME_PATH) != null
-        }.getOrDefault(subscription.overrideIds.isNotEmpty())
-        encrypted || transformed
     }
 
     /**

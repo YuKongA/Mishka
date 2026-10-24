@@ -50,10 +50,6 @@ object ProfileFileOps {
     fun getSubscriptionConfigFile(context: Context, uuid: String): File =
         File(getImportedDir(context, uuid), "config.yaml")
 
-    /** Persistent app-managed mode overlay used when the profile source is age-encrypted. */
-    fun getRootModeOverlayFile(context: Context, uuid: String): File =
-        File(File(getWorkDir(context), "root-mode"), "$uuid.json")
-
     fun hasValidConfig(context: Context, uuid: String?): Boolean {
         if (uuid.isNullOrEmpty()) return false
         val config = File(File(getWorkDir(context), "imported/$uuid"), "config.yaml")
@@ -200,11 +196,8 @@ object ProfileFileOps {
             RootHelper.rmRfAsRoot(imported.absolutePath)
         }
         if (pending.exists()) pending.deleteRecursively()
-        // 订阅删除时一并清掉 per-profile 的 root-mode overlay（age 密文订阅的持久模式配置）
-        val rootModeOverlay = getRootModeOverlayFile(context, uuid)
         // 与 prepare/release 同一把锁。直接 rm -rf 会在新沙箱建好后补删。
         RootRuntimeCache.discard(context, uuid)
-        if (rootModeOverlay.exists()) rootModeOverlay.delete()
     }
 
     /**

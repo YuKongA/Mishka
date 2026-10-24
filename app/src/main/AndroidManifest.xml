@@ -46,13 +46,6 @@
             </intent-filter>
         </activity>
 
-        <activity
-            android:name=".PanelActivity"
-            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|mnc|colorMode|density|fontScale|fontWeightAdjustment|keyboard|layoutDirection|locale|mcc|navigation|smallestScreenSize|touchscreen|uiMode"
-            android:exported="false"
-            android:launchMode="singleTop"
-            android:theme="@style/Theme.Mishka"
-            android:windowSoftInputMode="adjustResize" />
         <!-- clash:// / clashmeta:// 订阅一键导入深链入口 -->
         <activity
             android:name=".ExternalImportActivity"

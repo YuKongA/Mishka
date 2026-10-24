@@ -38,7 +38,6 @@ class MihomoRepositoryImpl(
 
     override suspend fun getVersion(): Result<MihomoVersion> = runCatching { apiClient.getVersion() }
     override suspend fun getConfig(): Result<MihomoConfig> = runCatching { apiClient.getConfig() }
-    override suspend fun setMode(mode: String): Result<Unit> = runCatching { apiClient.setMode(mode) }
     override suspend fun getProxies(): Result<ProxiesResponse> = runCatching { apiClient.getProxies() }
     override suspend fun getGroups(): Result<GroupsResponse> = runCatching { apiClient.getGroups() }
     override suspend fun selectProxy(group: String, name: String): Result<Unit> = runCatching { apiClient.selectProxy(group, name) }

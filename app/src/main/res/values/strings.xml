@@ -118,9 +118,6 @@
     <string name="home_inbound">Inbound</string>
     <string name="home_inbound_tproxy">TPROXY:%1$d</string>
     <string name="home_switch_mode">Switch Proxy Mode</string>
-    <string name="home_mode_rule">Rule</string>
-    <string name="home_mode_global">Global</string>
-    <string name="home_mode_direct">Direct</string>
     <string name="home_switch_tun_stack">Switch TUN Stack</string>
     <string name="home_uptime_seconds">%1$ds</string>
     <string name="home_uptime_minutes">%1$dm</string>
@@ -158,24 +155,6 @@
     <string name="home_speed_detail">Live Connection Rates</string>
     <string name="home_speed_no_active_connection">No active connections</string>
     <string name="home_tools">Tools</string>
-    <string name="home_panel">Panel</string>
-    <string name="home_panel_subtitle">Web UI</string>
-    <string name="panel_title">Panel</string>
-    <string name="panel_sheet_add_title">Add panel</string>
-    <string name="panel_field_name">Name</string>
-    <string name="panel_field_url">URL</string>
-    <string name="panel_local_name">Local</string>
-    <string name="panel_local_subtitle">Served by the core at /ui</string>
-    <string name="panel_local_not_running">The local panel needs the proxy running, or pick an online panel from the panel list.</string>
-    <string name="panel_proxy_unavailable">Proxy is running, but external requests from the panel cannot use it (no mixed-port, or the WebView does not support proxy settings), so they go direct. Tap to dismiss.</string>
-    <string name="panel_error_name_required">Name is required</string>
-    <string name="panel_error_url_invalid">URL is invalid</string>
-    <string name="panel_add">Add</string>
-    <string name="panel_clear_cache">Clear panel data</string>
-    <string name="panel_clear_cache_message">Clears the panel\'s cache, cookies and storage. Settings and sign-in stored inside the panel will be reset.</string>
-    <string name="panel_clear_cache_failed">Failed to clear panel data</string>
-    <string name="panel_save_failed">Failed to save the file</string>
-    <string name="panel_no_file_picker">No app available to pick a file</string>
     <string name="home_address">Address</string>
     <string name="home_interface">Interface</string>
     <string name="home_speed">Speed</string>
@@ -202,10 +181,6 @@
     <string name="proxy_start_first">Please start the proxy service first</string>
     <string name="proxy_mode_direct_hint">Direct mode is active: all traffic bypasses the proxy. Group selections are saved but only take effect after switching back to rule mode.</string>
     <string name="proxy_mode_global_hint">Global mode is active: only the GLOBAL group routes traffic. Selections in other groups take effect after switching back to rule mode.</string>
-    <string name="proxy_refresh_icon">Refresh Icons</string>
-    <string name="proxy_show_icons">Show Icons</string>
-    <string name="proxy_hide_unavailable">Hide Unavailable</string>
-    <string name="proxy_close_connections_on_switch">Disconnect Connections on Node Switch</string>
     <string name="proxy_single_column">Single Column</string>
     <string name="proxy_show_group_icons">Show Icons</string>
     <string name="proxy_timeout">Timeout</string>
@@ -216,11 +191,6 @@
     <string name="proxy_sort_reverse">Reverse</string>
     <string name="proxy_test_group_delay">Test latency</string>
     <string name="proxy_test_node_delay">Test node delay</string>
-    <string name="proxy_delay_failed_node">Delay test failed for %1$s: node could not reach the test URL</string>
-    <string name="proxy_delay_failed_timeout">Delay test for %1$s timed out: no response from the core</string>
-    <string name="proxy_delay_failed_network">Delay test failed: cannot reach the core API (is the proxy running?)</string>
-    <string name="proxy_delay_failed_unknown">Delay test failed for %1$s: %2$s</string>
-    <string name="proxy_delay_group_summary">Group %1$s: %2$d of %3$d nodes failed the delay test</string>
     <string name="proxy_fixed">Fixed to this node</string>
     <string name="proxy_unfix">Unfix, restore automatic selection</string>
 
@@ -322,7 +292,6 @@
     <string name="provider_updating_single">Updating %1$s…</string>
     <string name="provider_updating_progress">%1$d / %2$d</string>
     <string name="provider_update_failed">Failed to update %1$s: %2$s</string>
-    <string name="provider_upload_file">Upload file</string>
 
     <!-- Settings -->
     <string name="settings_title">Settings</string>
@@ -332,11 +301,9 @@
     <string name="settings_tun_vpn_summary">via VpnService</string>
     <string name="settings_tun_root_tun_summary">owns TUN device</string>
     <string name="settings_tun_root_tproxy_summary">iptables TPROXY</string>
-    <string name="settings_tun_root_ebpf_summary">eBPF auto-redir (requires an ebpf listener)</string>
     <string name="settings_tun_mode_vpn">VPN</string>
     <string name="settings_tun_mode_root_tun">ROOT TUN</string>
     <string name="settings_tun_mode_root_tproxy">ROOT TPROXY</string>
-    <string name="settings_tun_mode_root_ebpf">ROOT EBPF</string>
     <string name="settings_vpn_settings">VPN Settings</string>
     <string name="settings_vpn_summary">Bypass private network, DNS hijacking, IPv6</string>
     <string name="settings_tun_device">TUN Device Name</string>
@@ -378,7 +345,7 @@
     <string name="settings_theme_blur_style_gaussian_summary">Uniform frosted blur across the top bar</string>
     <string name="settings_theme_blur_style_progressive_summary">Gradient blur, strongest at the top edge</string>
     <string name="settings_theme_density_scale">Interface Scale</string>
-    <string name="settings_theme_density_scale_summary" formatted="false">Adjust the global display scale (80% - 110%)</string>
+    <string name="settings_theme_density_scale_summary">Adjust the global display scale (80% - 110%)</string>
     <string name="settings_theme_floating_bottom_bar">Floating Bottom Bar</string>
     <string name="settings_theme_floating_bottom_bar_summary">Use a floating bottom navigation bar on phones</string>
     <string name="settings_theme_floating_bottom_bar_style">Floating Bottom Bar Style</string>
@@ -451,22 +418,10 @@
     <string name="root_tether_scan_result_title">Detected interfaces</string>
     <string name="root_tether_tproxy_unavailable_warning">Kernel lacks xt_TPROXY module. Running in fallback path (slower, connections still work). Use a kernel with xt_TPROXY for native TPROXY performance.</string>
     <string name="root_tproxy_tether_note">TPROXY mode proxies all hotspot traffic via kernel rules; no Bypass/Through toggle needed.</string>
-    <string name="root_ebpf_tether_note">EBPF mode redirects hotspot traffic through mihomo eBPF listeners; no Bypass/Through toggle needed.</string>
     <string name="root_tun_jumbo_mtu_title">Jumbo MTU &amp; GSO</string>
     <string name="root_tun_jumbo_mtu_summary">Large-packet aggregation (mtu=9000, gso=on) reduces per-packet syscalls for throughput. Disable if the upstream link drops fragmented traffic.</string>
-    <string name="tun_profile_encrypted_override">The active profile is encrypted; this setting is saved as a Mishka override.</string>
-    <string name="root_tun_device_profile_summary">Using active profile tun.device: %1$s</string>
-    <string name="root_tun_device_override_summary">Using Mishka tun.device override: %1$s</string>
     <string name="root_attach_force_reapply_title">Force re-apply on reconnect</string>
     <string name="root_attach_force_reapply_summary">Diagnostic: re-apply iptables rules every time the app reattaches to a running mihomo. Leave off unless tether rules disappear after reconnect.</string>
-    <string name="root_section_system">System</string>
-    <string name="root_system_ipv6_title">System IPv6</string>
-    <string name="root_system_ipv6_summary_off">Off (default): disables IPv6 on non-cellular interfaces such as Wi-Fi and sets the internet APN protocol to IPv4 only. The IPv6 switches in the active config are turned off too. IMS calls and SMS are not affected. If the proxy is running, it restarts automatically to apply config changes.</string>
-    <string name="root_system_ipv6_summary_on">On: system IPv6 is restored, the internet APN protocol is reverted, and the IPv6 switches in the active config are turned on. If the proxy is running, it restarts automatically to apply config changes.</string>
-    <string name="root_system_ipv6_apn_line">Preferred APN "%1$s": protocol %2$s, roaming %3$s</string>
-    <string name="root_system_ipv6_apn_none">No preferred APN found (you can set the APN protocol to IPv4 manually)</string>
-    <string name="root_system_ipv6_no_root">Root permission required</string>
-    <string name="root_system_ipv6_apply_failed">Failed to apply the system IPv6 setting. Check the module log.</string>
 
     <!-- Network Settings -->
     <string name="network_settings_title">Override Settings</string>
@@ -563,11 +518,9 @@
     <!-- External Control -->
     <string name="external_control_title">External Controller</string>
     <string name="external_control_ip">API Address</string>
-    <string name="external_control_controller_hint">The active profile\'s external-controller value takes precedence; this field is a fallback. Profile bind addresses, including 0.0.0.0, are kept as configured and are not forced to loopback.</string>
+    <string name="external_control_controller_hint">Bind address for the HTTP API (e.g. 127.0.0.1:9090). 0.0.0.0 will be automatically overwritten with 127.0.0.1.</string>
     <string name="external_control_secret">API Secret</string>
-    <string name="external_control_secret_hint">The active profile\'s secret takes precedence; this value is a fallback. If neither source sets a secret, no key is generated and the API has no password. A wildcard bind such as 0.0.0.0 exposes the control API to devices that can reach it.</string>
-    <string name="settings_external_control_summary">Fallback override; active profile values take priority</string>
-
+    <string name="external_control_secret_hint">Bearer token for the HTTP API. When empty, falls back to the secret defined in the subscription config, or a random one if the subscription does not set it.</string>
     <string name="automation_title">Automation</string>
     <string name="settings_automation_summary">Allow other apps to control the proxy</string>
     <string name="automation_allow_external">Allow external app control</string>
@@ -575,6 +528,7 @@
     <string name="automation_actions_hint">Supported actions: START_PROXY / STOP_PROXY / TOGGLE_PROXY / RESTART_PROXY.</string>
     <string name="automation_result_hint">The calling app receives RESULT_OK when the action is done, and RESULT_CANCELED when the request is refused, the proxy is mid-transition or no subscription is available.</string>
     <string name="automation_scope_hint">The Quick Settings tile and the in-app controls keep working when this is off — they never go through this switch.</string>
+    <string name="settings_external_control_summary">Overwrite external controller configuration</string>
 
     <!-- File Manager -->
     <string name="file_manager_title">File Manager</string>
@@ -661,6 +615,8 @@
     <string name="override_url_placeholder">Enter an override URL</string>
     <string name="override_local_file">Local file</string>
     <string name="override_format">Format</string>
+    <string name="override_move_up">Move up</string>
+    <string name="override_move_down">Move down</string>
     <string name="override_format_yaml">YAML</string>
     <string name="override_format_javascript">JavaScript</string>
     <string name="override_delete_title">Delete override</string>
@@ -676,6 +632,4 @@
         <item quantity="other">%1$d overrides selected</item>
     </plurals>
     <string name="subscription_overrides">Overrides</string>
-    <string name="subscription_visual_config">Visual config</string>
-    <string name="subscription_visual_config_summary">Edit this subscription’s YAML config with structured forms</string>
 </resources>

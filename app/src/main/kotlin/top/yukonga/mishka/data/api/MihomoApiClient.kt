@@ -9,7 +9,6 @@ import io.ktor.client.plugins.timeout
 import io.ktor.client.plugins.websocket.WebSockets
 import io.ktor.client.request.delete
 import io.ktor.client.request.get
-import io.ktor.client.request.patch
 import io.ktor.client.request.header
 import io.ktor.client.request.post
 import io.ktor.client.request.put
@@ -70,21 +69,6 @@ class MihomoApiClient(
 
     suspend fun getConfig(): MihomoConfig =
         client.get("$baseUrl/configs").body()
-
-    // === 运行模式 ===
-
-    /**
-     * 即时切换运行模式（rule / global / direct）。对齐 mihomo_box 模块切换「运行模式」的做法：
-     * 只对活着的内核发一次 `PATCH /configs`，热生效——不重启内核、不重载配置、不中断代理。
-     * 非 2xx（内核不支持 / 控制器不可达）抛 [MihomoApiException]，由调用方决定是否回退重启。
-     */
-    suspend fun setMode(mode: String) {
-        val response: HttpResponse = client.patch("$baseUrl/configs") {
-            contentType(ContentType.Application.Json)
-            setBody(mapOf("mode" to mode))
-        }
-        ensureSuccess(response, "runtime mode '$mode'")
-    }
 
     // === 代理 ===
 

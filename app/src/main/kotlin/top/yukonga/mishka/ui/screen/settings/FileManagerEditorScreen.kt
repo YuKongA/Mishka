@@ -2,7 +2,6 @@ package top.yukonga.mishka.ui.screen.settings
 
 import androidx.compose.foundation.LocalOverscrollFactory
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -14,7 +13,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -33,9 +31,6 @@ import top.yukonga.mishka.platform.ProfileFileManager
 import top.yukonga.mishka.platform.showToast
 import top.yukonga.mishka.ui.component.blur.BlurredBar
 import top.yukonga.mishka.ui.component.blur.rememberBlurBackdrop
-import top.yukonga.mishka.custom.anchor.MishkaAnchorPanel
-import top.yukonga.mishka.custom.forms.ConfigTidy
-import top.yukonga.mishka.custom.forms.MishkaConfigFormPanel
 import top.yukonga.mishka.ui.theme.LocalAppDarkMode
 import top.yukonga.mishka.ui.util.horizontalCutoutPadding
 import top.yukonga.mishka.viewmodel.SubscriptionViewModel
@@ -49,24 +44,18 @@ import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Back
-import top.yukonga.miuix.kmp.icon.extended.Link
-import top.yukonga.miuix.kmp.icon.extended.Sort
-import top.yukonga.miuix.kmp.icon.extended.Tune
-import top.yukonga.miuix.kmp.icon.extended.Undo
 import top.yukonga.miuix.kmp.icon.extended.Ok
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.scripta.editor.CodeEditor
 import top.yukonga.scripta.editor.EditorColors
 import top.yukonga.scripta.editor.EditorLanguage
 import top.yukonga.scripta.editor.rememberCodeEditorController
-import top.yukonga.scripta.editor.text.TextPosition
 
 @Composable
 fun FileManagerEditorScreen(
     uuid: String,
     relativePath: String,
     subscriptionViewModel: SubscriptionViewModel? = null,
-    showConfigFormOnOpen: Boolean = false,
     onBack: () -> Unit = {},
 ) {
     val fileManager = subscriptionViewModel?.fileManager
@@ -74,63 +63,17 @@ fun FileManagerEditorScreen(
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     var isSaving by remember { mutableStateOf(false) }
-    var showAnchorPanel by remember { mutableStateOf(false) }
-    var showFormPanel by remember { mutableStateOf(false) }
-    var contentLoaded by remember(uuid, relativePath) { mutableStateOf(false) }
-    // [mishka-custom] 回退修改的基线：最近一次打开 / 保存成功时编辑器里的文本
-    var savedBaseline by remember(uuid, relativePath) { mutableStateOf("") }
 
     LaunchedEffect(uuid, relativePath, fileManager) {
         val content = withContext(Dispatchers.IO) {
             fileManager?.readImportedFile(uuid, relativePath)
         } ?: ""
         controller.setDocument(content)
-        savedBaseline = controller.getText()
-        contentLoaded = true
-    }
-    LaunchedEffect(contentLoaded, showConfigFormOnOpen) {
-        if (contentLoaded && showConfigFormOnOpen) showFormPanel = true
     }
 
     val backdrop = rememberBlurBackdrop()
     val blurActive = backdrop != null
     val barColor = if (blurActive) Color.Transparent else MiuixTheme.colorScheme.surface
-
-    fun tidyConfig() {
-        when (val outcome = ConfigTidy.apply(controller.getText())) {
-            is ConfigTidy.Outcome.Tidied -> {
-                // 终点取编辑器里旧文本的末位置（理由同锚点面板 / 配置表单的 apply：
-                // 新文本末行更短时会残留旧尾巴）
-                val oldLines = controller.getText().split('\n')
-                controller.replaceRange(
-                    TextPosition(0, 0),
-                    TextPosition(oldLines.lastIndex, oldLines.last().length),
-                    outcome.text,
-                )
-                showToast("✅ 已按官方规范整理配置字段顺序")
-            }
-
-            ConfigTidy.Outcome.Unchanged -> showToast("配置字段顺序已符合官方规范")
-
-            is ConfigTidy.Outcome.SourceInvalid ->
-                showToast("源码存在 YAML 语法错误，请先修正后再整理", long = true)
-
-            is ConfigTidy.Outcome.VerifyFailed ->
-                showToast("整理后验证失败：${outcome.detail}", long = true)
-        }
-    }
-
-    // [mishka-custom] 回退修改：恢复到最近一次打开 / 保存的内容，并把当前版本记为已保存（按钮随之隐藏）
-    fun revertChanges() {
-        val oldLines = controller.getText().split('\n')
-        controller.replaceRange(
-            TextPosition(0, 0),
-            TextPosition(oldLines.lastIndex, oldLines.last().length),
-            savedBaseline,
-        )
-        controller.markSaved(controller.documentVersion)
-        showToast("已回退到上次保存的内容")
-    }
 
     Scaffold(
         topBar = {
@@ -140,59 +83,19 @@ fun FileManagerEditorScreen(
                     title = relativePath,
                     color = barColor,
                     navigationIcon = {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            IconButton(onClick = onBack) {
-                                val ld = LocalLayoutDirection.current
-                                Icon(
-                                    imageVector = MiuixIcons.Back,
-                                    contentDescription = stringResource(R.string.common_back),
-                                    tint = MiuixTheme.colorScheme.onSurface,
-                                    modifier = Modifier.graphicsLayer {
-                                        scaleX = if (ld == LayoutDirection.Rtl) -1f else 1f
-                                    },
-                                )
-                            }
-                            // 与文件名同处导航区，显示在「config.yaml」标题左侧。
-                            if (isYamlPath(relativePath)) {
-                                IconButton(onClick = { tidyConfig() }) {
-                                    Icon(
-                                        imageVector = MiuixIcons.Sort,
-                                        contentDescription = "整理配置字段顺序",
-                                        tint = MiuixTheme.colorScheme.onSurface,
-                                    )
-                                }
-                                // [mishka-custom] 紧跟整理按钮；内容与基线一致时不显示
-                                if (controller.isModified) {
-                                    IconButton(onClick = { revertChanges() }) {
-                                        Icon(
-                                            imageVector = MiuixIcons.Undo,
-                                            contentDescription = "回退修改",
-                                            tint = MiuixTheme.colorScheme.onSurface,
-                                        )
-                                    }
-                                }
-                            }
+                        IconButton(onClick = onBack) {
+                            val ld = LocalLayoutDirection.current
+                            Icon(
+                                imageVector = MiuixIcons.Back,
+                                contentDescription = stringResource(R.string.common_back),
+                                tint = MiuixTheme.colorScheme.onSurface,
+                                modifier = Modifier.graphicsLayer {
+                                    scaleX = if (ld == LayoutDirection.Rtl) -1f else 1f
+                                },
+                            )
                         }
                     },
                     actions = {
-                        // [mishka-custom] YAML 配置的入口按钮：配置表单（可视化）/ 锚点面板
-                        if (isYamlPath(relativePath)) {
-                            IconButton(onClick = { showFormPanel = true }) {
-                                Icon(
-                                    imageVector = MiuixIcons.Tune,
-                                    contentDescription = stringResource(R.string.subscription_visual_config),
-                                    tint = MiuixTheme.colorScheme.onSurface,
-                                )
-                            }
-                            // 锚点面板入口保持在原位；用户明确要求不迁移锚点工具。
-                            IconButton(onClick = { showAnchorPanel = true }) {
-                                Icon(
-                                    imageVector = MiuixIcons.Link,
-                                    contentDescription = "锚点面板",
-                                    tint = MiuixTheme.colorScheme.onSurface,
-                                )
-                            }
-                        }
                         val canSave = controller.isModified && !isSaving && fileManager != null
                         IconButton(
                             enabled = canSave,
@@ -200,7 +103,6 @@ fun FileManagerEditorScreen(
                                 if (fileManager == null) return@onSave
                                 // 版本号与文本必须同刻捕获：校验期间的继续编辑不能被 markSaved 误吞
                                 val version = controller.documentVersion
-                                val savedText = controller.getText()
                                 val newContent = controller.getText(controller.lineEnding)
                                 // 取被编辑订阅的自定义 UA：校验阶段也走 in-process bridge，需要复用同一 UA
                                 // 否则 GeoIP/provider 缺失时下载会用默认 UA 触发服务端拦截
@@ -224,7 +126,6 @@ fun FileManagerEditorScreen(
                                     err.onSuccess { errMsg ->
                                         if (errMsg == null) {
                                             controller.markSaved(version)
-                                            savedBaseline = savedText
                                             showToast(context.getString(R.string.file_manager_saved))
                                         } else {
                                             showToast(context.getString(R.string.file_manager_save_failed, errMsg), long = true)
@@ -291,25 +192,6 @@ fun FileManagerEditorScreen(
                         .weight(1f),
                 )
             }
-
-            // [mishka-custom] 锚点面板：改动只落在编辑器草稿里，保存仍走顶栏 Ok（内核校验 + 失败回滚）
-            MishkaAnchorPanel(
-                visible = showAnchorPanel,
-                controller = controller,
-                fileName = relativePath,
-                onClose = { showAnchorPanel = false },
-            )
-
-            // [mishka-custom] 配置表单：同一套约定——只改被编辑的键，改动先落草稿
-            MishkaConfigFormPanel(
-                visible = showFormPanel,
-                controller = controller,
-                fileName = relativePath,
-                onClose = { showFormPanel = false },
-                // fileBaseDir = 本订阅 imported/ 目录：file 型合集的源文件上传 / 在线编辑靠它定位落盘；
-                // 不传的话表单里所有相对 path 都无法解析（上传 / 保存会报「缺少订阅目录」）。
-                fileBaseDir = remember(uuid, fileManager) { fileManager?.getImportedDir(uuid) },
-            )
         }
     }
 }

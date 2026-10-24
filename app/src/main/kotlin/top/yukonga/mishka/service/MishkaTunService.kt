@@ -21,10 +21,10 @@ import kotlinx.coroutines.launch
 import org.koin.android.ext.android.inject
 import top.yukonga.mishka.MishkaApplication
 import top.yukonga.mishka.R
-import top.yukonga.mishka.data.bridge.MishkaCoreBridge
 import top.yukonga.mishka.data.repository.OverrideJsonStore
 import top.yukonga.mishka.data.repository.SubscriptionRepositoryImpl
 import top.yukonga.mishka.data.store.ProfileTransformWriter
+import top.yukonga.mishka.domain.model.resolveExternalController
 import top.yukonga.mishka.platform.PlatformStorage
 import top.yukonga.mishka.platform.ProxyServiceBridge
 import top.yukonga.mishka.platform.ProxyServiceController
@@ -47,8 +47,6 @@ class MishkaTunService : VpnService() {
     private var destroyed = false
     private var foregroundFailure: ProxyServiceStatus? = null
     private val runner by lazy { MihomoRunner(this) }
-    private val processResolverDelegate = lazy { AndroidProcessResolver(this) }
-    private val processResolver by processResolverDelegate
     private val dynamicNotification by lazy {
         DynamicNotificationManager(this, scope, MishkaApplication.instance.connectionManager)
     }
@@ -178,15 +176,11 @@ class MishkaTunService : VpnService() {
                 runner.stop()
                 closeVpnResources()
 
-                val userOverride = overrideStore.load()
-                val residualTun = storage.getString(StorageKeys.ROOT_TUN_DEVICE_ACTIVE, "")
-                    .trim()
-                    .takeIf { it.isNotEmpty() }
-                    ?: ConfigGenerator.resolveRootTunDevice(userOverride, null, storage)
                 // ROOT 孤儿仍可能持有路由；切回 VPN 前保留既有清理和缓存回写。
                 val hadRootPid = storage.getString(StorageKeys.ROOT_MIHOMO_PID, "").isNotEmpty()
                 val hasRoot = storage.getString(StorageKeys.HAS_ROOT, "false") == "true"
                 if (hadRootPid || hasRoot) {
+                    val residualTun = storage.getString(StorageKeys.ROOT_TUN_DEVICE, RuntimeOverrideBuilder.DEFAULT_TUN_DEVICE)
                     RootHelper.cleanupOrphanedMihomo(tunDevice = residualTun)
                     RootTetherHijacker.teardown()
                     RootTproxyApplier.teardown()
@@ -195,15 +189,9 @@ class MishkaTunService : VpnService() {
                     storage.putString(StorageKeys.ROOT_MIHOMO_PID, "")
                     storage.putString(StorageKeys.ROOT_MIHOMO_SECRET, "")
                     storage.putString(StorageKeys.ROOT_ACTIVE_SUBSCRIPTION_ID, "")
-                    storage.putString(StorageKeys.ROOT_TUN_DEVICE_ACTIVE, "")
-                    storage.putString(StorageKeys.ROOT_CONTROLLER_API_ADDRESS_ACTIVE, "")
                 }
 
-                val profileModeConfig = ActiveProfileRuntimeConfig.prepare(
-                    this@MishkaTunService,
-                    subscriptionId,
-                    ebpfEnabled = false,
-                )
+                val userOverride = overrideStore.load()
                 val viaProxy = storage.getString(StorageKeys.SUBSCRIPTION_UPDATE_VIA_PROXY, "true") == "true"
                 val transformPlan = prepareRuntimeTransform(
                     this@MishkaTunService, subscriptionId, subscriptionRepository, transformWriter,
@@ -236,36 +224,8 @@ class MishkaTunService : VpnService() {
                     ?: throw IllegalStateException(getString(R.string.error_vpn_denied))
                 ensureActive()
                 clearCloseOnExec(tunFd)
-                val profileWorkDir = subscriptionId?.let {
-                    ProfileFileOps.getSubscriptionDir(this@MishkaTunService, it)
-                } ?: ConfigGenerator.getWorkDir(this@MishkaTunService)
-                val profileParameters = runCatching {
-                    MishkaCoreBridge.readRuntimeConfigValues(
-                        profileWorkDir.absolutePath,
-                        transformPlan.transformPath,
-                        transformPlan.ageSecretKey,
-                    )
-                }.onFailure { Log.w(TAG, "Unable to inspect active profile runtime values; using plain YAML fallback", it) }
-                    .getOrNull()
-                if (profileParameters == null && (profileModeConfig.encrypted || transformPlan.transformPath != null)) {
-                    throw IllegalStateException("Unable to inspect encrypted/transformed active profile for safe runtime overrides")
-                }
-                val effectiveProfileListeners = profileParameters?.let {
-                    ActiveProfileRuntimeConfig.patchRuntimeListeners(it.listeners, ebpfEnabled = false)
-                }
-                val useProfileTunDefaults = profileModeConfig.tunDefaultsInserted || profileParameters?.hasTun == false
-                val profileSecret = profileParameters?.secret
-                    ?: if (profileParameters == null) subscriptionId?.let {
-                        ConfigGenerator.readSubscriptionSecret(this@MishkaTunService, it)
-                    } else null
-                val profileController = profileParameters?.externalController
-                    ?: if (profileParameters == null) subscriptionId?.let {
-                        ConfigGenerator.readSubscriptionExternalController(this@MishkaTunService, it)
-                    } else null
-                val secret = ConfigGenerator.resolveSecret(userOverride, profileSecret)
-                val controllerBindAddress = ConfigGenerator.resolveExternalController(userOverride, profileController)
-                val controllerApiAddress = ConfigGenerator.apiClientAddress(controllerBindAddress)
-
+                val secret = ConfigGenerator.resolveSecret(this@MishkaTunService, userOverride, subscriptionId)
+                val extCtl = userOverride.resolveExternalController()
                 val overrideFile = RuntimeOverrideBuilder.buildAndWriteForRun(
                     context = this@MishkaTunService,
                     userOverride = userOverride,
@@ -273,9 +233,6 @@ class MishkaTunService : VpnService() {
                     tunMode = TunMode.Vpn,
                     subscriptionUpdateViaProxy = viaProxy,
                     subscriptionMixedPort = transformPlan.mixedPort,
-                    subscriptionId = subscriptionId,
-                    effectiveProfileListeners = effectiveProfileListeners,
-                    useProfileTunDefaults = useProfileTunDefaults,
                 )
                 val gateway = buildList {
                     add("${RuntimeOverrideBuilder.VPN_GATEWAY}/${RuntimeOverrideBuilder.VPN_PREFIX}")
@@ -286,14 +243,13 @@ class MishkaTunService : VpnService() {
                     useRoot = false,
                     overrideJsonPath = overrideFile.absolutePath,
                     secret = secret,
-                    externalControllerBindAddress = controllerBindAddress,
+                    externalController = extCtl,
                     ageSecretKey = transformPlan.ageSecretKey,
                     transformPath = transformPlan.transformPath,
                     preferTransformMixedPort = transformPlan.transformPath != null && viaProxy && userOverride.mixedPort == null,
                     vpnGateway = gateway,
                     vpnHttpFd = httpListenerFd,
                     vpnPlatformSocket = requireNotNull(platformBridge).socketName,
-                    processResolverAddress = processResolver.address,
                 )
                 if (!success) throw IllegalStateException(runner.errorMessage.ifBlank { getString(R.string.error_start_failed) })
                 ensureActive()
@@ -303,7 +259,7 @@ class MishkaTunService : VpnService() {
                             ProxyServiceStatus(
                                 ProxyState.Running,
                                 secret = runner.secret,
-                                externalController = controllerApiAddress,
+                                externalController = extCtl,
                                 tunMode = TunMode.Vpn,
                                 startTime = Clock.System.now().toEpochMilliseconds(),
                                 mihomoPid = runner.pid,
@@ -531,7 +487,6 @@ class MishkaTunService : VpnService() {
             teardown.cancel()
             Log.i(TAG, "VPN Service resources released")
         }
-        if (processResolverDelegate.isInitialized()) processResolver.close()
         Log.i(TAG, "MishkaTunService destroyed")
         super.onDestroy()
     }

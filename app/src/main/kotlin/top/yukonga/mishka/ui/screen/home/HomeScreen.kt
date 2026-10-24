@@ -50,7 +50,6 @@ fun HomeScreen(
     onNavigateProvider: () -> Unit = {},
     onNavigateConnection: () -> Unit = {},
     onNavigateDnsQuery: () -> Unit = {},
-    onNavigatePanel: () -> Unit = {},
     onStartProxy: () -> Unit = {},
     onSwitchMode: (String) -> Unit = {},
     onSwitchTunStack: (String) -> Unit = {},
@@ -149,7 +148,6 @@ fun HomeScreen(
                     onNavigateProvider = onNavigateProvider,
                     onNavigateConnection = onNavigateConnection,
                     onNavigateDnsQuery = onNavigateDnsQuery,
-                    onNavigatePanel = onNavigatePanel,
                 )
             }
         }

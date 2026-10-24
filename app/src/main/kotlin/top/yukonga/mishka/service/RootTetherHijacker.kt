@@ -48,8 +48,8 @@ object RootTetherHijacker {
     private const val BYPASS_GOTO_TARGET = RuntimeOverrideBuilder.ROOT_TUN_RULE_INDEX + 10
 
     // ========== TPROXY 路径 ==========
-    // mihomo 端口选择器的历史兜底值，与 mixed-port / redir-port 错开；
-    // ROOT TPROXY/热点 PROXY 规则实际使用活动 profile 的有效 tproxy-port。
+    // mihomo tproxy listener 固定端口，与 mixed-port / redir-port 错开；
+    // RuntimeOverrideBuilder 根据 probe 结果决定是否往 override 里写入该端口
     internal const val TPROXY_PORT = 7895
 
     // bit 24，避开 Android Netd 低 16 位 mark（permissions / explicit-socket / netId 等）。
@@ -145,21 +145,15 @@ object RootTetherHijacker {
      * @param tproxySupported 由 caller（MishkaRootService）提前 probe 得出的结果。
      *        仅 PROXY 模式参考；BYPASS 分支不读。
      */
-    fun apply(
-        mode: Mode,
-        interfaces: List<String>,
-        tproxySupported: Boolean,
-        tproxyPort: Int = TPROXY_PORT,
-    ) {
+    fun apply(mode: Mode, interfaces: List<String>, tproxySupported: Boolean) {
         if (interfaces.isEmpty()) {
             Log.i(TAG, "apply: no interfaces configured, skip (mode=$mode)")
             return
         }
-        val effectivePort = tproxyPort.takeIf { it in 1..65535 } ?: TPROXY_PORT
-        Log.i(TAG, "Applying tether rules: mode=$mode tproxySupported=$tproxySupported tproxyPort=$effectivePort ifaces=$interfaces")
+        Log.i(TAG, "Applying tether rules: mode=$mode tproxySupported=$tproxySupported ifaces=$interfaces")
         when (mode) {
             Mode.BYPASS -> applyBypass(interfaces)
-            Mode.PROXY -> if (tproxySupported) applyTproxy(interfaces, effectivePort) else applyProxyFallback(interfaces)
+            Mode.PROXY -> if (tproxySupported) applyTproxy(interfaces) else applyProxyFallback(interfaces)
         }
         dumpState()
     }
@@ -185,18 +179,18 @@ object RootTetherHijacker {
      * `ip route add local default dev lo table <X>` 是 TPROXY 套路的命门 —— 没有这条
      * 带 fwmark 的包找不到接收 socket，直接被丢。
      */
-    private fun applyTproxy(interfaces: List<String>, tproxyPort: Int) {
+    private fun applyTproxy(interfaces: List<String>) {
         // 幂等：清理残留（上次异常退出 / 第三方模块留下的同名 chain）
         runTeardownPass()
 
         // 整体 apply 走 heredoc 单次 su 调用：CIDR RETURN 规则 ~60 条，per-cmd 模式
         // 每条 ~50-100ms 会让 apply 慢 3-6s；heredoc 单次 fork 全部完成。
-        val script = buildApplyTproxyScript(interfaces, tproxyPort)
+        val script = buildApplyTproxyScript(interfaces)
         val code = RootHelper.runRootScriptHeredoc(script, timeoutSeconds = 15)
         Log.i(TAG, "applyTproxy finished code=$code ifaces=$interfaces")
     }
 
-    private fun buildApplyTproxyScript(interfaces: List<String>, tproxyPort: Int): String {
+    private fun buildApplyTproxyScript(interfaces: List<String>): String {
         val sb = StringBuilder()
         sb.appendLine("#!/system/bin/sh")
         sb.appendLine("set +e")
@@ -247,11 +241,11 @@ object RootTetherHijacker {
         for (proto in listOf("tcp", "udp")) {
             sb.appendLine(
                 "$IPT4 -t mangle -A $CHAIN_NAME -p $proto -j TPROXY " +
-                        "--on-ip 127.0.0.1 --on-port $tproxyPort --tproxy-mark $TPROXY_MARK/$TPROXY_MASK ${tag("tproxy-$proto")}"
+                        "--on-ip 127.0.0.1 --on-port $TPROXY_PORT --tproxy-mark $TPROXY_MARK/$TPROXY_MASK ${tag("tproxy-$proto")}"
             )
             sb.appendLine(
                 "$IPT6 -t mangle -A $CHAIN_NAME -p $proto -j TPROXY " +
-                        "--on-ip ::1 --on-port $tproxyPort --tproxy-mark $TPROXY_MARK/$TPROXY_MASK ${tag("tproxy-$proto-v6")} 2>/dev/null"
+                        "--on-ip ::1 --on-port $TPROXY_PORT --tproxy-mark $TPROXY_MARK/$TPROXY_MASK ${tag("tproxy-$proto-v6")} 2>/dev/null"
             )
         }
 
@@ -369,11 +363,24 @@ object RootTetherHijacker {
      * （不阻止 stop 流程；与第三方模块共存被引用时内核会拒绝删，属预期）。
      */
     fun teardown() {
-        Log.i(TAG, "Tearing down tether rules (single-pass fast path)")
-        // The script itself deletes every anchor in bounded loops and is idempotent. The old path
-        // launched another su just to verify, then sometimes a third su to repeat the same script;
-        // that dominated normal stop/restart latency on Magisk and KernelSU devices.
+        Log.i(TAG, "Tearing down tether rules")
         runTeardownPass()
+        val report = verifyClean()
+        if (report.residual.isEmpty()) {
+            Log.i(TAG, "teardown verified clean")
+            return
+        }
+        Log.w(TAG, "teardown residual after first pass (${report.residual.size}): ${report.residual}, retrying")
+        runTeardownPass()
+        val retryReport = verifyClean()
+        if (retryReport.residual.isEmpty()) {
+            Log.i(TAG, "teardown verified clean after retry")
+        } else {
+            Log.w(
+                TAG,
+                "teardown residual after retry (${retryReport.residual.size}): ${retryReport.residual} — manual intervention may be needed"
+            )
+        }
     }
 
     /**

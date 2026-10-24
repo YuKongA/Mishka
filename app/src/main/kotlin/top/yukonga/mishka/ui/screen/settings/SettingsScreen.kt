@@ -85,7 +85,6 @@ fun SettingsScreen(
             when (storage?.getString(StorageKeys.TUN_MODE, "vpn")) {
                 "root_tun" -> 1
                 "root_tproxy" -> 2
-                "root_ebpf" -> 3
                 else -> 0
             }
         )
@@ -95,7 +94,6 @@ fun SettingsScreen(
         stringResource(R.string.settings_tun_mode_vpn),
         stringResource(R.string.settings_tun_mode_root_tun),
         stringResource(R.string.settings_tun_mode_root_tproxy),
-        stringResource(R.string.settings_tun_mode_root_ebpf),
     )
 
     val backdrop = rememberBlurBackdrop()
@@ -142,7 +140,6 @@ fun SettingsScreen(
                                     summary = when (tunModeIndex) {
                                         1 -> stringResource(R.string.settings_tun_root_tun_summary)
                                         2 -> stringResource(R.string.settings_tun_root_tproxy_summary)
-                                        3 -> stringResource(R.string.settings_tun_root_ebpf_summary)
                                         else -> stringResource(R.string.settings_tun_vpn_summary)
                                     },
                                     items = tunModeItems,
@@ -151,7 +148,6 @@ fun SettingsScreen(
                                         val mode = when (index) {
                                             1 -> "root_tun"
                                             2 -> "root_tproxy"
-                                            3 -> "root_ebpf"
                                             else -> "vpn"
                                         }
                                         storage?.putString(StorageKeys.TUN_MODE, mode)
@@ -170,7 +166,7 @@ fun SettingsScreen(
                                 )
                             })
                         }
-                        if (tunModeIndex in 1..3) {
+                        if (tunModeIndex == 1 || tunModeIndex == 2) {
                             add(CardItem("rootSettings") {
                                 ArrowPreference(
                                     title = stringResource(R.string.root_settings_title),

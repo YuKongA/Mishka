@@ -1,13 +1,11 @@
 package top.yukonga.mishka.viewmodel
 
-import android.content.Context
 import androidx.compose.runtime.Immutable
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toPersistentList
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
@@ -19,10 +17,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import top.yukonga.mishka.R
 import top.yukonga.mishka.data.api.MihomoConnectionManager
 import top.yukonga.mishka.data.api.RuleLatencyTester
 import top.yukonga.mishka.data.repository.OverrideJsonStore
@@ -39,7 +34,6 @@ import top.yukonga.mishka.platform.ProxyServiceController
 import top.yukonga.mishka.platform.ProxyState
 import top.yukonga.mishka.platform.TunMode
 import top.yukonga.mishka.platform.showToast
-import top.yukonga.mishka.service.ActiveProfileRuntimeConfig
 import top.yukonga.mishka.util.FormatUtils
 import kotlin.time.Clock
 import kotlin.time.Duration
@@ -149,7 +143,6 @@ class HomeViewModel(
     private val connectionManager: MihomoConnectionManager,
     private val latencyTester: RuleLatencyTester,
     private val systemInfo: PlatformSystemInfo,
-    private val context: Context,
     private val getActiveSubscriptionId: () -> String? = { null },
     private val activeSubscription: StateFlow<Subscription?> = MutableStateFlow(null).asStateFlow(),
     private val onLiveProviderInfo: (subscriptionId: String?, info: SubscriptionInfo?) -> Unit = { _, _ -> },
@@ -186,8 +179,6 @@ class HomeViewModel(
 
     private var repository: MihomoRepository? = null
     private var latencyJob: Job? = null
-    // 运行模式即时切换：过渡态等状态落定后再打 PATCH，期间又点一次就取消上一次
-    private var modeApplyJob: Job? = null
     private var connectionRateJob: Job? = null
     private var trafficJob: Job? = null
     private var memoryJob: Job? = null
@@ -200,8 +191,6 @@ class HomeViewModel(
     private var startTime: Long = 0
     private var uptimeJob: Job? = null
     private var mihomoPid: Int = -1
-    private val profileTunWriteMutex = Mutex()
-    private data class TunConfigUpdateOutcome(val encrypted: Boolean = false, val failed: Boolean = false)
 
     /** UI 是否在前台，由 MainActivity 的 onStart/onStop 驱动，门控各轮询循环 */
     private val uiVisible = MutableStateFlow(true)
@@ -708,125 +697,25 @@ class HomeViewModel(
     private fun persistedMode(): String = overrideStore.load().mode?.takeIf { it.isNotBlank() } ?: "--"
 
     /**
-     * 切换运行模式（规则 / 全局 / 直连）。
-     *
-     * 运行中走一次 `PATCH /configs` 即时生效——对齐 mihomo_box 模块的「运行模式」：内核不重启、
-     * 启动链不重跑、代理不中断；随后在后台断开存量连接，老长连接会按旧模式继续路由几分钟，
-     * 不主动断开的话用户体感就是「点了切换没生效」。停止态只落 override，下次启动自然读到新值；
-     * 启动/停止过渡态等状态落定后再打 PATCH（重启窗口里配置已定型，直接发会被这次重启覆盖）。
-     * PATCH 失败才回退一次重启（[ProxyServiceController.restartWhenReady]），保证切换最终生效；
-     * 别退回无条件的 `restart()`——那会把用户没打算启动的代理拉起来。
+     * 停止态也可切：写 override 与运行态无关，重启交给 [ProxyServiceController.restartWhenReady]
+     * 判定（Stopped/Error 下什么都不做，下次启动自然读到新值），别退回 `restart()`——
+     * 那会把用户没打算启动的代理拉起来。
      */
     fun switchMode(mode: String) {
         val current = overrideStore.load()
         overrideStore.save(current.copy(mode = mode))
         _uiState.value = _uiState.value.copy(mode = mode)
-        modeApplyJob?.cancel()
-        modeApplyJob = when (serviceController.status.value.state) {
-            ProxyState.Running -> viewModelScope.launch { applyModeToLiveCore(mode) }
-
-            ProxyState.Starting, ProxyState.Stopping -> viewModelScope.launch {
-                val settled = serviceController.status.first {
-                    it.state != ProxyState.Starting && it.state != ProxyState.Stopping
-                }
-                if (settled.state == ProxyState.Running) applyModeToLiveCore(mode)
-            }
-
-            ProxyState.Stopped, ProxyState.Error -> null
-        }
+        serviceController.restartWhenReady(getActiveSubscriptionId())
     }
-
-    /**
-     * 把运行模式打到正在跑的内核上（PATCH /configs）。
-     * 内核客户端还没建好（Running 刚发布、连接管理器还在建客户端）或 PATCH 失败时回退一次重启
-     * ——切换模式是用户可见的操作，宁可慢一次也不能静默丢失。
-     */
-    private suspend fun applyModeToLiveCore(mode: String) {
-        val api = repository ?: run {
-            serviceController.restartWhenReady(getActiveSubscriptionId())
-            return
-        }
-        if (api.setMode(mode).isSuccess) {
-            // 后台断存量连接：不阻塞点击响应；失败（内核刚停 / 超时）不影响本次切换
-            viewModelScope.launch { api.closeAllConnections() }
-        } else {
-            serviceController.restartWhenReady(getActiveSubscriptionId())
-        }
-    }
-
-    /** Current app-level TUN device override, used by ROOT settings to show the effective source. */
-    val rootTunDeviceOverride: String?
-        get() = overrideStore.load().tun?.device?.trim()?.takeIf { it.isNotEmpty() }
-
-    /** App-managed tun fields are the writable fallback for encrypted/transformed profiles. */
-    val rootTunOverride: TunOverride?
-        get() = overrideStore.load().tun
 
     fun switchTunStack(stack: String) {
-        // TPROXY / EBPF 模式 tun.enable=false，切 stack 无意义（且不应触发 restart）
-        if (_uiState.value.tunMode == TunMode.RootTproxy ||
-            _uiState.value.tunMode == TunMode.RootEbpf ||
-            stack.isBlank()
-        ) {
-            return
-        }
-        val subscriptionId = getActiveSubscriptionId()
-        viewModelScope.launch {
-            val outcome = persistActiveTunValues(subscriptionId, mapOf("stack" to stack))
-            if (outcome.failed) return@launch
-            if (outcome.encrypted) showToast(context.getString(R.string.tun_profile_encrypted_override))
-            _uiState.update { it.copy(tunStack = stack) }
-            serviceController.restart(subscriptionId)
-        }
-    }
-
-    /** Persist the Root TUN MTU/GSO switch into active-profile tun fields (source or app fallback). */
-    fun setRootTunJumboMtu(enabled: Boolean) {
-        val values = linkedMapOf<String, Any?>(
-            "mtu" to if (enabled) 9000 else 1500,
-            "gso" to enabled,
-            "gso-max-size" to if (enabled) 65535 else null,
-        )
-        val subscriptionId = getActiveSubscriptionId()
-        viewModelScope.launch {
-            val outcome = persistActiveTunValues(subscriptionId, values)
-            if (outcome.encrypted) showToast(context.getString(R.string.tun_profile_encrypted_override))
-        }
-    }
-
-    /**
-     * Update comment-preserving profile YAML when possible. Age ciphertext is immutable, while
-     * selected transforms may rewrite the edited fields; in either case the app override is kept
-     * as the explicit user edit so the next runtime uses the requested value.
-     */
-    private suspend fun persistActiveTunValues(
-        subscriptionId: String?,
-        values: Map<String, Any?>,
-    ): TunConfigUpdateOutcome = profileTunWriteMutex.withLock {
-        val profile = activeSubscription.value?.takeIf { it.id == subscriptionId }
-        val hasTransform = profile?.overrideIds?.isNotEmpty() == true
-        val result = try {
-            withContext(Dispatchers.IO) {
-                ActiveProfileRuntimeConfig.updateTunValues(context, subscriptionId, values)
-            }
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            showToast(context.getString(R.string.error_save_failed, e.message ?: e.javaClass.simpleName))
-            return@withLock TunConfigUpdateOutcome(failed = true)
-        }
-        val keepAppOverride = result.encrypted || hasTransform
+        // TPROXY 模式 tun.enable=false，切 stack 无意义（且不应触发 restart）
+        if (_uiState.value.tunMode == TunMode.RootTproxy) return
         val current = overrideStore.load()
-        var tun = current.tun ?: TunOverride()
-        if ("stack" in values) tun = tun.copy(stack = if (keepAppOverride) values["stack"] as? String else null)
-        if ("mtu" in values) tun = tun.copy(mtu = if (keepAppOverride) values["mtu"] as? Int else null)
-        if ("gso" in values) tun = tun.copy(gso = if (keepAppOverride) values["gso"] as? Boolean else null)
-        if ("gso-max-size" in values) {
-            tun = tun.copy(gsoMaxSize = if (keepAppOverride) values["gso-max-size"] as? Int else null)
-        }
-        overrideStore.save(current.copy(tun = tun.takeIf { it != TunOverride() }))
-
-        TunConfigUpdateOutcome(encrypted = result.encrypted)
+        val nextTun = (current.tun ?: TunOverride()).copy(stack = stack)
+        overrideStore.save(current.copy(tun = nextTun))
+        _uiState.value = _uiState.value.copy(tunStack = stack)
+        serviceController.restart(getActiveSubscriptionId())
     }
 
     fun reloadConfig() {

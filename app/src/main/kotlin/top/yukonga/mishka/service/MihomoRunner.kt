@@ -29,7 +29,6 @@ class MihomoRunner(private val context: Context) {
     @Volatile
     private var isRootMode = false
     private var vpnReadyFile: File? = null
-    private var rootTunDeviceName: String? = null
     val pid: Int get() = synchronized(processLock) { childPid }
     var secret: String = ""
     var externalController: String = "127.0.0.1:9090"
@@ -61,9 +60,8 @@ class MihomoRunner(private val context: Context) {
     fun attachToExisting(
         pid: Int,
         secret: String,
-        controllerApiAddress: String,
+        externalController: String,
         subscriptionId: String?,
-        tunDeviceName: String? = null,
     ): Boolean {
         if (pid <= 0 || !RootHelper.isAliveAsRoot(pid)) {
             Log.w(TAG, "Attach failed: pid dead (pid=$pid)")
@@ -74,15 +72,18 @@ class MihomoRunner(private val context: Context) {
             Log.w(TAG, "Attach failed: wrong cmdline (pid=$pid, cmdline=${cmdline.take(64)})")
             return false
         }
-        if (!isApiAuthorized(secret, controllerApiAddress)) {
-            Log.w(TAG, "Attach failed: API authorization probe failed (pid=$pid)")
+        if (!RootHelper.hasCoreCredentials(pid)) {
+            Log.w(TAG, "Attach failed: incompatible ROOT process credentials (pid=$pid)")
+            return false
+        }
+        if (!isApiAuthorized(secret, externalController) || !isRootDnsReady(secret, externalController)) {
+            Log.w(TAG, "Attach failed: controller or ROOT DNS is not ready (pid=$pid)")
             return false
         }
         childPid = pid
         isRootMode = true
         this.secret = secret
-        this.externalController = controllerApiAddress
-        this.rootTunDeviceName = tunDeviceName
+        this.externalController = externalController
         activeSubscriptionId = subscriptionId
         Log.i(TAG, "Attached to existing mihomo process: pid=$pid")
         return true
@@ -110,15 +111,13 @@ class MihomoRunner(private val context: Context) {
         useRoot: Boolean = false,
         overrideJsonPath: String,
         secret: String,
-        externalControllerBindAddress: String,
-        tunDeviceName: String? = null,
+        externalController: String,
         ageSecretKey: String = "",
         transformPath: String? = null,
         preferTransformMixedPort: Boolean = false,
         vpnGateway: String? = null,
         vpnHttpFd: Int = -1,
         vpnPlatformSocket: String? = null,
-        processResolverAddress: String = "",
     ): Boolean = withContext(Dispatchers.IO) {
         if (isRunning) {
             Log.w(TAG, "mihomo already running")
@@ -134,8 +133,7 @@ class MihomoRunner(private val context: Context) {
         isRootMode = useRoot
         activeSubscriptionId = subscriptionId
         this@MihomoRunner.secret = secret
-        this@MihomoRunner.externalController = ConfigGenerator.apiClientAddress(externalControllerBindAddress)
-        this@MihomoRunner.rootTunDeviceName = tunDeviceName
+        this@MihomoRunner.externalController = externalController
 
         // ROOT 模式走独立 runtime/{uuid}/ 沙箱（mihomo 会以 uid=0 写 provider 缓存，不能污染 imported/；停机由 RootRuntimeCache 回写后再删）；
         // 调用方（MishkaRootService）必须在 start 之前调 ProfileFileOps.prepareRootRuntime 准备好内容。
@@ -171,20 +169,17 @@ class MihomoRunner(private val context: Context) {
                     if (vpnHttpFd >= 0) {
                         add("--vpn-http-fd"); add(vpnHttpFd.toString())
                     }
+                } else {
+                    add("--root-dns")
                 }
                 if (transformPath != null) {
                     add("--transform"); add(transformPath)
                     if (preferTransformMixedPort) add("--prefer-transform-mixed-port")
                 }
-                if (secret.isNotEmpty()) {
-                    add("--secret"); add(secret)
-                }
-                add("--ext-ctl"); add(externalControllerBindAddress)
+                add("--secret"); add(secret)
+                add("--ext-ctl"); add(externalController)
                 if (ageSecretKey.isNotEmpty()) {
                     add("--age-secret-key"); add(ageSecretKey)
-                }
-                if (processResolverAddress.isNotEmpty()) {
-                    add("--android-process-resolver"); add(processResolverAddress)
                 }
             }.toTypedArray()
             val logFile = File(workDir, "mihomo.log")
@@ -214,6 +209,14 @@ class MihomoRunner(private val context: Context) {
             }
 
             Log.i(TAG, "mihomo child pid=$childPid (root=$useRoot)")
+            if (useRoot && !RootHelper.hasCoreCredentials(childPid)) {
+                errorMessage = context.getString(
+                    R.string.error_generic_start_failed,
+                    "ROOT process must run as 0:${RootHelper.CORE_GID}",
+                )
+                stop()
+                return@withContext false
+            }
 
             // 轮询 API 确认 mihomo 真正就绪，进程退出则快速失败
             val result = waitForReady(useRoot, workDir)
@@ -251,12 +254,7 @@ class MihomoRunner(private val context: Context) {
             val target = childPid
             Log.i(TAG, "Stopping mihomo pid=$target (root=$isRootMode)")
             if (isRootMode) {
-                val storage = PlatformStorage(context)
-                val tunDevice = rootTunDeviceName?.takeIf { it.isNotBlank() }
-                    ?: storage.getString(
-                        StorageKeys.ROOT_TUN_DEVICE_ACTIVE,
-                        storage.getString(StorageKeys.ROOT_TUN_DEVICE, RuntimeOverrideBuilder.DEFAULT_TUN_DEVICE),
-                    )
+                val tunDevice = PlatformStorage(context).getString(StorageKeys.ROOT_TUN_DEVICE, "Mishka")
                 val killed = RootHelper.killAsRoot(target, tunDevice)
                 if (!killed) {
                     RootHelper.killMihomoByName(tunDevice)
@@ -283,7 +281,6 @@ class MihomoRunner(private val context: Context) {
         }
         secret = ""
         isRootMode = false
-        rootTunDeviceName = null
         vpnReadyFile?.delete()
         vpnReadyFile = null
         return true
@@ -300,8 +297,8 @@ class MihomoRunner(private val context: Context) {
             delay(500)
             val checkLiveness = !useRoot || rootRound++ % LIVENESS_CHECK_EVERY == 0
             if (useRoot) {
-                if (isApiAuthorized(secret, externalController, timeoutMs = 500)) {
-                    delay(100)
+                if (isRootDnsReady(secret, externalController, timeoutMs = 500)) {
+                    delay(500)
                     return scanLogForTunError(true, workDir)
                 }
             } else {
@@ -394,9 +391,7 @@ class MihomoRunner(private val context: Context) {
             val conn = URL("http://$externalController/configs").openConnection() as HttpURLConnection
             conn.connectTimeout = timeoutMs
             conn.readTimeout = timeoutMs
-            if (secret.isNotEmpty()) {
-                conn.setRequestProperty("Authorization", "Bearer $secret")
-            }
+            conn.setRequestProperty("Authorization", "Bearer $secret")
             val code = conn.responseCode
             conn.disconnect()
             code in 200..299

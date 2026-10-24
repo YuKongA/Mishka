@@ -20,14 +20,6 @@ interface SubscriptionRepository {
     /** 当前活跃订阅（含 mihomo runtime 聚合流量）。 */
     val activeSubscription: StateFlow<Subscription?>
 
-    /**
-     * 直接读 DB 的订阅快照（imported + pending 合并，字段优先级与 [subscriptions] 一致）。
-     *
-     * 给「内置免流配置对账」用的：subscriptions 的首个值是构造时的空列表，DB 回填前按它判断
-     * 「订阅被删了没」会在每次冷启动误判一次；这里从 DB 现读，不依赖 Flow 的回填时机。
-     */
-    suspend fun snapshot(): List<Subscription>
-
     /** 推送 mihomo runtime 聚合后的 live provider 流量；传 null 清空。 */
     fun setLiveProviderInfo(subscriptionId: String?, info: SubscriptionInfo?)
 

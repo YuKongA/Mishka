@@ -57,7 +57,7 @@ class DynamicNotificationManager(
     /**
      * 根据设置启动动态通知或显示静态通知。
      *
-     * ROOT 模式（RootTun / RootTproxy / RootEbpf）下强制走静态：app 进程无 VpnService 系统 binding 加持，
+     * ROOT 模式（RootTun / RootTproxy）下强制走静态：app 进程无 VpnService 系统 binding 加持，
      * 后台时 device idle 让 1 Hz `/traffic` WS 帧合并 + `notify()` 批处理，动态通知会冻结
      */
     fun startOrFallbackStatic(storage: PlatformStorage, tunMode: TunMode = TunMode.Vpn) {
@@ -72,7 +72,6 @@ class DynamicNotificationManager(
                 when (tunMode) {
                     TunMode.RootTun -> R.string.settings_tun_mode_root_tun
                     TunMode.RootTproxy -> R.string.settings_tun_mode_root_tproxy
-                    TunMode.RootEbpf -> R.string.settings_tun_mode_root_ebpf
                     TunMode.Vpn -> R.string.settings_tun_mode_vpn
                 }
             )

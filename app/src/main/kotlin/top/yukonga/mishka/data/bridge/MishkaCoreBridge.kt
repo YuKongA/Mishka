@@ -10,7 +10,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonElement
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -38,27 +37,12 @@ data class CoreFetchResult(
 @Serializable
 private data class TransformCheck(val valid: Boolean = false)
 
-@Serializable
-data class CoreRuntimeConfig(
-    val externalController: String? = null,
-    val secret: String? = null,
-    val tunDevice: String? = null,
-    val tproxyPort: Int? = null,
-    val hasTun: Boolean = false,
-    /** Full effective `tun` mapping after age decryption and subscription transforms. */
-    val tun: JsonElement? = null,
-    val listeners: JsonElement? = null,
-    /** Effective `proxy-providers` map after age decryption and subscription transforms. */
-    val proxyProviders: JsonElement? = null,
-)
-
 class MishkaCoreError(message: String) : RuntimeException(message)
 
 object MishkaCoreBridge {
 
     private val tokenSeq = AtomicInteger(1)
     private val json = Json { ignoreUnknownKeys = true }
-    private val nativeConfigLock = Any()
 
     init {
         // mishka_jni 链接依赖 libmihomo.so 的导出符号，必须先加载。
@@ -101,15 +85,13 @@ object MishkaCoreBridge {
         val pollerJob = launchProgressPoller(this, token, onProgress)
         try {
             val raw = withContext(Dispatchers.IO) {
-                // age 全局密钥进程级共享：与配置检查/读取共用锁，避免密钥交叉污染。
-                synchronized(nativeConfigLock) {
-                    nativeSetAgeSecretKey(ageSecretKey)
-                    try {
-                        nativeFetchAndValid(workDir, url, force, httpProxy, userAgent, token)
-                    } finally {
-                        nativeDone.set(true)
-                        nativeSetAgeSecretKey("")
-                    }
+                // age 全局密钥进程级共享：fetchAndValid 由 processLock 串行，fetch 前设置、后清空。
+                nativeSetAgeSecretKey(ageSecretKey)
+                try {
+                    nativeFetchAndValid(workDir, url, force, httpProxy, userAgent, token)
+                } finally {
+                    nativeDone.set(true)
+                    nativeSetAgeSecretKey("")
                 }
             }
             interpretResult(raw)
@@ -146,26 +128,9 @@ object MishkaCoreBridge {
             .getOrElse { throw MishkaCoreError("invalid native payload: $raw") }
     }
 
-    /**
-     * Read the profile values needed before mihomo starts, using the same age decryption and
-     * optional transform path as the runtime. A missing YAML key is null; an explicit empty value
-     * remains an empty string so callers can distinguish it from a missing key.
-     */
-    fun readRuntimeConfigValues(workDir: String, transformPath: String?, ageSecretKey: String): CoreRuntimeConfig {
-        val raw = synchronized(nativeConfigLock) {
-            nativeReadRuntimeConfigValues(workDir, transformPath.orEmpty(), ageSecretKey)
-        }
-        if (raw.isNullOrEmpty()) throw MishkaCoreError("native returned empty runtime config values")
-        if (raw.startsWith("error:")) throw MishkaCoreError(raw.removePrefix("error:").trim())
-        return runCatching { json.decodeFromString<CoreRuntimeConfig>(raw) }
-            .getOrElse { throw MishkaCoreError("invalid runtime config payload: $raw") }
-    }
-
     /** 按运行时同一条解密、脚本、Parse 链路校验变换，保存失败时不污染覆写文件。 */
     fun validateTransform(workDir: java.io.File, transform: java.io.File, ageSecretKey: String) {
-        val raw = synchronized(nativeConfigLock) {
-            nativeValidateTransform(workDir.path, transform.path, ageSecretKey)
-        }
+        val raw = nativeValidateTransform(workDir.path, transform.path, ageSecretKey)
         val result = interpretTransformResult(raw)
         check(result.valid) { "native transform validation returned invalid result" }
     }
@@ -176,13 +141,6 @@ object MishkaCoreBridge {
         return runCatching { json.decodeFromString(TransformCheck.serializer(), raw) }
             .getOrElse { throw MishkaCoreError("invalid native payload: $raw") }
     }
-
-    @JvmStatic
-    private external fun nativeReadRuntimeConfigValues(
-        workDir: String,
-        transform: String,
-        secretKey: String,
-    ): String?
 
     @JvmStatic
     private external fun nativeValidateTransform(

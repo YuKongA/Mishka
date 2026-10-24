@@ -1,100 +1,30 @@
 package top.yukonga.mishka.service
 
 import android.content.Context
-import top.yukonga.mishka.custom.runtime.RuntimeConfigValues
 import top.yukonga.mishka.domain.model.ConfigurationOverride
-import top.yukonga.mishka.domain.model.TunOverride
-import top.yukonga.mishka.platform.PlatformStorage
-import top.yukonga.mishka.platform.StorageKeys
+import top.yukonga.mishka.domain.model.resolveSecretOrNull
 import java.io.File
+import java.util.UUID
 
 /**
- * Runtime profile-value resolution for mihomo. The active profile file has priority over Mishka
- * overrides; controller credentials are empty when neither source configures a secret.
+ * mihomo 运行时路径与 secret 工具。配置覆写不在此处生成，
+ * 运行时合并逻辑见 [RuntimeOverrideBuilder]，用户持久设置见 OverrideJsonStore。
  */
 object ConfigGenerator {
 
-    private const val DEFAULT_EXTERNAL_CONTROLLER = "127.0.0.1:9090"
+    fun generateSecret(): String = UUID.randomUUID().toString().take(16)
 
     /**
-     * Secret priority: active profile `secret` > Mishka override > no authentication.
-     * An explicitly empty/null profile secret is retained as empty and therefore disables auth.
+     * external-controller 的 secret，优先级：用户 override > 订阅 config.yaml 顶层 `secret:` >
+     * 随机生成。两个 Service 都从这里取，别各写一份——它是「secret 优先级」这条约束的实现单点。
      */
     fun resolveSecret(
         context: Context,
         userOverride: ConfigurationOverride,
         subscriptionId: String?,
-    ): String = resolveSecret(userOverride, readProfileScalar(context, subscriptionId, "secret"))
-
-    /** Resolve a secret using an already decrypted/transformed profile value. */
-    fun resolveSecret(userOverride: ConfigurationOverride, profileSecret: String?): String =
-        RuntimeConfigValues.selectSecret(profileSecret, userOverride.secret)
-
-    /**
-     * Binding priority: active profile `external-controller` > Mishka override > loopback default.
-     * The configured bind value is returned unchanged; use [apiClientAddress] for requests made by
-     * Mishka itself when that bind is a wildcard.
-     */
-    fun resolveExternalController(
-        context: Context,
-        userOverride: ConfigurationOverride,
-        subscriptionId: String?,
-    ): String = resolveExternalController(
-        userOverride,
-        readSubscriptionExternalController(context, subscriptionId),
-    )
-
-    /** Resolve a binding using an already decrypted/transformed profile value. */
-    fun resolveExternalController(userOverride: ConfigurationOverride, profileController: String?): String =
-        RuntimeConfigValues.selectExternalController(
-            profileController,
-            userOverride.externalController,
-            DEFAULT_EXTERNAL_CONTROLLER,
-        )
-
-    fun apiClientAddress(bindAddress: String): String = RuntimeConfigValues.apiClientAddress(bindAddress)
-
-    /** Read the active profile's top-level `tproxy-port`, if it is plain YAML. */
-    fun readSubscriptionTproxyPort(context: Context, subscriptionId: String?): Int? =
-        readProfileScalar(context, subscriptionId, "tproxy-port")
-            ?.trim()
-            ?.toIntOrNull()
-            ?.takeIf { it in 1..65535 }
-
-    /** Active profile `tproxy-port` > app override > the historical ROOT fallback. */
-    fun resolveRootTproxyPort(profilePort: Int?, appPort: Int?): Int =
-        RuntimeConfigValues.selectRootTproxyPort(
-            profilePort = profilePort,
-            appPort = appPort,
-            defaultPort = RootTproxyApplier.TPROXY_PORT,
-        )
-
-    /**
-     * ROOT TUN device priority: active profile `tun.device` > Mishka's `tun.device` override >
-     * existing ROOT device setting > the historic default.
-     */
-    fun resolveRootTunDevice(
-        context: Context,
-        userOverride: ConfigurationOverride,
-        subscriptionId: String?,
-        storage: PlatformStorage = PlatformStorage(context),
-    ): String = resolveRootTunDevice(
-        userOverride,
-        readSubscriptionTunDevice(context, subscriptionId),
-        storage,
-    )
-
-    /** Resolve ROOT TUN name using an already decrypted/transformed profile value. */
-    fun resolveRootTunDevice(
-        userOverride: ConfigurationOverride,
-        profileTunDevice: String?,
-        storage: PlatformStorage,
-    ): String = RuntimeConfigValues.selectTunDevice(
-        profileValue = profileTunDevice,
-        appValue = userOverride.tun?.device,
-        rootSetting = storage.getString(StorageKeys.ROOT_TUN_DEVICE, RuntimeOverrideBuilder.DEFAULT_TUN_DEVICE),
-        defaultValue = RuntimeOverrideBuilder.DEFAULT_TUN_DEVICE,
-    )
+    ): String = userOverride.resolveSecretOrNull()
+        ?: subscriptionId?.let { readSubscriptionSecret(context, it) }
+        ?: generateSecret()
 
     fun getWorkDir(context: Context): File {
         val dir = File(context.filesDir, "mihomo")
@@ -102,51 +32,29 @@ object ConfigGenerator {
         return dir
     }
 
-    /** Plain-YAML fallback used only if native age/transform inspection is unavailable. */
-    fun readSubscriptionSecret(context: Context, subscriptionId: String): String? =
-        readProfileScalar(context, subscriptionId, "secret")
-
-    /** Read the active profile's top-level `external-controller` scalar, if present. */
-    fun readSubscriptionExternalController(context: Context, subscriptionId: String?): String? =
-        readProfileScalar(context, subscriptionId, "external-controller")
-
-    /** Read the active profile's direct `tun.device` scalar, including flow-style `tun` maps. */
-    fun readSubscriptionTunDevice(context: Context, subscriptionId: String?): String? {
-        val file = configFile(context, subscriptionId)
-        if (!file.isFile) return null
+    /**
+     * 从订阅 config.yaml 中提取顶层 secret 字段。
+     *
+     * 仅做行级匹配（行首 `secret:`，不含缩进），支持单/双引号与行尾注释。
+     *
+     * @return 去引号后的 secret 值；订阅无该字段或文件不存在则返回 null
+     */
+    fun readSubscriptionSecret(context: Context, subscriptionId: String): String? {
+        val file = ProfileFileOps.getSubscriptionConfigFile(context, subscriptionId)
+        if (!file.exists()) return null
+        val regex = Regex("""^secret:\s*(.+?)\s*(?:#.*)?$""")
         return try {
-            RuntimeConfigValues.nestedScalar(file.readText(Charsets.UTF_8), "tun", "device")
-                ?.trim()
-                ?.takeIf { it.isNotEmpty() }
-        } catch (_: Exception) {
-            null
-        }
-    }
-
-    /** Read simple tun values from plain YAML as a fallback when native effective-config inspection is unavailable. */
-    fun readSubscriptionTunConfig(context: Context, subscriptionId: String?): TunOverride? {
-        val file = configFile(context, subscriptionId)
-        if (!file.isFile) return null
-        return try {
-            val source = file.readText(Charsets.UTF_8)
-            if (source.trimStart().startsWith("-----BEGIN AGE ENCRYPTED FILE-----")) return null
-            fun scalar(key: String): String? = RuntimeConfigValues.nestedScalar(source, "tun", key)
-            val config = TunOverride(
-                enable = scalar("enable")?.trim()?.toBooleanStrictOrNull(),
-                device = scalar("device")?.trim()?.takeIf { it.isNotEmpty() },
-                stack = scalar("stack")?.trim()?.takeIf { it.isNotEmpty() },
-                autoRoute = scalar("auto-route")?.trim()?.toBooleanStrictOrNull(),
-                strictRoute = scalar("strict-route")?.trim()?.toBooleanStrictOrNull(),
-                autoRedirect = scalar("auto-redirect")?.trim()?.toBooleanStrictOrNull(),
-                autoDetectInterface = scalar("auto-detect-interface")?.trim()?.toBooleanStrictOrNull(),
-                mtu = scalar("mtu")?.trim()?.toIntOrNull(),
-                gso = scalar("gso")?.trim()?.toBooleanStrictOrNull(),
-                gsoMaxSize = scalar("gso-max-size")?.trim()?.toIntOrNull(),
-            )
-            config.takeIf {
-                it.enable != null || it.device != null || it.stack != null || it.autoRoute != null ||
-                    it.strictRoute != null || it.autoRedirect != null || it.autoDetectInterface != null ||
-                    it.mtu != null || it.gso != null || it.gsoMaxSize != null
+            file.useLines { lines ->
+                for (line in lines) {
+                    val raw = regex.matchEntire(line)?.groupValues?.get(1) ?: continue
+                    val unquoted = when {
+                        raw.length >= 2 && raw.startsWith('"') && raw.endsWith('"') -> raw.substring(1, raw.length - 1)
+                        raw.length >= 2 && raw.startsWith('\'') && raw.endsWith('\'') -> raw.substring(1, raw.length - 1)
+                        else -> raw
+                    }
+                    return@useLines unquoted.takeIf { it.isNotEmpty() }
+                }
+                null
             }
         } catch (_: Exception) {
             null
@@ -154,33 +62,27 @@ object ConfigGenerator {
     }
 
     /**
-     * Read a top-level scalar from the active profile's config.yaml. `""` is intentionally
-     * different from null: it means the key is present but empty (for example `secret:`).
+     * 从订阅 config.yaml 中提取顶层 `mixed-port` 字段，用于判断 mihomo 是否
+     * 已经会监听 HTTP 代理端口（决定 [RuntimeOverrideBuilder] 是否注入兜底默认值）。
+     *
+     * 仅做行级匹配（行首 `mixed-port:`，不含缩进），支持行尾注释。值非正整数视为未设置。
+     *
+     * @return 解析到的端口（1..65535）；订阅无该字段、值非数字、或文件不存在则返回 null
      */
-    private fun readProfileScalar(context: Context, subscriptionId: String?, key: String): String? {
-        val file = configFile(context, subscriptionId)
-        if (!file.isFile) return null
+    fun readSubscriptionMixedPort(context: Context, subscriptionId: String): Int? {
+        val file = ProfileFileOps.getSubscriptionConfigFile(context, subscriptionId)
+        if (!file.exists()) return null
+        val regex = Regex("""^mixed-port:\s*(\d+)\s*(?:#.*)?$""")
         return try {
-            RuntimeConfigValues.topLevelScalar(file.readText(Charsets.UTF_8), key)
+            file.useLines { lines ->
+                for (line in lines) {
+                    val raw = regex.matchEntire(line)?.groupValues?.get(1) ?: continue
+                    return@useLines raw.toIntOrNull()?.takeIf { it in 1..65535 }
+                }
+                null
+            }
         } catch (_: Exception) {
             null
         }
     }
-
-    private fun configFile(context: Context, subscriptionId: String?): File =
-        if (!subscriptionId.isNullOrBlank()) {
-            ProfileFileOps.getSubscriptionConfigFile(context, subscriptionId)
-        } else {
-            File(getWorkDir(context), "config.yaml")
-        }
-
-    /**
-     * From the active profile's top-level `mixed-port`, used to decide whether mihomo already
-     * listens for HTTP proxy traffic. Invalid/empty values are treated as unset.
-     */
-    fun readSubscriptionMixedPort(context: Context, subscriptionId: String): Int? =
-        readProfileScalar(context, subscriptionId, "mixed-port")
-            ?.trim()
-            ?.toIntOrNull()
-            ?.takeIf { it in 1..65535 }
 }

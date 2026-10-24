@@ -30,13 +30,6 @@ interface MihomoRepository {
 
     suspend fun getVersion(): Result<MihomoVersion>
     suspend fun getConfig(): Result<MihomoConfig>
-
-    /**
-     * 即时切换运行模式（rule / global / direct）：`PATCH /configs` 打到活着的内核上，
-     * 热生效，不重启。失败时调用方回退一次重启。
-     */
-    suspend fun setMode(mode: String): Result<Unit>
-
     suspend fun getProxies(): Result<ProxiesResponse>
     suspend fun getGroups(): Result<GroupsResponse>
     suspend fun selectProxy(group: String, name: String): Result<Unit>

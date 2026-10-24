@@ -4,7 +4,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyListScope
@@ -27,7 +26,6 @@ fun LazyListScope.quickEntriesSection(
     onNavigateProvider: () -> Unit = {},
     onNavigateConnection: () -> Unit = {},
     onNavigateDnsQuery: () -> Unit = {},
-    onNavigatePanel: () -> Unit = {},
 ) {
     item(key = "quick_entries_title") {
         SmallTitle(text = stringResource(R.string.home_tools))
@@ -76,21 +74,6 @@ fun LazyListScope.quickEntriesSection(
                     isRunning = isRunning,
                     onClick = onNavigateDnsQuery,
                 )
-            }
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                // 外部面板是纯前端页面，不读 app 的状态，代理没起也能开（只是拿不到数据），
-                // 故不跟其它入口一起受 isRunning 门控
-                QuickEntryCard(
-                    modifier = Modifier.weight(1f),
-                    title = stringResource(R.string.home_panel),
-                    subtitle = stringResource(R.string.home_panel_subtitle),
-                    isRunning = true,
-                    onClick = onNavigatePanel,
-                )
-                Spacer(modifier = Modifier.weight(1f))
             }
         }
     }

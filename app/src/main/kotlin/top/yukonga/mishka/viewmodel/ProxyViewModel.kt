@@ -27,23 +27,6 @@ import top.yukonga.mishka.platform.PlatformStorage
 import top.yukonga.mishka.platform.StorageKeys
 import top.yukonga.mishka.util.describe
 
-/**
- * mihomo 内置出站名：`DIRECT` / `REJECT` / `REJECT-DROP` / `PASS` / `COMPATIBLE`，外加 `GLOBAL` 组。
- * 内核按全大写注册，但手写配置里混大小写很常见，故一律小写比对。
- */
-private val BuiltInOutboundNames = setOf("direct", "reject", "reject-drop", "pass", "compatible", "global")
-
-/** 内置出站的类型字段（/proxies 的 `type`）；只在节点被改名、名字兜不住时起作用。 */
-private val BuiltInOutboundTypes = setOf("direct", "reject", "rejectdrop", "pass", "compatible")
-
-/**
- * 是否 mihomo 内置出站。「隐藏不可用」按 delay == -1（healthcheck 超时）过滤，而内置出站
- * 从不参与拨测——history 恒为 0，于是一开开关它们就整组消失，偏偏 DIRECT / REJECT / GLOBAL
- * 是任何配置都得留着的兜底出口，隐藏后只能关掉开关才看得见。
- */
-fun isBuiltInOutbound(name: String, type: String = ""): Boolean =
-    name.trim().lowercase() in BuiltInOutboundNames || type.trim().lowercase() in BuiltInOutboundTypes
-
 @Immutable
 data class ProxyGroupUi(
     val name: String = "",
@@ -101,16 +84,6 @@ class ProxyViewModel(
     )
     val showGroupIcons: StateFlow<Boolean> = _showGroupIcons.asStateFlow()
 
-    private val _hideUnavailable = MutableStateFlow(
-        storage?.getString(StorageKeys.PROXY_HIDE_UNAVAILABLE, "false") == "true"
-    )
-    val hideUnavailable: StateFlow<Boolean> = _hideUnavailable.asStateFlow()
-
-    private val _closeConnectionsOnSwitch = MutableStateFlow(
-        storage?.getString(StorageKeys.PROXY_CLOSE_CONNECTIONS_ON_SWITCH, "false") == "true"
-    )
-    val closeConnectionsOnSwitch: StateFlow<Boolean> = _closeConnectionsOnSwitch.asStateFlow()
-
     private var repository: MihomoRepository? = null
 
     // mihomo 重启切 client 时取消旧的 loadProxies 协程，防止其 HTTP 响应已读完但 UI 写回
@@ -143,16 +116,6 @@ class ProxyViewModel(
     fun updateShowGroupIcons(enabled: Boolean) {
         _showGroupIcons.value = enabled
         storage?.putString(StorageKeys.PROXY_GROUP_SHOW_ICONS, enabled.toString())
-    }
-
-    fun updateHideUnavailable(enabled: Boolean) {
-        _hideUnavailable.value = enabled
-        storage?.putString(StorageKeys.PROXY_HIDE_UNAVAILABLE, enabled.toString())
-    }
-
-    fun updateCloseConnectionsOnSwitch(enabled: Boolean) {
-        _closeConnectionsOnSwitch.value = enabled
-        storage?.putString(StorageKeys.PROXY_CLOSE_CONNECTIONS_ON_SWITCH, enabled.toString())
     }
 
     fun setRepository(repo: MihomoRepository?) {
@@ -272,7 +235,6 @@ class ProxyViewModel(
         val target = groupOf(group) ?: return
         // 不可选组 PUT 必定 400，提前挡下省一个 RTT
         if (!target.isSelectable) return
-        val shouldCloseConnections = _closeConnectionsOnSwitch.value && target.now != proxy
         viewModelScope.launch {
             repo.selectProxy(group, proxy).onSuccess {
                 if (repository !== repo) return@onSuccess
@@ -289,11 +251,6 @@ class ProxyViewModel(
                         .toPersistentList()
                 )
                 saveSelection(group, proxy)
-                if (shouldCloseConnections) {
-                    repo.closeAllConnections().onFailure {
-                        Log.w(TAG, "Failed to close connections after switching node", it)
-                    }
-                }
             }
         }
     }

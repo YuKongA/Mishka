@@ -2,7 +2,6 @@ package top.yukonga.mishka.domain.model
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.JsonElement
 
 /**
  * mihomo 配置覆写模型。字段按 mihomo `RawConfig` json tag 命名，
@@ -36,9 +35,6 @@ data class ConfigurationOverride(
     @SerialName("dns") val dns: DnsOverride? = null,
     @SerialName("sniffer") val sniffer: SnifferOverride? = null,
     @SerialName("tun") val tun: TunOverride? = null,
-    // ROOT mode supplies the effective profile listener list after selectively toggling eBPF roles;
-    // retaining the full list avoids RawConfig's array replacement dropping unrelated listeners.
-    @SerialName("listeners") val listeners: JsonElement? = null,
     @SerialName("profile") val profile: ProfileOverride? = null,
 )
 
@@ -77,8 +73,6 @@ data class TunOverride(
     @SerialName("stack") val stack: String? = null,
     @SerialName("file-descriptor") val fileDescriptor: Int? = null,
     @SerialName("auto-route") val autoRoute: Boolean? = null,
-    @SerialName("strict-route") val strictRoute: Boolean? = null,
-    @SerialName("auto-redirect") val autoRedirect: Boolean? = null,
     @SerialName("auto-detect-interface") val autoDetectInterface: Boolean? = null,
     @SerialName("route-exclude-address") val routeExcludeAddress: List<String>? = null,
     @SerialName("inet6-address") val inet6Address: List<String>? = null,
@@ -99,16 +93,15 @@ data class ProfileOverride(
 )
 
 /**
- * Resolve the Mishka fallback binding: trim, treat blank as unset, and default to loopback.
- * Wildcard binds are preserved; callers must use a separate loopback address for their own API
- * requests without changing the actual mihomo listener.
+ * 解析用户的 external-controller 设置：trim、空字符串视为未设置、默认 `127.0.0.1:9090`，
+ * 并把监听地址 `0.0.0.0` 替换为客户端可连的 `127.0.0.1`。
  */
 fun ConfigurationOverride.resolveExternalController(): String =
-    externalController?.trim()?.takeIf { it.isNotEmpty() } ?: "127.0.0.1:9090"
+    (externalController?.trim()?.takeIf { it.isNotEmpty() } ?: "127.0.0.1:9090")
+        .replace("0.0.0.0", "127.0.0.1")
 
 /**
- * Resolve the Mishka secret override: trim and treat a blank value as unset. If no source configures
- * a secret, the API is intentionally left unauthenticated rather than assigned a random token.
+ * 解析用户的 secret：trim、空字符串视为未设置（让调用方 fallback 到 random 生成值）。
  */
 fun ConfigurationOverride.resolveSecretOrNull(): String? =
     secret?.trim()?.takeIf { it.isNotEmpty() }

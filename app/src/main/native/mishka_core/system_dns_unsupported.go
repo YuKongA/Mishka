@@ -1,4 +1,4 @@
-//go:build !android || (!cmfa && !mishka)
+//go:build !android || !cmfa
 
 package main
 

@@ -18,8 +18,6 @@ class BootReceiver : BroadcastReceiver() {
         when (intent.action) {
             Intent.ACTION_BOOT_COMPLETED,
             Intent.ACTION_MY_PACKAGE_REPLACED -> {
-                // 系统 IPv6 对账循环随重启消失：ROOT 可用时按开关期望值重新拉起（与 mihomo_box 开机行为一致）
-                SystemIpv6.onBootAsync(context)
                 val storage = PlatformStorage(context)
                 val wasRunning = storage.getString(StorageKeys.SERVICE_WAS_RUNNING, "false") == "true"
                 if (!wasRunning) return

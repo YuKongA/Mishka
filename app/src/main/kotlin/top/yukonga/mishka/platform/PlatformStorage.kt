@@ -19,14 +19,6 @@ object StorageKeys {
     const val ROOT_MIHOMO_SECRET = "root_mihomo_secret"
     const val ROOT_START_TIME = "root_start_time"
     const val ROOT_ACTIVE_SUBSCRIPTION_ID = "root_active_subscription_id"
-    const val ROOT_TUN_DEVICE_ACTIVE = "root_tun_device_active"
-    const val ROOT_CONTROLLER_API_ADDRESS_ACTIVE = "root_controller_api_address_active"
-    const val ROOT_TPROXY_PORT_ACTIVE = "root_tproxy_port_active"
-    const val ROOT_LAST_STOP_CLEAN = "root_last_stop_clean"
-    // Tproxy 分应用名单快照（启动时由 TUN 黑白名单解析写入；attach 与 UID 重解析沿用）
-    const val ROOT_TPROXY_APP_MODE_ACTIVE = "root_tproxy_app_mode_active"
-    const val ROOT_TPROXY_APP_PACKAGES_ACTIVE = "root_tproxy_app_packages_active"
-    const val ROOT_TPROXY_APP_USERS_ACTIVE = "root_tproxy_app_users_active"
 
     // 启动时刻的 boot session 标记，用于 reopen 重连前识别设备是否重启过（重启会杀死 root
     // mihomo，不能把过期 PID 误当"仍存活"）。判定逻辑见 [BootSession]
@@ -84,9 +76,6 @@ object StorageKeys {
     // 仅额外强制重建 ROOT TUN 热点数据规则；DNS 与本机 TPROXY 在 attach 时始终重建。
     const val ROOT_ATTACH_FORCE_REAPPLY = "root_attach_force_reapply"
 
-    // ROOT 设置 · 系统 IPv6 开关（默认 false = 关闭系统 IPv6，见 service/SystemIpv6.kt）
-    const val ROOT_SYSTEM_IPV6 = "root_system_ipv6"
-
     // 上次启动时探测 xt_TPROXY 的结果（"true"/"false"/""），仅在 PROXY 或 ROOT TPROXY
     // 路径下有值。UI 读取此 key 决定是否显示「内核不支持 TPROXY，已降级」告警。
     // 空串表示「不适用」（BYPASS 模式 / 未启动过 PROXY）。
@@ -95,8 +84,6 @@ object StorageKeys {
     // 代理页设置
     const val PROXY_NODE_SORT_OPTION = "proxy_node_sort_option"
     const val PROXY_GROUP_SHOW_ICONS = "proxy_group_show_icons"
-    const val PROXY_HIDE_UNAVAILABLE = "proxy_hide_unavailable"
-    const val PROXY_CLOSE_CONNECTIONS_ON_SWITCH = "proxy_close_connections_on_switch"
 
     // 节点单列显示，默认 false（每行 2 个）
     const val PROXY_NODE_SINGLE_COLUMN = "proxy_node_single_column"

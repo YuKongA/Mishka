@@ -1,7 +1,6 @@
 package top.yukonga.mishka.service
 
 import android.util.Log
-import java.io.File
 import java.util.concurrent.TimeUnit
 
 object RootHelper {
@@ -68,7 +67,7 @@ object RootHelper {
                 "${escapeShellSingleQuoted(binary)} $argsStr > ${escapeShellSingleQuoted(logFile)} 2>&1 & echo \$!"
         Log.i(TAG, "Starting as root: ${redactArgs(args)}")
         return try {
-            val process = ProcessBuilder("su", "-c", command)
+            val process = ProcessBuilder("su", "-g", CORE_GID.toString(), "-c", command)
                 .redirectErrorStream(true)
                 .start()
             val reader = process.inputStream.bufferedReader()
@@ -146,57 +145,69 @@ object RootHelper {
         }
     }
 
-    /**
-     * 单次 su 完成 TERM → 短轮询 → KILL。旧实现每 500ms 重新 fork 一次 su，正常重启也会
-     * 累积数秒 Magisk/SU 握手；这里把判活留在同一个 root shell 内，正常退出通常 < 300ms。
-     */
     fun killAsRoot(pid: Int, tunDevice: String = "Mishka"): Boolean {
-        if (pid <= 0) return true
-        Log.i(TAG, "Killing root process: pid=$pid")
-        val escapedTun = escapeShellSingleQuoted(tunDevice)
-        val script = """
-            #!/system/bin/sh
-            kill -0 $pid 2>/dev/null || exit 0
-            kill -TERM $pid 2>/dev/null
-            i=0
-            while kill -0 $pid 2>/dev/null && [ ${'$'}i -lt 10 ]; do
-                sleep 0.1
-                i=${'$'}((i+1))
-            done
-            if kill -0 $pid 2>/dev/null; then
-                kill -KILL $pid 2>/dev/null
-                i=0
-                while kill -0 $pid 2>/dev/null && [ ${'$'}i -lt 10 ]; do
-                    sleep 0.05
-                    i=${'$'}((i+1))
-                done
-                ip link delete $escapedTun 2>/dev/null || true
-            fi
-            kill -0 $pid 2>/dev/null && exit 1
-            exit 0
-        """.trimIndent()
-        val code = runRootScriptHeredoc(script, timeoutSeconds = 3)
-        if (code != 0) Log.e(TAG, "Process $pid still alive after SIGKILL (code=$code)")
-        return code == 0
+        try {
+            Log.i(TAG, "Killing root process: pid=$pid")
+            runRootCommand("kill $pid")
+            for (i in 1..6) {
+                Thread.sleep(500)
+                if (!isAliveAsRoot(pid)) {
+                    Log.i(TAG, "Process $pid terminated after SIGTERM")
+                    return true
+                }
+            }
+            // SIGKILL（进程无法优雅清理，需要手动清理 TUN 残留）
+            Log.w(TAG, "Process $pid still alive after SIGTERM, sending SIGKILL")
+            runRootCommand("kill -9 $pid")
+            for (i in 1..4) {
+                Thread.sleep(500)
+                if (!isAliveAsRoot(pid)) {
+                    Log.i(TAG, "Process $pid terminated after SIGKILL")
+                    cleanupRootNetwork(tunDevice)
+                    return true
+                }
+            }
+            Log.e(TAG, "Process $pid still alive after SIGKILL")
+            return false
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to kill root process: ${e.message}")
+            return false
+        }
     }
 
-    /** 按名称兜底清理，同样只 fork 一次 su。 */
     fun killMihomoByName(tunDevice: String = "Mishka") {
-        Log.w(TAG, "Falling back to pkill for libmihomo_runner.so")
-        val escapedTun = escapeShellSingleQuoted(tunDevice)
-        val script = """
-            #!/system/bin/sh
-            pkill -TERM -f libmihomo_runner.so 2>/dev/null || true
-            i=0
-            while pgrep -f libmihomo_runner.so >/dev/null 2>&1 && [ ${'$'}i -lt 5 ]; do
-                sleep 0.1
-                i=${'$'}((i+1))
-            done
-            pgrep -f libmihomo_runner.so >/dev/null 2>&1 && pkill -KILL -f libmihomo_runner.so 2>/dev/null
-            ip link delete $escapedTun 2>/dev/null || true
-            exit 0
-        """.trimIndent()
-        runRootScriptHeredoc(script, timeoutSeconds = 2)
+        try {
+            Log.w(TAG, "Falling back to pkill for libmihomo_runner.so")
+            runRootCommand("pkill -TERM -f libmihomo_runner.so")
+            Thread.sleep(1000)
+            runRootCommand("pkill -9 -f libmihomo_runner.so")
+            cleanupRootNetwork(tunDevice)
+        } catch (_: Exception) {
+        }
+    }
+
+    /**
+     * 清理 Root 模式 mihomo 被 SIGKILL 后残留的 TUN 设备和路由表。
+     * SIGKILL 不给进程清理机会，需要手动清理。
+     */
+    private fun cleanupRootNetwork(tunDevice: String) {
+        try {
+            Log.i(TAG, "Cleaning up root network state")
+            runRootCommand("ip link delete ${escapeShellSingleQuoted(tunDevice)} 2>/dev/null; true")
+        } catch (_: Exception) {
+        }
+    }
+
+    private fun runRootCommand(command: String): Boolean {
+        return try {
+            val process = ProcessBuilder("su", "-c", command)
+                .redirectErrorStream(true)
+                .start()
+            process.waitFor(3, TimeUnit.SECONDS)
+            process.exitValue() == 0
+        } catch (_: Exception) {
+            false
+        }
     }
 
 
@@ -219,15 +230,15 @@ object RootHelper {
         val script = """
             pgrep -f libmihomo_runner.so >/dev/null 2>&1 && {
                 pkill -TERM -f libmihomo_runner.so 2>/dev/null
-                i=0; while [ ${'$'}i -lt 10 ]; do
-                    sleep 0.1
+                i=0; while [ ${'$'}i -lt 6 ]; do
+                    sleep 0.5
                     pgrep -f libmihomo_runner.so >/dev/null 2>&1 || break
                     i=${'$'}((i+1))
                 done
                 pgrep -f libmihomo_runner.so >/dev/null 2>&1 && {
                     pkill -KILL -f libmihomo_runner.so 2>/dev/null
-                    i=0; while [ ${'$'}i -lt 10 ]; do
-                        sleep 0.05
+                    i=0; while [ ${'$'}i -lt 4 ]; do
+                        sleep 0.5
                         pgrep -f libmihomo_runner.so >/dev/null 2>&1 || break
                         i=${'$'}((i+1))
                     done
@@ -243,7 +254,7 @@ object RootHelper {
             val process = ProcessBuilder("su", "-c", script)
                 .redirectErrorStream(true)
                 .start()
-            val exited = process.waitFor(3, TimeUnit.SECONDS)
+            val exited = process.waitFor(8, TimeUnit.SECONDS)
             if (!exited) {
                 process.destroyForcibly()
                 Log.e(TAG, "cleanupOrphanedMihomo timed out")
@@ -273,26 +284,6 @@ object RootHelper {
                 arg == "--secret" || arg == "--age-secret-key" -> arg.also { maskNext = true }
                 else -> arg
             }
-        }
-    }
-
-    /** Copy an app-owned file into a ROOT runtime directory, creating its parent as root. */
-    fun copyFileAsRoot(sourcePath: String, destinationPath: String): Boolean {
-        return try {
-            val source = escapeShellSingleQuoted(sourcePath)
-            val destination = escapeShellSingleQuoted(destinationPath)
-            val parent = escapeShellSingleQuoted(File(destinationPath).parentFile?.absolutePath ?: return false)
-            val process = ProcessBuilder("su", "-c", "mkdir -p $parent && cp -f $source $destination")
-                .redirectErrorStream(true)
-                .start()
-            val outcome = awaitDrained(process, 10)
-            if (outcome.code != 0 && outcome.output.isNotBlank()) {
-                Log.w(TAG, "copyFileAsRoot code=${outcome.code}: ${outcome.output.take(1000)}")
-            }
-            outcome.code == 0
-        } catch (e: Exception) {
-            Log.w(TAG, "copyFileAsRoot failed: ${e.message}")
-            false
         }
     }
 
@@ -341,20 +332,6 @@ object RootHelper {
         } catch (e: Exception) {
             Log.w(TAG, "runRootScriptHeredoc failed: ${e.message}")
             -1
-        }
-    }
-
-    /** Merge an imported profile into an existing ROOT runtime without deleting provider caches. */
-    fun syncDirectoryContentsAsRoot(sourcePath: String, destinationPath: String): Boolean {
-        val source = escapeShellSingleQuoted(sourcePath)
-        val destination = escapeShellSingleQuoted(destinationPath)
-        val script = "mkdir -p $destination && cp -a $source/. $destination/"
-        return try {
-            val process = ProcessBuilder("su", "-c", script).redirectErrorStream(true).start()
-            awaitDrained(process, 10).code == 0
-        } catch (e: Exception) {
-            Log.w(TAG, "syncDirectoryContentsAsRoot failed: ${e.message}")
-            false
         }
     }
 

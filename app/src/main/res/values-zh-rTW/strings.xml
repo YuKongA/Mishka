@@ -116,9 +116,6 @@
     <string name="home_inbound">入站</string>
     <string name="home_inbound_tproxy">TPROXY:%1$d</string>
     <string name="home_switch_mode">切換代理模式</string>
-    <string name="home_mode_rule">規則</string>
-    <string name="home_mode_global">全域</string>
-    <string name="home_mode_direct">直連</string>
     <string name="home_switch_tun_stack">切換 TUN Stack</string>
     <string name="home_uptime_seconds">%1$d 秒</string>
     <string name="home_uptime_minutes">%1$d 分鐘</string>
@@ -156,24 +153,6 @@
     <string name="home_speed_detail">即時連線速率</string>
     <string name="home_speed_no_active_connection">尚無作用中連線</string>
     <string name="home_tools">工具</string>
-    <string name="home_panel">面板</string>
-    <string name="home_panel_subtitle">Web 介面</string>
-    <string name="panel_title">面板</string>
-    <string name="panel_sheet_add_title">新增面板</string>
-    <string name="panel_field_name">名稱</string>
-    <string name="panel_field_url">連結</string>
-    <string name="panel_local_name">本機</string>
-    <string name="panel_local_subtitle">由核心 /ui 提供</string>
-    <string name="panel_local_not_running">本機面板需要代理正在執行；也可以在面板清單裡選一個線上面板。</string>
-    <string name="panel_proxy_unavailable">代理已在執行，但面板的外網請求無法走代理（未取得 mixed-port，或 WebView 不支援代理設定），目前為直連。點按可關閉。</string>
-    <string name="panel_error_name_required">請輸入名稱</string>
-    <string name="panel_error_url_invalid">連結格式不正確</string>
-    <string name="panel_add">新增</string>
-    <string name="panel_clear_cache">清除面板資料</string>
-    <string name="panel_clear_cache_message">將清除面板的快取、Cookie 與儲存資料，面板內儲存的設定與登入狀態會被重置。</string>
-    <string name="panel_clear_cache_failed">清除面板資料失敗</string>
-    <string name="panel_save_failed">儲存檔案失敗</string>
-    <string name="panel_no_file_picker">沒有可用的檔案選擇器</string>
     <string name="home_address">位址</string>
     <string name="home_interface">介面</string>
     <string name="home_speed">網速</string>
@@ -200,10 +179,6 @@
     <string name="proxy_start_first">請先啟動代理服務</string>
     <string name="proxy_mode_direct_hint">目前為直連模式，所有流量皆不經過代理。此處的選擇會被儲存，切回規則模式後生效。</string>
     <string name="proxy_mode_global_hint">目前為全域模式，僅由 GLOBAL 群組決定出口。其他代理群組的選擇將在切回規則模式後生效。</string>
-    <string name="proxy_refresh_icon">重新整理圖示</string>
-    <string name="proxy_show_icons">顯示圖示</string>
-    <string name="proxy_hide_unavailable">隱藏不可用</string>
-    <string name="proxy_close_connections_on_switch">切換節點時中斷連線</string>
     <string name="proxy_single_column">單欄顯示</string>
     <string name="proxy_show_group_icons">顯示圖示</string>
     <string name="proxy_timeout">逾時</string>
@@ -214,11 +189,6 @@
     <string name="proxy_sort_reverse">反向</string>
     <string name="proxy_test_group_delay">測試延遲</string>
     <string name="proxy_test_node_delay">測試節點延遲</string>
-    <string name="proxy_delay_failed_node">「%1$s」測速失敗：節點連不通測速位址（逾時或被拒絕）</string>
-    <string name="proxy_delay_failed_timeout">「%1$s」測速逾時：核心長時間沒有返回結果</string>
-    <string name="proxy_delay_failed_network">測速失敗：連不上核心 API（代理沒有執行？）</string>
-    <string name="proxy_delay_failed_unknown">「%1$s」測速失敗：%2$s</string>
-    <string name="proxy_delay_group_summary">「%1$s」群組測速完成：%3$d 個節點中 %2$d 個失敗</string>
     <string name="proxy_fixed">已固定至此節點</string>
     <string name="proxy_unfix">解除固定，恢復自動選擇</string>
 
@@ -320,7 +290,6 @@
     <string name="provider_updating_single">正在更新 %1$s…</string>
     <string name="provider_updating_progress">%1$d / %2$d</string>
     <string name="provider_update_failed">更新 %1$s 失敗: %2$s</string>
-    <string name="provider_upload_file">上傳檔案</string>
 
     <!-- Settings -->
     <string name="settings_title">設定</string>
@@ -330,11 +299,9 @@
     <string name="settings_tun_vpn_summary">透過 VpnService</string>
     <string name="settings_tun_root_tun_summary">自建 TUN 裝置</string>
     <string name="settings_tun_root_tproxy_summary">iptables TPROXY</string>
-    <string name="settings_tun_root_ebpf_summary">eBPF 自動重定向（需設定 ebpf 入站）</string>
     <string name="settings_tun_mode_vpn">VPN</string>
     <string name="settings_tun_mode_root_tun">ROOT TUN</string>
     <string name="settings_tun_mode_root_tproxy">ROOT TPROXY</string>
-    <string name="settings_tun_mode_root_ebpf">ROOT EBPF</string>
     <string name="settings_vpn_settings">VPN 設定</string>
     <string name="settings_vpn_summary">繞過私人網路、DNS 攔截、IPv6</string>
     <string name="settings_tun_device">TUN 裝置名稱</string>
@@ -376,7 +343,7 @@
     <string name="settings_theme_blur_style_gaussian_summary">頂欄整體均勻模糊</string>
     <string name="settings_theme_blur_style_progressive_summary">頂部漸強模糊</string>
     <string name="settings_theme_density_scale">介面縮放</string>
-    <string name="settings_theme_density_scale_summary" formatted="false">調整全域顯示比例（80% - 110%）</string>
+    <string name="settings_theme_density_scale_summary">調整全域顯示比例（80% - 110%）</string>
     <string name="settings_theme_floating_bottom_bar">懸浮底部列</string>
     <string name="settings_theme_floating_bottom_bar_summary">在手機版面中使用懸浮底部導覽列</string>
     <string name="settings_theme_floating_bottom_bar_style">懸浮底部列樣式</string>
@@ -449,22 +416,10 @@
     <string name="root_tether_scan_result_title">偵測到以下介面</string>
     <string name="root_tether_tproxy_unavailable_warning">目前核心缺少 xt_TPROXY 模組，已降級為相容路徑（吞吐量略低，連線仍可用）。如需原生 TPROXY 效能，請更換支援該模組的核心。</string>
     <string name="root_tproxy_tether_note">TPROXY 模式下所有熱點流量由核心規則自動代理，無需切換「繞過／經過代理」。</string>
-    <string name="root_ebpf_tether_note">EBPF 模式下熱點流量由 mihomo 的 eBPF 監聽器重定向，無需切換「繞過／經過代理」。</string>
     <string name="root_tun_jumbo_mtu_title">大 MTU 與 GSO</string>
     <string name="root_tun_jumbo_mtu_summary">大封包聚合（mtu=9000、開啟 gso）可減少每個封包的 syscall，提升吞吐量。上游線路丟棄分段封包時可關閉。</string>
-    <string name="tun_profile_encrypted_override">活動設定檔已加密；此設定將儲存為 Mishka 應用程式覆寫。</string>
-    <string name="root_tun_device_profile_summary">使用目前設定檔 tun.device：%1$s</string>
-    <string name="root_tun_device_override_summary">使用 Mishka 的 tun.device 覆寫：%1$s</string>
     <string name="root_attach_force_reapply_title">重新連線時強制重建規則</string>
     <string name="root_attach_force_reapply_summary">診斷開關：每次應用程式重新連線到執行中的 mihomo 時強制重建 iptables 規則。僅在重連後熱點規則遺失時開啟。</string>
-    <string name="root_section_system">系統</string>
-    <string name="root_system_ipv6_title">系統 IPv6</string>
-    <string name="root_system_ipv6_summary_off">已關閉（預設）：Wi-Fi 等非蜂窩網卡停用 IPv6，上網 APN 協議改為僅 IPv4，設定檔中的 IPv6 開關同時關閉；不影響 IMS 高清通話與簡訊。代理執行中會自動重啟以生效</string>
-    <string name="root_system_ipv6_summary_on">已開啟：恢復系統 IPv6，並還原上網 APN 協議，設定檔中的 IPv6 開關同時開啟。代理執行中會自動重啟以生效</string>
-    <string name="root_system_ipv6_apn_line">首選 APN「%1$s」：協議 %2$s，漫遊 %3$s</string>
-    <string name="root_system_ipv6_apn_none">未讀取到首選 APN（可手動把 APN 協議設為 IPv4，效果相同）</string>
-    <string name="root_system_ipv6_no_root">需要 ROOT 權限</string>
-    <string name="root_system_ipv6_apply_failed">系統 IPv6 設定失敗，請查看模組日誌</string>
 
     <!-- Network Settings -->
     <string name="network_settings_title">覆寫設定</string>
@@ -561,11 +516,9 @@
     <!-- External Control -->
     <string name="external_control_title">外部控制器</string>
     <string name="external_control_ip">API 位址</string>
-    <string name="external_control_controller_hint">優先使用目前設定檔的 external-controller；此處僅作為回退。設定檔中的監聽位址（包括 0.0.0.0）會照原值保留，不強制改為迴環位址。</string>
+    <string name="external_control_controller_hint">HTTP API 的監聽位址（例如 127.0.0.1:9090）。0.0.0.0 將自動覆寫為 127.0.0.1。</string>
     <string name="external_control_secret">API 金鑰</string>
-    <string name="external_control_secret_hint">目前設定檔的 secret 優先；此處僅在設定檔未設定時生效。兩處都未設定時不會產生密鑰，API 沒有密碼；若監聽 0.0.0.0 等萬用位址，可連線到該位址的區域網路裝置也能呼叫控制 API。</string>
-    <string name="settings_external_control_summary">回退覆寫；目前設定檔的值優先</string>
-
+    <string name="external_control_secret_hint">HTTP API 的 Bearer 驗證權杖。留空時優先使用訂閱設定檔中的 secret；若訂閱未設定則隨機產生。</string>
     <string name="automation_title">自動化</string>
     <string name="settings_automation_summary">允許其他應用程式控制代理</string>
     <string name="automation_allow_external">允許外部應用程式控制</string>
@@ -573,6 +526,7 @@
     <string name="automation_actions_hint">支援的動作：START_PROXY / STOP_PROXY / TOGGLE_PROXY / RESTART_PROXY。</string>
     <string name="automation_result_hint">動作完成時呼叫端會收到 RESULT_OK；請求被拒絕、代理處於過渡狀態或沒有可用訂閱時會收到 RESULT_CANCELED。</string>
     <string name="automation_scope_hint">關閉後，快速設定磚與應用程式內控制仍可正常運作，它們不會經過此開關。</string>
+    <string name="settings_external_control_summary">覆寫外部控制器設定</string>
 
     <!-- File Manager -->
     <string name="file_manager_title">檔案管理</string>
@@ -659,6 +613,8 @@
     <string name="override_url_placeholder">輸入覆寫網址</string>
     <string name="override_local_file">本機檔案</string>
     <string name="override_format">檔案格式</string>
+    <string name="override_move_up">上移</string>
+    <string name="override_move_down">下移</string>
     <string name="override_format_yaml">YAML</string>
     <string name="override_format_javascript">JavaScript</string>
     <string name="override_delete_title">刪除覆寫</string>
@@ -673,6 +629,4 @@
         <item quantity="other">已選擇 %1$d 項覆寫</item>
     </plurals>
     <string name="subscription_overrides">覆寫</string>
-    <string name="subscription_visual_config">視覺化設定</string>
-    <string name="subscription_visual_config_summary">使用結構化表單編輯此訂閱的 YAML 設定</string>
 </resources>

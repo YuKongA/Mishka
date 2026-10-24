@@ -26,7 +26,6 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import top.yukonga.mishka.R
 import top.yukonga.mishka.domain.model.ProfileType
-import top.yukonga.mishka.platform.showToast
 import top.yukonga.mishka.ui.component.AdaptiveTopAppBar
 import top.yukonga.mishka.ui.component.CardItem
 import top.yukonga.mishka.ui.component.blur.BlurredBar
@@ -62,7 +61,6 @@ fun SubscriptionEditScreen(
     onBack: () -> Unit = {},
     onSaved: () -> Unit = {},
     onNavigateOverrides: () -> Unit = {},
-    onNavigateVisualConfig: (relativePath: String) -> Unit = {},
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val subscription = uiState.subscriptions.find { it.id == uuid }
@@ -226,34 +224,6 @@ fun SubscriptionEditScreen(
                     },
                 ),
             )
-
-            if (subscription.imported) {
-                groupedCardItems(
-                    keyPrefix = "subscription_visual_config",
-                    outerTopPadding = 0.dp,
-                    outerBottomPadding = 12.dp,
-                    items = listOf(
-                        CardItem("open") {
-                            ArrowPreference(
-                                title = stringResource(R.string.subscription_visual_config),
-                                summary = stringResource(R.string.subscription_visual_config_summary),
-                                onClick = {
-                                    val files = viewModel.fileManager.listImportedFiles(uuid)
-                                    val relativePath = files.firstOrNull { it.equals("config.yaml", ignoreCase = true) }
-                                        ?: files.firstOrNull {
-                                            it.endsWith(".yaml", ignoreCase = true) || it.endsWith(".yml", ignoreCase = true)
-                                        }
-                                    if (relativePath == null) {
-                                        showToast("未找到此订阅的 YAML 配置文件", long = true)
-                                    } else {
-                                        onNavigateVisualConfig(relativePath)
-                                    }
-                                },
-                            )
-                        },
-                    ),
-                )
-            }
 
             item {
                 TextButton(

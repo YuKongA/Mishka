@@ -7,9 +7,13 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.KeyboardArrowDown
+import androidx.compose.material.icons.rounded.KeyboardArrowUp
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -19,17 +23,13 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import top.yukonga.mishka.R
-import top.yukonga.mishka.custom.forms.DragHandle
-import top.yukonga.mishka.custom.forms.DragSortRow
-import top.yukonga.mishka.custom.forms.DragSortState
-import top.yukonga.mishka.custom.forms.dragSortItem
-import top.yukonga.mishka.custom.forms.rememberDragSortState
 import top.yukonga.mishka.domain.model.OverrideProfile
 import top.yukonga.mishka.domain.model.orderedOverrideIds
 import top.yukonga.mishka.ui.component.AdaptiveTopAppBar
@@ -87,13 +87,6 @@ fun SubscriptionOverridesScreen(
     var order by rememberSaveable(subscriptionId) { mutableStateOf(initialOrder) }
     var selected by rememberSaveable(subscriptionId) { mutableStateOf(initialSelected) }
     val displayed = order.filter { it in profilesById } + initialOrder.filter { it !in order }
-    // 列表就是「覆写生效顺序」本身：按住行尾把手拖动即改顺序，不再用一对上/下箭头一点点挪。
-    // 拖动只改 order 的顺序，落点判定与校验仍走原有保存路径。
-    val listState = rememberLazyListState()
-    val dragSort = rememberDragSortState(displayed.size) { from, to ->
-        val moved = displayed.toMutableList().also { it.add(to, it.removeAt(from)) }
-        order = moved + order.filter { it !in moved }
-    }
     val selectedIds = displayed.filter { it in selected }
     val hasChanges = displayed != initialOrder || selectedIds != initialSelected
 
@@ -136,12 +129,8 @@ fun SubscriptionOverridesScreen(
     ) { innerPadding ->
         WideContentBox { sidePadding ->
             LazyColumn(
-                state = listState,
-                // 拖动一开始就关掉用户滚动：外层 scrollable 退出仲裁；自动翻滚走 dispatchRawDelta 不受影响
-                userScrollEnabled = dragSort.dragging < 0,
                 modifier = Modifier
                     .fillMaxSize()
-                    .then(dragSort.containerModifier { listState.dispatchRawDelta(it) })
                     .horizontalCutoutPadding()
                     .then(if (backdrop != null) Modifier.layerBackdrop(backdrop) else Modifier)
                     .scrollEndHaptic()
@@ -175,24 +164,21 @@ fun SubscriptionOverridesScreen(
                     }
                 }
 
-                // 顺序由 DragSortState.order 定（拖动中实时换位）；key 仍是覆写 id，内容按原始下标取
-                items(dragSort.order, key = { displayed.getOrNull(it) ?: it }) { index ->
-                    val id = displayed.getOrNull(index)
-                    val profile = id?.let { profilesById[it] }
-                    if (id != null && profile != null) {
-                        val checked = id in selected
-                        DragSortRow(state = dragSort, index = index, modifier = dragSortItem(dragSort, index)) {
-                            OverrideSelectionItem(
-                                profile = profile,
-                                checked = checked,
-                                dragSort = dragSort,
-                                index = index,
-                                onToggle = {
-                                    selected = if (checked) selected - id else selected + id
-                                },
-                            )
-                        }
-                    }
+                itemsIndexed(displayed, key = { _, id -> id }) { index, id ->
+                    val profile = profilesById[id] ?: return@itemsIndexed
+                    val checked = id in selected
+                    OverrideSelectionItem(
+                        profile = profile,
+                        checked = checked,
+                        canMoveUp = index > 0,
+                        canMoveDown = index < displayed.lastIndex,
+                        onToggle = {
+                            selected = if (checked) selected - id else selected + id
+                        },
+                        onMoveUp = { order = displayed.swap(index, index - 1) },
+                        onMoveDown = { order = displayed.swap(index, index + 1) },
+                        modifier = Modifier.animateItem(),
+                    )
                 }
 
                 item(key = "bottom_spacer") {
@@ -211,12 +197,15 @@ fun SubscriptionOverridesScreen(
 private fun OverrideSelectionItem(
     profile: OverrideProfile,
     checked: Boolean,
-    dragSort: DragSortState,
-    index: Int,
+    canMoveUp: Boolean,
+    canMoveDown: Boolean,
     onToggle: () -> Unit,
+    onMoveUp: () -> Unit,
+    onMoveDown: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     Card(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 12.dp)
             .padding(bottom = 12.dp),
@@ -231,9 +220,49 @@ private fun OverrideSelectionItem(
                     modifier = Modifier.padding(end = 12.dp),
                 )
             },
-            // 排序方式与 mihomo_box 面板一致：行尾按住把手拖动，不再用一对上/下箭头
-            endActions = { DragHandle(dragSort, index) },
+            endActions = {
+                MoveButton(
+                    icon = Icons.Rounded.KeyboardArrowUp,
+                    contentDescription = stringResource(R.string.override_move_up),
+                    enabled = canMoveUp,
+                    onClick = onMoveUp,
+                )
+                Spacer(Modifier.width(8.dp))
+                MoveButton(
+                    icon = Icons.Rounded.KeyboardArrowDown,
+                    contentDescription = stringResource(R.string.override_move_down),
+                    enabled = canMoveDown,
+                    onClick = onMoveDown,
+                )
+            },
             onClick = onToggle,
         )
     }
 }
+
+@Composable
+private fun MoveButton(
+    icon: ImageVector,
+    contentDescription: String,
+    enabled: Boolean,
+    onClick: () -> Unit,
+) {
+    IconButton(
+        onClick = onClick,
+        enabled = enabled,
+        minHeight = 35.dp,
+        minWidth = 35.dp,
+        backgroundColor = MiuixTheme.colorScheme.secondaryContainer,
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = contentDescription,
+            modifier = Modifier.size(20.dp),
+            tint = if (enabled) MiuixTheme.colorScheme.onSurfaceVariantSummary
+            else MiuixTheme.colorScheme.disabledOnSecondaryVariant,
+        )
+    }
+}
+
+private fun List<String>.swap(from: Int, to: Int): List<String> =
+    toMutableList().also { it[from] = this[to]; it[to] = this[from] }

@@ -179,34 +179,25 @@ private fun StatusContent(
                 )
             }
             Spacer(Modifier.height(12.dp))
-            // RootTproxy / RootEbpf 下 tun.enable=false，stack 无意义：
-            // TPROXY 展示 Inbound=TPROXY:port，EBPF 展示 Inbound=EBPF 静态信息
+            // RootTproxy 下 tun.enable=false，stack 无意义：展示 Inbound=TPROXY:port 静态信息
             val isTproxy = state.tunMode == TunMode.RootTproxy
-            val isEbpf = state.tunMode == TunMode.RootEbpf
-            val noTunStack = isTproxy || isEbpf
-            val effectiveTproxyPort = state.config?.tproxyPort?.takeIf { it in 1..65535 }
-                ?: TPROXY_INBOUND_PORT
-            val inboundTproxyLabel = stringResource(R.string.home_inbound_tproxy, effectiveTproxyPort)
+            val inboundTproxyLabel = stringResource(R.string.home_inbound_tproxy, TPROXY_INBOUND_PORT)
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f),
                 insideMargin = PaddingValues(16.dp),
-                onClick = { if (isRunning && !noTunStack) showTunStackDialog = true },
-                showIndication = isRunning && !noTunStack,
-                pressFeedbackType = if (isRunning && !noTunStack) PressFeedbackType.Sink else PressFeedbackType.None,
+                onClick = { if (isRunning && !isTproxy) showTunStackDialog = true },
+                showIndication = isRunning && !isTproxy,
+                pressFeedbackType = if (isRunning && !isTproxy) PressFeedbackType.Sink else PressFeedbackType.None,
             ) {
                 Text(
-                    text = if (noTunStack) stringResource(R.string.home_inbound) else stringResource(R.string.home_tun),
+                    text = if (isTproxy) stringResource(R.string.home_inbound) else stringResource(R.string.home_tun),
                     fontSize = 13.sp,
                     color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                 )
                 Text(
-                    text = when {
-                        isTproxy -> inboundTproxyLabel
-                        isEbpf -> "EBPF"
-                        else -> tunStackLabel(state.tunStack)
-                    },
+                    text = if (isTproxy) inboundTproxyLabel else tunStackLabel(state.tunStack),
                     fontSize = 20.sp,
                     fontWeight = FontWeight.Bold,
                     color = MiuixTheme.colorScheme.onSurface,
@@ -218,7 +209,7 @@ private fun StatusContent(
     OptionSelectDialog(
         show = showModeDialog,
         title = stringResource(R.string.home_switch_mode),
-        options = modeOptions(),
+        options = MODE_OPTIONS,
         current = state.mode,
         onSelect = onSwitchMode,
         onDismiss = { showModeDialog = false },
@@ -237,22 +228,13 @@ private fun StatusContent(
 // ROOT TPROXY 模式 mihomo tproxy-port（与 RootTproxyApplier.TPROXY_PORT 对齐，UI 仅展示用）
 private const val TPROXY_INBOUND_PORT: Int = 7895
 
-// value（mihomo 侧小写标识）to label（展示名），同时供卡片取值与选择弹窗列举。
-// r23：展示名改字符串资源——中文语言环境下 Rule / Global / Direct 显示为 规则 / 全局 / 直连。
-@Composable
-private fun modeOptions(): List<Pair<String, String>> = listOf(
-    "rule" to stringResource(R.string.home_mode_rule),
-    "global" to stringResource(R.string.home_mode_global),
-    "direct" to stringResource(R.string.home_mode_direct),
-)
+// value（mihomo 侧小写标识）to label（展示名），同时供卡片取值与选择弹窗列举
+private val MODE_OPTIONS = listOf("rule" to "Rule", "global" to "Global", "direct" to "Direct")
 
 private val TUN_STACK_OPTIONS = listOf("mixed" to "Mixed", "gvisor" to "gVisor", "system" to "System", "mips" to "MIPS")
 
-@Composable
-private fun modeLabel(mode: String): String {
-    val options = modeOptions()
-    return options.firstOrNull { it.first == mode.lowercase() }?.second ?: mode.ifEmpty { "--" }
-}
+private fun modeLabel(mode: String): String =
+    MODE_OPTIONS.firstOrNull { it.first == mode.lowercase() }?.second ?: mode.ifEmpty { "--" }
 
 private fun tunStackLabel(stack: String): String =
     TUN_STACK_OPTIONS.firstOrNull { it.first == stack.lowercase() }?.second ?: stack.ifEmpty { "--" }

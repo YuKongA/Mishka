@@ -10,12 +10,10 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 
 	"github.com/metacubex/mihomo/component/age"
 	"github.com/metacubex/mihomo/config"
-	"go.yaml.in/yaml/v3"
 
 	"mishka_core/overrides"
 )
@@ -59,101 +57,6 @@ func readTransformedConfig(workDir, transformPath, ageSecretKey string) ([]byte,
 
 type transformCheck struct {
 	Valid bool `json:"valid"`
-}
-
-type runtimeConfigValues struct {
-	ExternalController *string         `json:"externalController"`
-	Secret             *string         `json:"secret"`
-	TunDevice          *string         `json:"tunDevice"`
-	TproxyPort         *int            `json:"tproxyPort,omitempty"`
-	HasTun             bool            `json:"hasTun"`
-	Tun                json.RawMessage `json:"tun,omitempty"`
-	Listeners          json.RawMessage `json:"listeners,omitempty"`
-	ProxyProviders     json.RawMessage `json:"proxyProviders,omitempty"`
-}
-
-func extractRuntimeConfigValues(configBytes []byte) (runtimeConfigValues, error) {
-	var root map[string]interface{}
-	if err := yaml.Unmarshal(configBytes, &root); err != nil {
-		return runtimeConfigValues{}, err
-	}
-	values := runtimeConfigValues{}
-	if raw, ok := root["external-controller"]; ok {
-		value := yamlScalarString(raw)
-		values.ExternalController = &value
-	}
-	if raw, ok := root["secret"]; ok {
-		value := yamlScalarString(raw)
-		values.Secret = &value
-	}
-	if rawTun, ok := root["tun"].(map[string]interface{}); ok {
-		values.HasTun = true
-		encoded, err := json.Marshal(rawTun)
-		if err != nil {
-			return runtimeConfigValues{}, fmt.Errorf("marshal tun: %w", err)
-		}
-		values.Tun = encoded
-		if rawDevice, exists := rawTun["device"]; exists {
-			value := yamlScalarString(rawDevice)
-			values.TunDevice = &value
-		}
-	}
-	if raw, ok := root["tproxy-port"]; ok {
-		if port, err := strconv.Atoi(strings.TrimSpace(yamlScalarString(raw))); err == nil {
-			values.TproxyPort = &port
-		}
-	}
-	if raw, ok := root["listeners"]; ok && raw != nil {
-		encoded, err := json.Marshal(raw)
-		if err != nil {
-			return runtimeConfigValues{}, fmt.Errorf("marshal listeners: %w", err)
-		}
-		values.Listeners = encoded
-	}
-	if raw, ok := root["proxy-providers"]; ok && raw != nil {
-		encoded, err := json.Marshal(raw)
-		if err != nil {
-			return runtimeConfigValues{}, fmt.Errorf("marshal proxy providers: %w", err)
-		}
-		values.ProxyProviders = encoded
-	}
-	return values, nil
-}
-
-func yamlScalarString(value interface{}) string {
-	if value == nil {
-		return ""
-	}
-	if text, ok := value.(string); ok {
-		return text
-	}
-	return fmt.Sprint(value)
-}
-
-// 解密并应用与 mihomo 启动时相同的订阅变换后，读取服务启动前需要的配置值、TPROXY 端口与 listener 列表。
-//
-//export mishkaReadRuntimeConfigValues
-func mishkaReadRuntimeConfigValues(cWorkDir, cTransform, cKey *C.char) *C.char {
-	return guardString(func() string {
-		workDir := C.GoString(cWorkDir)
-		transformPath := C.GoString(cTransform)
-		key := C.GoString(cKey)
-		age.SetGlobalSecretKeys(key)
-		defer age.SetGlobalSecretKeys()
-		configBytes, err := readTransformedConfig(workDir, transformPath, key)
-		if err != nil {
-			return "error: " + err.Error()
-		}
-		values, err := extractRuntimeConfigValues(configBytes)
-		if err != nil {
-			return "error: inspect config: " + err.Error()
-		}
-		data, err := json.Marshal(values)
-		if err != nil {
-			return "error: marshal config values: " + err.Error()
-		}
-		return string(data)
-	})
 }
 
 // 与运行时同一套变换与解析流程：保存改动前先在应用内跑一遍，失败时不去重启代理。
