@@ -110,6 +110,15 @@ class LogViewModel : ViewModel() {
         resetLogs()
     }
 
+    fun filteredLogs(searchQuery: String): ImmutableList<IndexedLog> {
+        val query = searchQuery.trim().lowercase()
+        if (query.isEmpty()) return _logs.value
+        return _logs.value.filter { log ->
+            log.message.payload.lowercase().contains(query) ||
+                    log.message.type.lowercase().contains(query)
+        }.toPersistentList()
+    }
+
     private fun resetLogs() {
         buffer.clear()
         nextLogId = 0L

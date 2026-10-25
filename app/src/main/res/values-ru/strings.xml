@@ -263,6 +263,8 @@
     <!-- Log -->
     <string name="log_title">Журнал</string>
     <string name="log_clear">Очистить</string>
+    <string name="log_search">Поиск по журналу</string>
+    <string name="log_no_match">Ничего не найдено</string>
     <string name="log_waiting">Ожидание логов...</string>
     <string name="log_not_connected">Не подключено</string>
 

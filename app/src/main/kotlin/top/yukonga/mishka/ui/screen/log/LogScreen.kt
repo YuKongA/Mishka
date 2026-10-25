@@ -1,13 +1,18 @@
 package top.yukonga.mishka.ui.screen.log
 
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -21,11 +26,16 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInWindow
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
@@ -37,8 +47,15 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import top.yukonga.mishka.R
 import top.yukonga.mishka.domain.model.LogMessage
 import top.yukonga.mishka.ui.component.AdaptiveTopAppBar
+import top.yukonga.mishka.ui.component.SearchBarFake
+import top.yukonga.mishka.ui.component.SearchBox
+import top.yukonga.mishka.ui.component.SearchPager
+import top.yukonga.mishka.ui.component.SearchResultStatusEffect
+import top.yukonga.mishka.ui.component.SearchStatus
 import top.yukonga.mishka.ui.component.blur.BlurredBar
 import top.yukonga.mishka.ui.component.blur.rememberBlurBackdrop
+import top.yukonga.mishka.ui.component.rememberSearchBarTopPadding
+import top.yukonga.mishka.ui.component.rememberSearchScreenStatus
 import top.yukonga.mishka.ui.util.horizontalCutoutPadding
 import top.yukonga.mishka.viewmodel.LogViewModel
 import top.yukonga.miuix.kmp.basic.Card
@@ -65,11 +82,24 @@ fun LogScreen(
     val logs by viewModel.logs.collectAsStateWithLifecycle()
     val scrollBehavior = MiuixScrollBehavior()
     val listState = rememberLazyListState()
+    val density = LocalDensity.current
 
     DisposableEffect(Unit) {
         viewModel.connect()
         onDispose { viewModel.disconnect() }
     }
+
+    val searchStatusState = rememberSearchScreenStatus(stringResource(R.string.log_search))
+    var searchStatus by searchStatusState
+
+    // 搜索词只作过滤的 key，不写回 ViewModel：回写会在组合期触发状态写
+    val searchText = searchStatus.searchText
+    val filteredLogs = remember(searchText, logs) {
+        viewModel.filteredLogs(searchText)
+    }
+    SearchResultStatusEffect(searchStatusState, filteredLogs.isEmpty())
+
+    val dynamicTopPadding = rememberSearchBarTopPadding(scrollBehavior)
 
     // 仅当用户已滚到底部时自动跟随新日志，否则不抢夺滚动位置
     val autoScrollEnabled by remember {
@@ -88,7 +118,8 @@ fun LogScreen(
     // key 用单调递增的末条 id：缓冲写满后 size 恒定，不能再以 size 变化驱动自动跟随
     val lastLogId = logs.lastOrNull()?.id
     LaunchedEffect(lastLogId) {
-        if (lastLogId != null && autoScrollEnabled) {
+        // 搜索态下主列表被弹出层盖住，滚它也看不见，收起后还会停在错位置
+        if (lastLogId != null && autoScrollEnabled && searchStatus.isCollapsed()) {
             listState.animateScrollToItem(logs.lastIndex)
         }
     }
@@ -100,84 +131,169 @@ fun LogScreen(
     Scaffold(
         topBar = {
             BlurredBar(backdrop = backdrop, blurActive = blurActive) {
-                AdaptiveTopAppBar(
-                    title = stringResource(R.string.log_title),
-                    color = barColor,
-                    scrollBehavior = scrollBehavior,
-                    navigationIcon = {
-                        IconButton(onClick = onBack) {
-                            val layoutDirection = LocalLayoutDirection.current
-                            Icon(
-                                imageVector = MiuixIcons.Back,
-                                contentDescription = stringResource(R.string.common_back),
-                                tint = MiuixTheme.colorScheme.onSurface,
-                                modifier = Modifier.graphicsLayer {
-                                    scaleX = if (layoutDirection == LayoutDirection.Rtl) -1f else 1f
-                                },
-                            )
-                        }
-                    },
-                    actions = {
-                        IconButton(onClick = { viewModel.clearLogs() }) {
-                            Icon(
-                                imageVector = MiuixIcons.Delete,
-                                contentDescription = stringResource(R.string.log_clear),
-                                tint = MiuixTheme.colorScheme.onSurface,
-                            )
-                        }
-                    },
-                )
+                searchStatus.TopAppBarAnim(
+                    backgroundColor = if (blurActive) Color.Transparent else MiuixTheme.colorScheme.surface,
+                ) {
+                    AdaptiveTopAppBar(
+                        title = stringResource(R.string.log_title),
+                        color = barColor,
+                        scrollBehavior = scrollBehavior,
+                        navigationIcon = {
+                            IconButton(onClick = onBack) {
+                                val layoutDirection = LocalLayoutDirection.current
+                                Icon(
+                                    imageVector = MiuixIcons.Back,
+                                    contentDescription = stringResource(R.string.common_back),
+                                    tint = MiuixTheme.colorScheme.onSurface,
+                                    modifier = Modifier.graphicsLayer {
+                                        scaleX = if (layoutDirection == LayoutDirection.Rtl) -1f else 1f
+                                    },
+                                )
+                            }
+                        },
+                        actions = {
+                            IconButton(onClick = { viewModel.clearLogs() }) {
+                                Icon(
+                                    imageVector = MiuixIcons.Delete,
+                                    contentDescription = stringResource(R.string.log_clear),
+                                    tint = MiuixTheme.colorScheme.onSurface,
+                                )
+                            }
+                        },
+                        bottomContent = {
+                            Box(
+                                modifier = Modifier
+                                    .graphicsLayer { alpha = if (searchStatus.isCollapsed()) 1f else 0f }
+                                    .onGloballyPositioned { coordinates ->
+                                        with(density) {
+                                            val newOffsetY = coordinates.positionInWindow().y.toDp()
+                                            if (searchStatus.offsetY != newOffsetY) {
+                                                searchStatus = searchStatus.copy(offsetY = newOffsetY)
+                                            }
+                                        }
+                                    }
+                                    .then(
+                                        if (searchStatus.isCollapsed()) {
+                                            Modifier.pointerInput(Unit) {
+                                                detectTapGestures {
+                                                    searchStatus = searchStatus.copy(current = SearchStatus.Status.EXPANDING)
+                                                }
+                                            }
+                                        } else Modifier,
+                                    ),
+                            ) {
+                                SearchBarFake(searchStatus.label, dynamicTopPadding)
+                            }
+                        },
+                    )
+                }
             }
         },
-    ) { innerPadding ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .horizontalCutoutPadding()
-                .then(if (backdrop != null) Modifier.layerBackdrop(backdrop) else Modifier)
-                .scrollEndHaptic()
-                .overScrollVertical()
-                .nestedScroll(scrollBehavior.nestedScrollConnection),
-            state = listState,
-            contentPadding = PaddingValues(
-                top = innerPadding.calculateTopPadding(),
-            ),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            if (logs.isEmpty()) {
-                item(key = "empty", contentType = "empty") {
-                    Column(
-                        modifier = Modifier.fillParentMaxSize(),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center,
-                    ) {
-                        Text(
-                            text = if (uiState.isConnected) {
-                                stringResource(R.string.log_waiting)
-                            } else {
-                                stringResource(R.string.log_not_connected)
-                            },
-                            fontSize = 16.sp,
-                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+        popupHost = {
+            searchStatus.SearchPager(
+                onSearchStatusChange = { searchStatus = it },
+                defaultResult = {},
+                searchBarTopPadding = dynamicTopPadding,
+            ) {
+                val imeBottomPadding = WindowInsets.ime.asPaddingValues().calculateBottomPadding()
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .overScrollVertical(),
+                ) {
+                    item {
+                        Spacer(Modifier.height(12.dp))
+                    }
+
+                    if (filteredLogs.isEmpty()) {
+                        item(key = "search_empty") {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 32.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                            ) {
+                                Text(
+                                    text = stringResource(R.string.log_no_match),
+                                    fontSize = 16.sp,
+                                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                                )
+                            }
+                        }
+                    } else {
+                        items(
+                            items = filteredLogs,
+                            key = { it.id },
+                            contentType = { "log" },
+                        ) { indexedLog ->
+                            LogCard(indexedLog.message)
+                        }
+                    }
+
+                    item {
+                        Spacer(
+                            Modifier
+                                .height(imeBottomPadding)
+                                .navigationBarsPadding(),
                         )
                     }
                 }
-            } else {
-                item(key = "top_spacer", contentType = "spacer") {
-                    Spacer(Modifier)
+            }
+        },
+    ) { innerPadding ->
+        searchStatus.SearchBox {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .horizontalCutoutPadding()
+                    .then(if (backdrop != null) Modifier.layerBackdrop(backdrop) else Modifier)
+                    .scrollEndHaptic()
+                    .overScrollVertical()
+                    .nestedScroll(scrollBehavior.nestedScrollConnection),
+                state = listState,
+                contentPadding = PaddingValues(
+                    top = innerPadding.calculateTopPadding(),
+                ),
+            ) {
+                if (logs.isEmpty()) {
+                    item(key = "empty", contentType = "empty") {
+                        Column(
+                            modifier = Modifier.fillParentMaxSize(),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center,
+                        ) {
+                            Text(
+                                text = if (uiState.isConnected) {
+                                    stringResource(R.string.log_waiting)
+                                } else {
+                                    stringResource(R.string.log_not_connected)
+                                },
+                                fontSize = 16.sp,
+                                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                            )
+                        }
+                    }
+                } else {
+                    item(key = "top_spacer", contentType = "spacer") {
+                        Spacer(Modifier.height(12.dp))
+                    }
                 }
-            }
 
-            items(
-                items = logs,
-                key = { it.id },
-                contentType = { "log" },
-            ) { indexedLog ->
-                LogCard(indexedLog.message)
-            }
+                items(
+                    items = logs,
+                    key = { it.id },
+                    contentType = { "log" },
+                ) { indexedLog ->
+                    LogCard(indexedLog.message)
+                }
 
-            item(key = "bottom_spacer", contentType = "spacer") {
-                Spacer(Modifier.navigationBarsPadding())
+                item(key = "bottom_spacer", contentType = "spacer") {
+                    Spacer(
+                        Modifier
+                            .height(24.dp)
+                            .navigationBarsPadding(),
+                    )
+                }
             }
         }
     }
@@ -246,7 +362,8 @@ private fun LogCard(log: LogMessage) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 12.dp),
+            .padding(horizontal = 12.dp)
+            .padding(bottom = 12.dp),
         insideMargin = PaddingValues(12.dp),
     ) {
         Column(

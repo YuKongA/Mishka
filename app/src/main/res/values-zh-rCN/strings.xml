@@ -263,6 +263,8 @@
     <!-- Log -->
     <string name="log_title">日志</string>
     <string name="log_clear">清除</string>
+    <string name="log_search">搜索日志</string>
+    <string name="log_no_match">无匹配结果</string>
     <string name="log_waiting">等待日志...</string>
     <string name="log_not_connected">未连接</string>
 
