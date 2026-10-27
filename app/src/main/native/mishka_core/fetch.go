@@ -18,6 +18,7 @@ import (
 	"path"
 	P "path"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -26,7 +27,6 @@ import (
 
 	"github.com/metacubex/bbolt"
 	"github.com/metacubex/mihomo/common/utils"
-	clashHttp "github.com/metacubex/mihomo/component/http"
 	"github.com/metacubex/mihomo/config"
 )
 
@@ -101,14 +101,6 @@ func runFetchAndValid(
 		effectiveUA = currentUserAgent()
 	}
 
-	// mihomo HTTP / GeoIP downloadToPath 读 env；processLock 串行保证 set/unset 不被并发污染。
-	if httpProxy != "" {
-		_ = os.Setenv("HTTPS_PROXY", httpProxy)
-		_ = os.Setenv("HTTP_PROXY", httpProxy)
-		defer os.Unsetenv("HTTPS_PROXY")
-		defer os.Unsetenv("HTTP_PROXY")
-	}
-
 	configPath := P.Join(workDir, "config.yaml")
 	result := &FetchResult{}
 
@@ -126,7 +118,7 @@ func runFetchAndValid(
 			Progress:    -1,
 			MaxProgress: -1,
 		})
-		if err := fetchURL(ctx, u, configPath, result, effectiveUA); err != nil {
+		if err := fetchURL(ctx, u, configPath, result, effectiveUA, httpProxy); err != nil {
 			return nil, err
 		}
 	}
@@ -144,7 +136,7 @@ func runFetchAndValid(
 
 	patchProvidersPath(rawCfg, workDir)
 
-	prefetchProviders(ctx, token, rawCfg, effectiveUA, workDir, result)
+	prefetchProviders(ctx, token, rawCfg, effectiveUA, workDir, result, httpProxy)
 
 	if ctx.Err() != nil {
 		return nil, ctx.Err()
@@ -171,7 +163,44 @@ func setProgress(token int32, p FetchProgress) {
 	}
 }
 
-func fetchURL(ctx context.Context, u *url.URL, dest string, result *FetchResult, userAgent string) error {
+// mihomo 的 clashHttp 给 Transport 不设 Proxy，其 dialer 也不读 HTTP(S)_PROXY，
+// 只设环境变量等于没设——订阅下载会永远直连，需要代理的地址必然失败。
+func newFetchClient(proxyURL string) (*http.Client, error) {
+	transport := &http.Transport{
+		DisableKeepAlives:     runtime.GOOS == "android",
+		MaxIdleConns:          100,
+		IdleConnTimeout:       30 * time.Second,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
+	}
+	if proxyURL != "" {
+		p, err := url.Parse(proxyURL)
+		if err != nil {
+			return nil, fmt.Errorf("parse proxy url: %w", err)
+		}
+		transport.Proxy = http.ProxyURL(p)
+	}
+	return &http.Client{Transport: transport}, nil
+}
+
+func newFetchRequest(ctx context.Context, u *url.URL, header http.Header) (*http.Request, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+	for k, vs := range header {
+		for _, v := range vs {
+			req.Header.Add(k, v)
+		}
+	}
+	if user := u.User; user != nil {
+		password, _ := user.Password()
+		req.SetBasicAuth(user.Username(), password)
+	}
+	return req, nil
+}
+
+func fetchURL(ctx context.Context, u *url.URL, dest string, result *FetchResult, userAgent, proxyURL string) error {
 	scheme := strings.ToLower(u.Scheme)
 	if scheme != "http" && scheme != "https" {
 		return fmt.Errorf("unsupported scheme %s", u.Scheme)
@@ -180,8 +209,15 @@ func fetchURL(ctx context.Context, u *url.URL, dest string, result *FetchResult,
 	subCtx, cancel := context.WithTimeout(ctx, fetchTimeout)
 	defer cancel()
 
-	header := http.Header{"User-Agent": []string{userAgent}}
-	resp, err := clashHttp.HttpRequest(subCtx, u.String(), http.MethodGet, header, nil)
+	client, err := newFetchClient(proxyURL)
+	if err != nil {
+		return err
+	}
+	req, err := newFetchRequest(subCtx, u, http.Header{"User-Agent": []string{userAgent}})
+	if err != nil {
+		return err
+	}
+	resp, err := client.Do(req)
 	if err != nil {
 		return fmt.Errorf("http request: %w", err)
 	}
@@ -382,7 +418,7 @@ func parseProviderInfo(provider map[string]any) (http.Header, int64) {
 }
 
 // best-effort：单个下载失败不阻塞 Parse；缺 provider 时 Parse 自己会报错。
-func prefetchProviders(ctx context.Context, token int32, cfg *config.RawConfig, userAgent string, workDir string, result *FetchResult) {
+func prefetchProviders(ctx context.Context, token int32, cfg *config.RawConfig, userAgent string, workDir string, result *FetchResult, proxyURL string) {
 	type item struct {
 		key       string
 		url       string
@@ -445,7 +481,7 @@ func prefetchProviders(ctx context.Context, token int32, cfg *config.RawConfig, 
 				return
 			}
 			if u, err := url.Parse(it.url); err == nil {
-				rawUserinfo, _ := fetchProvider(ctx, u, it.dest, userAgent, it.header, it.sizeLimit)
+				rawUserinfo, _ := fetchProvider(ctx, u, it.dest, userAgent, it.header, it.sizeLimit, proxyURL)
 				if rawUserinfo != "" && it.kind == "proxies" {
 					info := &FetchResult{}
 					parseUserinfo(rawUserinfo, info)
@@ -553,7 +589,7 @@ func writeFileAtomic(dest string, src io.Reader) (int64, error) {
 	return n, nil
 }
 
-func fetchProvider(ctx context.Context, u *url.URL, dest string, userAgent string, customHeader http.Header, sizeLimit int64) (string, error) {
+func fetchProvider(ctx context.Context, u *url.URL, dest string, userAgent string, customHeader http.Header, sizeLimit int64, proxyURL string) (string, error) {
 	subCtx, cancel := context.WithTimeout(ctx, fetchTimeout)
 	defer cancel()
 	header := http.Header{}
@@ -563,7 +599,15 @@ func fetchProvider(ctx context.Context, u *url.URL, dest string, userAgent strin
 	if header.Get("User-Agent") == "" {
 		header.Set("User-Agent", userAgent)
 	}
-	resp, err := clashHttp.HttpRequest(subCtx, u.String(), http.MethodGet, header, nil)
+	client, err := newFetchClient(proxyURL)
+	if err != nil {
+		return "", err
+	}
+	req, err := newFetchRequest(subCtx, u, header)
+	if err != nil {
+		return "", err
+	}
+	resp, err := client.Do(req)
 	if err != nil {
 		return "", err
 	}
