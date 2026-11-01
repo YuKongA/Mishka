@@ -6,29 +6,13 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"syscall"
 
 	"golang.org/x/sys/unix"
 )
 
-func rootDNSSocketControl(network, address string, raw syscall.RawConn) error {
-	var socketErr error
-	err := raw.Control(func(fd uintptr) {
-		level, option := unix.SOL_IP, unix.IP_TRANSPARENT
-		if network == "tcp6" || network == "udp6" {
-			level, option = unix.SOL_IPV6, unix.IPV6_TRANSPARENT
-		}
-		socketErr = unix.SetsockoptInt(int(fd), level, option, 1)
-	})
-	if err != nil {
-		return err
-	}
-	return socketErr
-}
-
-func listenRootDNS() ([]rootDNSSockets, error) {
-	lc := &net.ListenConfig{Control: rootDNSSocketControl}
-	ipv4, err := bindRootDNSFamily(lc, "4", "0.0.0.0:53")
+func listenRootDNS(port int) ([]rootDNSSockets, error) {
+	lc := &net.ListenConfig{}
+	ipv4, err := bindRootDNSFamily(lc, "4", fmt.Sprintf("127.0.0.1:%d", port))
 	if err != nil {
 		return nil, err
 	}
@@ -53,7 +37,7 @@ func listenRootDNS() ([]rootDNSSockets, error) {
 		return nil, fmt.Errorf("probe ROOT DNS IPv6 support: %w", err)
 	}
 	unix.Close(fd)
-	ipv6, err := bindRootDNSFamily(lc, "6", "[::]:53")
+	ipv6, err := bindRootDNSFamily(lc, "6", fmt.Sprintf("[::1]:%d", port))
 	if err != nil {
 		return nil, err
 	}

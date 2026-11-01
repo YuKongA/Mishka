@@ -398,6 +398,7 @@ class BackupManager(
             StorageKeys.ROOT_MIHOMO_SECRET,
             StorageKeys.ROOT_START_TIME,
             StorageKeys.ROOT_ACTIVE_SUBSCRIPTION_ID,
+            StorageKeys.ROOT_DNS_PORT,
             StorageKeys.ROOT_BOOT_COUNT,
             StorageKeys.ROOT_SUBMODE_ACTIVE,
             StorageKeys.ROOT_TETHER_MODE_ACTIVE,
