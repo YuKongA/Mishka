@@ -19,6 +19,8 @@ object StorageKeys {
     const val ROOT_MIHOMO_SECRET = "root_mihomo_secret"
     const val ROOT_START_TIME = "root_start_time"
     const val ROOT_ACTIVE_SUBSCRIPTION_ID = "root_active_subscription_id"
+    // 本次 ROOT 进程实际绑定的 loopback DNS 端口；attach 时必须复用，不能重新选端口
+    const val ROOT_DNS_PORT = "root_dns_port"
 
     // 启动时刻的 boot session 标记，用于 reopen 重连前识别设备是否重启过（重启会杀死 root
     // mihomo，不能把过期 PID 误当"仍存活"）。判定逻辑见 [BootSession]

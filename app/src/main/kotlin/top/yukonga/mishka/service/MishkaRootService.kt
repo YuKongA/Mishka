@@ -440,6 +440,10 @@ class MishkaRootService : Service() {
             }
 
             // 5. 以 root 启动 mihomo
+            // 端口必须在启动前选定并持久化；attach 时复用它，否则新进程会选到另一个端口，
+            // 规则 DNAT 到无人监听的端口。
+            val rootDnsPort = RootDnsApplier.allocatePort()
+            storage.putString(StorageKeys.ROOT_DNS_PORT, rootDnsPort.toString())
             // age 加密订阅：runtime/ 保持密文，密钥与覆写选择来自同一份 imported DB 快照。
             val success = runner.start(
                 subscriptionId = subscriptionId,
@@ -450,6 +454,7 @@ class MishkaRootService : Service() {
                 ageSecretKey = transformPlan.ageSecretKey,
                 transformPath = transformPlan.transformPath,
                 preferTransformMixedPort = transformPlan.transformPath != null && viaProxy && userOverride.mixedPort == null,
+                rootDnsPort = rootDnsPort,
             )
             if (!success) {
                 if (!teardownRootRulesOrReport(tunMode)) return@launch
@@ -513,8 +518,10 @@ class MishkaRootService : Service() {
             ) == RootTetherHijacker.Mode.PROXY
             val allowedInterfaces = rootTetherInterfaces(storage)
             val interfaces = if (proxyTether) allowedInterfaces else emptyList()
+            val rootDnsPort = storage.getString(StorageKeys.ROOT_DNS_PORT, "").toIntOrNull()
+                ?: throw IllegalStateException("ROOT DNS port is not persisted; refusing to attach")
             // DNS hook 必须排在数据转发 hook 前；attach 也重建整套 DNS 规则，不能只检查单个锚点。
-            RootDnsApplier.apply(applicationInfo.uid, interfaces, allowedInterfaces)
+            RootDnsApplier.apply(applicationInfo.uid, interfaces, allowedInterfaces, rootDnsPort)
             currentCoroutineContext().ensureActive()
             return true
         } catch (e: CancellationException) {
@@ -744,6 +751,7 @@ class MishkaRootService : Service() {
         BootSession.clear(storage)
         storage.putString(StorageKeys.ROOT_TETHER_MODE_ACTIVE, "")
         storage.putString(StorageKeys.ROOT_SUBMODE_ACTIVE, "")
+        storage.putString(StorageKeys.ROOT_DNS_PORT, "")
     }
 
     /** 全新启动路径：用当前设置的 tether mode + 外部传入的 TPROXY 能力 apply 规则。 */

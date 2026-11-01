@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"net"
 	"net/netip"
@@ -44,7 +45,7 @@ func TestRootDNSDisabledResolverIsNotReady(t *testing.T) {
 	if server.Ready() {
 		t.Fatal("ROOT DNS reported ready without a DNS service")
 	}
-	if started, err := startRootDNS(); err == nil {
+	if started, err := startRootDNS(15353); err == nil {
 		started.Close()
 		t.Fatal("ROOT DNS started without a DNS service")
 	}
@@ -280,5 +281,28 @@ func TestRootDNSAAAARequiresCapturedIPv6(t *testing.T) {
 				t.Fatalf("uncaptured IPv6 address exposed to clients: %v", reply.Answer)
 			}
 		})
+	}
+}
+
+func TestRootDNSBindsRequestedLoopbackPort(t *testing.T) {
+	probe, err := net.Listen("tcp4", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	port := probe.Addr().(*net.TCPAddr).Port
+	probe.Close()
+	sockets, err := listenRootDNS(port)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		for _, socket := range sockets {
+			socket.udp.Close()
+			socket.tcp.Close()
+		}
+	}()
+	want := fmt.Sprintf("127.0.0.1:%d", port)
+	if got := sockets[0].udp.LocalAddr().String(); got != want {
+		t.Fatalf("ROOT DNS UDP address = %q, want %q", got, want)
 	}
 }

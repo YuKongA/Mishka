@@ -61,6 +61,7 @@ func runMihomo() int {
 		vpnPlatformSocket   string
 		vpnReadyFile        string
 		rootDNS             bool
+		rootDNSPort         int
 	)
 	fs.StringVar(&homeDir, "d", "", "set configuration directory")
 	fs.StringVar(&configFile, "f", "", "specify configuration file")
@@ -75,8 +76,13 @@ func runMihomo() int {
 	fs.IntVar(&vpnHTTPFD, "vpn-http-fd", -1, "inherited loopback HTTP listener fd")
 	fs.StringVar(&vpnPlatformSocket, "vpn-platform-socket", "", "Android VPN platform abstract socket")
 	fs.StringVar(&vpnReadyFile, "vpn-ready-file", "", "publish VPN readiness after listeners start")
-	fs.BoolVar(&rootDNS, "root-dns", false, "serve transparent ROOT DNS on UDP and TCP port 53")
+	fs.BoolVar(&rootDNS, "root-dns", false, "serve transparent ROOT DNS on localhost")
+	fs.IntVar(&rootDNSPort, "root-dns-port", 15353, "localhost port for ROOT DNS listener")
 	if err := fs.Parse(os.Args[1:]); err != nil {
+		return 2
+	}
+	if rootDNS && (rootDNSPort < 1 || rootDNSPort > 65535) {
+		fmt.Fprintln(os.Stderr, "invalid root-dns-port")
 		return 2
 	}
 	if rootDNS {
@@ -227,14 +233,14 @@ func runMihomo() int {
 	var rootServer *rootDNSServer
 	var rootErrors <-chan error
 	if rootDNS {
-		rootServer, err = startRootDNS()
+		rootServer, err = startRootDNS(rootDNSPort)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "start ROOT DNS:", err)
 			return 1
 		}
 		defer rootServer.Close()
 		rootErrors = rootServer.errors
-		log.Infoln("[ROOT] Transparent DNS listening on UDP and TCP port 53")
+		log.Infoln("[ROOT] Transparent DNS listening on localhost:%d", rootDNSPort)
 	}
 	if vpnMode && !listener.TunListenerReady() {
 		fmt.Fprintln(os.Stderr, "VPN TUN listener did not start")

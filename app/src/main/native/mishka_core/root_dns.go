@@ -182,11 +182,11 @@ func (r rootDNSReader) ReadUDP(conn *net.UDPConn, timeout time.Duration) ([]byte
 	return msg, session, err
 }
 
-func startRootDNS() (*rootDNSServer, error) {
+func startRootDNS(port int) (*rootDNSServer, error) {
 	if err := validateRootDNSResolver(); err != nil {
 		return nil, err
 	}
-	sockets, err := listenRootDNS()
+	sockets, err := listenRootDNS(port)
 	if err != nil {
 		return nil, err
 	}
@@ -196,7 +196,7 @@ func startRootDNS() (*rootDNSServer, error) {
 	handler.SetService(rootDNSService{owner: server})
 	for _, socket := range sockets {
 		// 保留原生 *net.UDPConn，miekg 才会通过 pktinfo 把原目标地址作为回复源。
-		// socket 自身绑定 53，因此无需 NAT，也不会把回复源端口改成临时端口。
+		// 本机 DNS 由 RootDnsApplier DNAT 到该 loopback 端口，避免和 tethering dnsmasq 抢 53。
 		server.servers = append(server.servers,
 			&D.Server{
 				PacketConn: socket.udp, Handler: handler.UDPHandler(), UDPSize: D.MaxMsgSize,
