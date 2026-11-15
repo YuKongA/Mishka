@@ -350,6 +350,7 @@ class MainActivity : ComponentActivity() {
             statusBarStyle = systemBarStyle,
             navigationBarStyle = systemBarStyle,
         )
+        window.isNavigationBarContrastEnforced = false
         enforceSystemBarsAppearance(isDark)
         window.decorView.post {
             enforceSystemBarsAppearance(isDark)
