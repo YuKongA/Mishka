@@ -13,11 +13,12 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import top.yukonga.mishka.R
+import top.yukonga.mishka.ui.component.GlassDialogTextButton
+import top.yukonga.mishka.ui.component.blur.LocalPageBackdrop
 import top.yukonga.miuix.kmp.basic.CircularProgressIndicator
 import top.yukonga.miuix.kmp.basic.Text
-import top.yukonga.miuix.kmp.basic.TextButton
+import top.yukonga.miuix.kmp.glass.GlassDialog
 import top.yukonga.miuix.kmp.theme.MiuixTheme
-import top.yukonga.miuix.kmp.window.WindowDialog
 
 /**
  * 导入进度对话框：校验配置、下载外部资源时显示。
@@ -31,10 +32,11 @@ fun ImportProgressDialog(
     title: String = stringResource(R.string.subscription_import_config),
     onCancel: (() -> Unit)? = null,
 ) {
-    WindowDialog(
+    GlassDialog(
         show = show,
+        backdrop = LocalPageBackdrop.current,
         title = title,
-        onDismissRequest = null,
+        onDismissRequest = {},
         content = {
             Column {
                 Row(
@@ -50,7 +52,7 @@ fun ImportProgressDialog(
                 }
                 if (onCancel != null) {
                     Spacer(Modifier.height(16.dp))
-                    TextButton(
+                    GlassDialogTextButton(
                         text = stringResource(R.string.common_cancel),
                         onClick = onCancel,
                         modifier = Modifier.fillMaxWidth(),

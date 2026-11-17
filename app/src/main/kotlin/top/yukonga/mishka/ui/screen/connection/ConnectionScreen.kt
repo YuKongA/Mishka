@@ -1,8 +1,8 @@
 package top.yukonga.mishka.ui.screen.connection
 
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -10,12 +10,9 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -29,58 +26,50 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.positionInWindow
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import top.yukonga.mishka.R
 import top.yukonga.mishka.domain.model.ConnectionInfo
 import top.yukonga.mishka.ui.component.AdaptiveTopAppBar
-import top.yukonga.mishka.ui.component.SearchBarFake
-import top.yukonga.mishka.ui.component.SearchBox
-import top.yukonga.mishka.ui.component.SearchPager
-import top.yukonga.mishka.ui.component.SearchResultStatusEffect
-import top.yukonga.mishka.ui.component.SearchStatus
+import top.yukonga.mishka.ui.component.BackNavigationIcon
+import top.yukonga.mishka.ui.component.GlassDialogTextButton
+import top.yukonga.mishka.ui.component.GlassSearchOverlay
+import top.yukonga.mishka.ui.component.TopBarIconButton
 import top.yukonga.mishka.ui.component.blur.BlurredBar
+import top.yukonga.mishka.ui.component.blur.LocalPageBackdrop
+import top.yukonga.mishka.ui.component.blur.PageBackdropBox
 import top.yukonga.mishka.ui.component.blur.rememberBlurBackdrop
-import top.yukonga.mishka.ui.component.rememberSearchBarTopPadding
-import top.yukonga.mishka.ui.component.rememberSearchScreenStatus
+import top.yukonga.mishka.ui.component.glassSearchBarTransition
+import top.yukonga.mishka.ui.component.overScrollVertical
+import top.yukonga.mishka.ui.component.rememberGlassSearchBarAlpha
 import top.yukonga.mishka.ui.util.horizontalCutoutPadding
 import top.yukonga.mishka.util.FormatUtils
 import top.yukonga.mishka.viewmodel.ConnectionViewModel
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
-import top.yukonga.miuix.kmp.basic.Icon
-import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.Text
-import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.blur.layerBackdrop
+import top.yukonga.miuix.kmp.glass.GlassDialog
+import top.yukonga.miuix.kmp.glass.GlassDialogButtonRole
 import top.yukonga.miuix.kmp.icon.MiuixIcons
-import top.yukonga.miuix.kmp.icon.extended.Back
 import top.yukonga.miuix.kmp.icon.extended.Close
-import top.yukonga.miuix.kmp.icon.extended.Delete
 import top.yukonga.miuix.kmp.squircle.squircleBackground
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.overScrollVertical
 import top.yukonga.miuix.kmp.utils.scrollEndHaptic
-import top.yukonga.miuix.kmp.window.WindowDialog
+import top.yukonga.miuix.kmp.icon.glass.Delete as GlassDelete
+import top.yukonga.miuix.kmp.icon.glass.Search as GlassSearch
 
 @Composable
 fun ConnectionScreen(
@@ -90,7 +79,7 @@ fun ConnectionScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val scrollBehavior = MiuixScrollBehavior()
     var showCloseAllDialog by remember { mutableStateOf(false) }
-    val density = LocalDensity.current
+    var searchExpanded by remember { mutableStateOf(false) }
 
     // WS 订阅只在本页存续，理由见 startObserving
     DisposableEffect(viewModel) {
@@ -98,143 +87,43 @@ fun ConnectionScreen(
         onDispose { viewModel.stopObserving() }
     }
 
-    val searchStatusState = rememberSearchScreenStatus(stringResource(R.string.connection_search))
-    var searchStatus by searchStatusState
-
-    // 搜索过滤（直接传入 searchText，避免组合期间写入 ViewModel 状态）
-    val searchText = searchStatus.searchText
-    val filteredConnections = remember(searchText, uiState.connections) {
-        viewModel.filteredConnections(searchText)
-    }
-    SearchResultStatusEffect(searchStatusState, filteredConnections.isEmpty())
-
-    val dynamicTopPadding = rememberSearchBarTopPadding(scrollBehavior)
+    val barAlpha = rememberGlassSearchBarAlpha(searchExpanded)
 
     val backdrop = rememberBlurBackdrop()
     val blurActive = backdrop != null
-    val barColor = if (blurActive) Color.Transparent else MiuixTheme.colorScheme.surface
 
-    Scaffold(
-        topBar = {
-            BlurredBar(backdrop = backdrop, blurActive = blurActive) {
-                searchStatus.TopAppBarAnim(
-                    backgroundColor = if (blurActive) Color.Transparent else MiuixTheme.colorScheme.surface,
-                ) {
+    PageBackdropBox(modifier = Modifier.background(MiuixTheme.colorScheme.surface)) {
+        Scaffold(
+            modifier = Modifier.glassSearchBarTransition(searchExpanded) { barAlpha.value },
+            topBar = {
+                BlurredBar(backdrop = backdrop, blurActive = blurActive) {
                     AdaptiveTopAppBar(
                         title = stringResource(R.string.connection_title),
-                        color = barColor,
                         scrollBehavior = scrollBehavior,
-                        navigationIcon = {
-                            IconButton(onClick = onBack) {
-                                val layoutDirection = LocalLayoutDirection.current
-                                Icon(
-                                    imageVector = MiuixIcons.Back,
-                                    contentDescription = stringResource(R.string.common_back),
-                                    tint = MiuixTheme.colorScheme.onSurface,
-                                    modifier = Modifier.graphicsLayer {
-                                        scaleX = if (layoutDirection == LayoutDirection.Rtl) -1f else 1f
-                                    },
-                                )
-                            }
-                        },
+                        navigationIcon = { BackNavigationIcon(onBack) },
                         actions = {
-                            IconButton(onClick = { showCloseAllDialog = true }) {
-                                Icon(
-                                    imageVector = MiuixIcons.Delete,
-                                    contentDescription = stringResource(R.string.connection_close_all),
-                                    tint = MiuixTheme.colorScheme.onSurface,
-                                )
-                            }
-                        },
-                        bottomContent = {
-                            Box(
-                                modifier = Modifier
-                                    .graphicsLayer { alpha = if (searchStatus.isCollapsed()) 1f else 0f }
-                                    .onGloballyPositioned { coordinates ->
-                                        with(density) {
-                                            val newOffsetY = coordinates.positionInWindow().y.toDp()
-                                            if (searchStatus.offsetY != newOffsetY) {
-                                                searchStatus = searchStatus.copy(offsetY = newOffsetY)
-                                            }
-                                        }
-                                    }
-                                    .then(
-                                        if (searchStatus.isCollapsed()) {
-                                            Modifier.pointerInput(Unit) {
-                                                detectTapGestures {
-                                                    searchStatus = searchStatus.copy(current = SearchStatus.Status.EXPANDING)
-                                                }
-                                            }
-                                        } else Modifier,
-                                    ),
-                            ) {
-                                SearchBarFake(searchStatus.label, dynamicTopPadding)
-                            }
+                            TopBarIconButton(
+                                onClick = { searchExpanded = true },
+                                glassIcon = MiuixIcons.Glass.GlassSearch,
+                                contentDescription = stringResource(R.string.connection_search),
+                            )
+                            TopBarIconButton(
+                                onClick = { showCloseAllDialog = true },
+                                glassIcon = MiuixIcons.Glass.GlassDelete,
+                                contentDescription = stringResource(R.string.connection_close_all),
+                            )
                         },
                     )
                 }
-            }
-        },
-        popupHost = {
-            searchStatus.SearchPager(
-                onSearchStatusChange = { searchStatus = it },
-                defaultResult = {},
-                searchBarTopPadding = dynamicTopPadding,
-            ) {
-                // 搜索结果列表
-                val imeBottomPadding = WindowInsets.ime.asPaddingValues().calculateBottomPadding()
-                LazyColumn(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .overScrollVertical(),
-                ) {
-                    item {
-                        Spacer(Modifier.height(6.dp))
-                    }
-
-                    if (filteredConnections.isEmpty()) {
-                        item(key = "search_empty") {
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 32.dp),
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                            ) {
-                                Text(
-                                    text = stringResource(R.string.connection_no_match),
-                                    fontSize = 16.sp,
-                                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                                )
-                            }
-                        }
-                    } else {
-                        items(filteredConnections, key = { it.id }) { conn ->
-                            ConnectionItem(
-                                connection = conn,
-                                onClose = { viewModel.closeConnection(conn.id) },
-                            )
-                        }
-                    }
-
-                    item {
-                        Spacer(
-                            Modifier
-                                .height(imeBottomPadding)
-                                .navigationBarsPadding(),
-                        )
-                    }
-                }
-            }
-        },
-    ) { innerPadding ->
-        searchStatus.SearchBox {
+            },
+        ) { innerPadding ->
             LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
-                    .horizontalCutoutPadding()
                     .then(if (backdrop != null) Modifier.layerBackdrop(backdrop) else Modifier)
+                    .horizontalCutoutPadding()
                     .scrollEndHaptic()
-                    .overScrollVertical()
+                    .overScrollVertical(scrollBehavior)
                     .nestedScroll(scrollBehavior.nestedScrollConnection),
                 contentPadding = PaddingValues(
                     top = innerPadding.calculateTopPadding(),
@@ -290,33 +179,81 @@ fun ConnectionScreen(
                 }
             }
         }
-    }
 
-    // 关闭全部确认 Dialog
-    WindowDialog(
-        show = showCloseAllDialog,
-        title = stringResource(R.string.connection_close_all_title),
-        summary = stringResource(R.string.connection_close_all_summary),
-        onDismissRequest = { showCloseAllDialog = false },
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        GlassSearchOverlay(
+            expanded = searchExpanded,
+            onDismissRequest = { searchExpanded = false },
+            label = stringResource(R.string.connection_search),
+        ) { query ->
+            val filteredConnections = remember(query, uiState.connections) {
+                viewModel.filteredConnections(query)
+            }
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .overScrollVertical(),
+            ) {
+                item {
+                    Spacer(Modifier.height(6.dp))
+                }
+
+                if (filteredConnections.isEmpty()) {
+                    item(key = "search_empty") {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 32.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                        ) {
+                            Text(
+                                text = stringResource(R.string.connection_no_match),
+                                fontSize = 16.sp,
+                                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                            )
+                        }
+                    }
+                } else {
+                    items(filteredConnections, key = { it.id }) { conn ->
+                        ConnectionItem(
+                            connection = conn,
+                            onClose = { viewModel.closeConnection(conn.id) },
+                        )
+                    }
+                }
+
+                item {
+                    Spacer(Modifier.navigationBarsPadding())
+                }
+            }
+        }
+
+        // 关闭全部确认 Dialog
+        GlassDialog(
+            show = showCloseAllDialog,
+            backdrop = LocalPageBackdrop.current,
+            title = stringResource(R.string.connection_close_all_title),
+            summary = stringResource(R.string.connection_close_all_summary),
+            onDismissRequest = { showCloseAllDialog = false },
         ) {
-            TextButton(
-                text = stringResource(R.string.common_cancel),
-                modifier = Modifier.weight(1f),
-                onClick = { showCloseAllDialog = false },
-            )
-            TextButton(
-                text = stringResource(R.string.common_confirm),
-                modifier = Modifier.weight(1f),
-                colors = top.yukonga.miuix.kmp.basic.ButtonDefaults.textButtonColorsPrimary(),
-                onClick = {
-                    viewModel.closeAllConnections()
-                    showCloseAllDialog = false
-                },
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                GlassDialogTextButton(
+                    text = stringResource(R.string.common_cancel),
+                    modifier = Modifier.weight(1f),
+                    onClick = { showCloseAllDialog = false },
+                )
+                GlassDialogTextButton(
+                    text = stringResource(R.string.common_confirm),
+                    modifier = Modifier.weight(1f),
+                    role = GlassDialogButtonRole.Primary,
+                    onClick = {
+                        viewModel.closeAllConnections()
+                        showCloseAllDialog = false
+                    },
+                )
+            }
         }
     }
 }

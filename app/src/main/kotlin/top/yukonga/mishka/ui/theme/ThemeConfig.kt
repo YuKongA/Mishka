@@ -14,10 +14,8 @@ data class ThemeConfig(
     val accentColor: ThemeAccentColor = ThemeAccentColor.Default,
     val blurEnabled: Boolean = true,
     val topBarBlurStyle: TopBarBlurStyle = TopBarBlurStyle.Gaussian,
-    val floatingBottomBar: Boolean = false,
-    val floatingBottomBarStyle: FloatingBottomBarStyle = FloatingBottomBarStyle.Miuix,
-    val bottomBarMode: BottomBarMode = BottomBarMode.IconAndText,
-    val pagerInterceptionMode: PagerInterceptionMode = PagerInterceptionMode.CrossAxisInterceptor,
+    val floatingBottomBarStyle: FloatingBottomBarStyle = FloatingBottomBarStyle.Glass,
+    val pagerInterceptionMode: PagerInterceptionMode = PagerInterceptionMode.CrossAxis,
     val densityScale: Float = DefaultDensityScale,
 )
 
@@ -35,25 +33,17 @@ fun ThemeConfig.resolveIsDark(systemDark: Boolean): Boolean = when (colorMode) {
 fun normalizeDensityScale(value: Float): Float =
     if (value.isFinite()) value.coerceIn(MinDensityScale, MaxDensityScale) else DefaultDensityScale
 
+
 enum class FloatingBottomBarStyle(val storageValue: String) {
-    Miuix("miuix"),
+    Glass("glass"),
     IosLike("ios_like");
 
     companion object {
         fun fromStorage(value: String): FloatingBottomBarStyle =
-            entries.firstOrNull { it.storageValue == value } ?: Miuix
+            entries.firstOrNull { it.storageValue == value } ?: Glass
     }
 }
 
-enum class BottomBarMode(val storageValue: String) {
-    IconAndText("icon_and_text"),
-    IconOnly("icon_only");
-
-    companion object {
-        fun fromStorage(value: String): BottomBarMode =
-            entries.firstOrNull { it.storageValue == value } ?: IconAndText
-    }
-}
 
 enum class TopBarBlurStyle(val storageValue: String) {
     Gaussian("gaussian"),
@@ -110,17 +100,13 @@ fun readThemeConfig(storage: PlatformStorage): ThemeConfig {
         topBarBlurStyle = TopBarBlurStyle.fromStorage(
             storage.getString(StorageKeys.THEME_BLUR_STYLE, TopBarBlurStyle.Gaussian.storageValue),
         ),
-        floatingBottomBar = storage.getString(StorageKeys.THEME_FLOATING_BOTTOM_BAR, "false") == "true",
         floatingBottomBarStyle = FloatingBottomBarStyle.fromStorage(
-            storage.getString(StorageKeys.THEME_FLOATING_BOTTOM_BAR_STYLE, FloatingBottomBarStyle.Miuix.storageValue),
-        ),
-        bottomBarMode = BottomBarMode.fromStorage(
-            storage.getString(StorageKeys.THEME_BOTTOM_BAR_MODE, BottomBarMode.IconAndText.storageValue),
+            storage.getString(StorageKeys.THEME_FLOATING_BOTTOM_BAR_STYLE, FloatingBottomBarStyle.Glass.storageValue),
         ),
         pagerInterceptionMode = pagerInterceptionModeFromStorage(
             storage.getString(
                 StorageKeys.THEME_PAGER_GESTURE_MODE,
-                PagerInterceptionMode.CrossAxisInterceptor.name,
+                PagerInterceptionMode.CrossAxis.name,
             ),
         ),
         densityScale = normalizeDensityScale(
@@ -145,12 +131,12 @@ fun writeThemeConfig(storage: PlatformStorage, config: ThemeConfig) {
     storage.putString(StorageKeys.THEME_ACCENT_COLOR, config.accentColor.storageValue)
     storage.putString(StorageKeys.THEME_BLUR, config.blurEnabled.toString())
     storage.putString(StorageKeys.THEME_BLUR_STYLE, config.topBarBlurStyle.storageValue)
-    storage.putString(StorageKeys.THEME_FLOATING_BOTTOM_BAR, config.floatingBottomBar.toString())
     storage.putString(StorageKeys.THEME_FLOATING_BOTTOM_BAR_STYLE, config.floatingBottomBarStyle.storageValue)
-    storage.putString(StorageKeys.THEME_BOTTOM_BAR_MODE, config.bottomBarMode.storageValue)
     storage.putString(StorageKeys.THEME_PAGER_GESTURE_MODE, config.pagerInterceptionMode.name)
     storage.putString(StorageKeys.THEME_DENSITY_SCALE, normalizeDensityScale(config.densityScale).toString())
 }
 
-private fun pagerInterceptionModeFromStorage(value: String): PagerInterceptionMode =
-    PagerInterceptionMode.entries.firstOrNull { it.name == value } ?: PagerInterceptionMode.CrossAxisInterceptor
+private fun pagerInterceptionModeFromStorage(value: String): PagerInterceptionMode = when (value) {
+    "CrossAxisInterceptor" -> PagerInterceptionMode.CrossAxis
+    else -> PagerInterceptionMode.entries.firstOrNull { it.name == value } ?: PagerInterceptionMode.CrossAxis
+}

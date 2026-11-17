@@ -28,12 +28,12 @@ import kotlinx.coroutines.withContext
 import top.yukonga.mishka.R
 import top.yukonga.mishka.platform.scanTetherInterfacesAsRoot
 import top.yukonga.mishka.platform.showToast
+import top.yukonga.mishka.ui.component.blur.LocalPageBackdrop
 import top.yukonga.miuix.kmp.basic.BasicComponent
-import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Checkbox
-import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.basic.TextField
-import top.yukonga.miuix.kmp.window.WindowDialog
+import top.yukonga.miuix.kmp.glass.GlassDialog
+import top.yukonga.miuix.kmp.glass.GlassDialogButtonRole
 
 /**
  * 热点接口名编辑对话框。多行 TextField（每行一个接口名）+ [检测当前接口] 辅助按钮。
@@ -65,8 +65,9 @@ fun TetherInterfaceEditDialog(
         }
     }
 
-    WindowDialog(
+    GlassDialog(
         show = show,
+        backdrop = LocalPageBackdrop.current,
         title = title,
         summary = stringResource(R.string.root_tether_ifaces_hint),
         onDismissRequest = onDismiss,
@@ -76,7 +77,7 @@ fun TetherInterfaceEditDialog(
             modifier = Modifier.fillMaxWidth(),
         )
         Spacer(Modifier.height(12.dp))
-        TextButton(
+        GlassDialogTextButton(
             text = stringResource(R.string.root_tether_scan),
             modifier = Modifier.fillMaxWidth(),
             onClick = {
@@ -101,15 +102,15 @@ fun TetherInterfaceEditDialog(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            TextButton(
+            GlassDialogTextButton(
                 text = stringResource(R.string.common_cancel),
                 modifier = Modifier.weight(1f),
                 onClick = onDismiss,
             )
-            TextButton(
+            GlassDialogTextButton(
                 text = stringResource(R.string.common_confirm),
                 modifier = Modifier.weight(1f),
-                colors = ButtonDefaults.textButtonColorsPrimary(),
+                role = GlassDialogButtonRole.Primary,
                 onClick = {
                     val csv = textState.text.toString()
                         .lines()
@@ -146,8 +147,9 @@ private fun ScanResultDialog(
     onDismiss: () -> Unit,
     onApply: (List<String>) -> Unit,
 ) {
-    WindowDialog(
+    GlassDialog(
         show = show,
+        backdrop = LocalPageBackdrop.current,
         title = stringResource(R.string.root_tether_scan_result_title),
         onDismissRequest = onDismiss,
     ) {
@@ -173,15 +175,15 @@ private fun ScanResultDialog(
                 .padding(top = 4.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            TextButton(
+            GlassDialogTextButton(
                 text = stringResource(R.string.common_cancel),
                 modifier = Modifier.weight(1f),
                 onClick = onDismiss,
             )
-            TextButton(
+            GlassDialogTextButton(
                 text = stringResource(R.string.common_confirm),
                 modifier = Modifier.weight(1f),
-                colors = ButtonDefaults.textButtonColorsPrimary(),
+                role = GlassDialogButtonRole.Primary,
                 onClick = {
                     val picked = candidates.filter { selected[it] == true }
                     onApply(picked)

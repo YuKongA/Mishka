@@ -1,32 +1,19 @@
 package top.yukonga.mishka.ui.navigation
 
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.Orientation
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsPressedAsState
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.asPaddingValues
-import androidx.compose.foundation.layout.consumeWindowInsets
-import androidx.compose.foundation.layout.defaultMinSize
-import androidx.compose.foundation.layout.displayCutout
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBars
-import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.systemBars
-import androidx.compose.foundation.layout.union
-import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerDefaults
 import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.foundation.selection.selectable
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -45,22 +32,21 @@ import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigationevent.NavigationEventInfo
 import androidx.navigationevent.compose.NavigationBackHandler
 import androidx.navigationevent.compose.rememberNavigationEventState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
@@ -71,7 +57,12 @@ import top.yukonga.mishka.platform.FilePicker
 import top.yukonga.mishka.platform.PlatformStorage
 import top.yukonga.mishka.platform.StorageKeys
 import top.yukonga.mishka.platform.WifiPolicyController
-import top.yukonga.mishka.ui.component.blur.BlurredBar
+import top.yukonga.mishka.ui.component.LocalTopLayer
+import top.yukonga.mishka.ui.component.TopLayerHost
+import top.yukonga.mishka.ui.component.TopLayerState
+import top.yukonga.mishka.ui.component.blur.LocalTopAppBarTitleAlpha
+import top.yukonga.mishka.ui.component.blur.LocalTopBarStartInset
+import top.yukonga.mishka.ui.component.blur.PageBackdropBox
 import top.yukonga.mishka.ui.component.blur.rememberBlurBackdrop
 import top.yukonga.mishka.ui.component.liquid.IosLiquidGlassNavigationBar
 import top.yukonga.mishka.ui.screen.connection.ConnectionScreen
@@ -86,8 +77,8 @@ import top.yukonga.mishka.ui.screen.provider.ProviderScreen
 import top.yukonga.mishka.ui.screen.proxy.ProxyScreen
 import top.yukonga.mishka.ui.screen.settings.AboutScreen
 import top.yukonga.mishka.ui.screen.settings.AppProxyScreen
-import top.yukonga.mishka.ui.screen.settings.BackupRestoreScreen
 import top.yukonga.mishka.ui.screen.settings.AutomationScreen
+import top.yukonga.mishka.ui.screen.settings.BackupRestoreScreen
 import top.yukonga.mishka.ui.screen.settings.ExternalControlScreen
 import top.yukonga.mishka.ui.screen.settings.FileManagerEditorScreen
 import top.yukonga.mishka.ui.screen.settings.FileManagerScreen
@@ -102,17 +93,15 @@ import top.yukonga.mishka.ui.screen.subscription.SubscriptionAddScreen
 import top.yukonga.mishka.ui.screen.subscription.SubscriptionAddUrlScreen
 import top.yukonga.mishka.ui.screen.subscription.SubscriptionEditScreen
 import top.yukonga.mishka.ui.screen.subscription.SubscriptionScreen
-import top.yukonga.mishka.ui.theme.BottomBarMode
 import top.yukonga.mishka.ui.theme.FloatingBottomBarStyle
 import top.yukonga.mishka.ui.theme.LocalAppDarkMode
 import top.yukonga.mishka.ui.theme.ThemeConfig
-import top.yukonga.mishka.ui.theme.TopBarBlurStyle
 import top.yukonga.mishka.ui.util.rememberIsWideScreen
 import top.yukonga.mishka.viewmodel.AppProxyViewModel
+import top.yukonga.mishka.viewmodel.AutomationViewModel
 import top.yukonga.mishka.viewmodel.BackupViewModel
 import top.yukonga.mishka.viewmodel.ConnectionViewModel
 import top.yukonga.mishka.viewmodel.DnsQueryViewModel
-import top.yukonga.mishka.viewmodel.AutomationViewModel
 import top.yukonga.mishka.viewmodel.ExternalControlViewModel
 import top.yukonga.mishka.viewmodel.HomeUiState
 import top.yukonga.mishka.viewmodel.HomeViewModel
@@ -123,39 +112,36 @@ import top.yukonga.mishka.viewmodel.OverrideProfileViewModel
 import top.yukonga.mishka.viewmodel.ProviderViewModel
 import top.yukonga.mishka.viewmodel.ProxyViewModel
 import top.yukonga.mishka.viewmodel.SubscriptionViewModel
-import top.yukonga.miuix.kmp.basic.FloatingNavigationBar
-import top.yukonga.miuix.kmp.basic.Icon
-import top.yukonga.miuix.kmp.basic.NavigationBar
-import top.yukonga.miuix.kmp.basic.NavigationBarDisplayMode
-import top.yukonga.miuix.kmp.basic.NavigationBarItem
 import top.yukonga.miuix.kmp.basic.NavigationItem
-import top.yukonga.miuix.kmp.basic.NavigationRail
-import top.yukonga.miuix.kmp.basic.NavigationRailItem
-import top.yukonga.miuix.kmp.basic.NavigationRailValue
 import top.yukonga.miuix.kmp.basic.Scaffold
-import top.yukonga.miuix.kmp.basic.Text
-import top.yukonga.miuix.kmp.basic.rememberNavigationRailState
-import top.yukonga.miuix.kmp.blur.BlendColorEntry
-import top.yukonga.miuix.kmp.blur.BlurDefaults
-import top.yukonga.miuix.kmp.blur.highlight.Highlight
 import top.yukonga.miuix.kmp.blur.layerBackdrop
-import top.yukonga.miuix.kmp.blur.textureBlur
+import top.yukonga.miuix.kmp.glass.GlassNavigationBar
+import top.yukonga.miuix.kmp.glass.GlassNavigationItem
+import top.yukonga.miuix.kmp.glass.GlassNavigationRail
+import top.yukonga.miuix.kmp.glass.GlassNavigationRailDefaults
+import top.yukonga.miuix.kmp.glass.rememberGlassNavigationRailState
 import top.yukonga.miuix.kmp.icon.MiuixIcons
-import top.yukonga.miuix.kmp.icon.extended.Home
-import top.yukonga.miuix.kmp.icon.extended.Settings
-import top.yukonga.miuix.kmp.icon.extended.Tune
-import top.yukonga.miuix.kmp.icon.extended.UploadCloud
+import top.yukonga.miuix.kmp.icon.glass.HomeOutline
+import top.yukonga.miuix.kmp.icon.glass.SettingsOutline
 import top.yukonga.miuix.kmp.nav.core.NavDisplay
 import top.yukonga.miuix.kmp.nav.core.NavDisplayEffects
 import top.yukonga.miuix.kmp.nav.core.NavKey
 import top.yukonga.miuix.kmp.nav.core.rememberNavSystemCornerRadius
+import top.yukonga.miuix.kmp.nav.transition.NavMotion
+import top.yukonga.miuix.kmp.nav.transition.NavSettleSpec
 import top.yukonga.miuix.kmp.nav.transition.NavSwipeDirection
+import top.yukonga.miuix.kmp.nav.transition.NavTransition
+import top.yukonga.miuix.kmp.nav.transition.NavTransitions
+import top.yukonga.miuix.kmp.nav.transition.navGraphicsTransition
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.PagerGestureNestedScrollConnection
 import top.yukonga.miuix.kmp.utils.PagerInterceptionMode
 import top.yukonga.miuix.kmp.utils.PagerNavigationSpringSpec
 import top.yukonga.miuix.kmp.utils.pagerGestureOverride
 import top.yukonga.miuix.kmp.utils.springAnimateToPage
+import kotlin.time.Duration.Companion.milliseconds
+import top.yukonga.miuix.kmp.icon.glass.Tune as GlassTune
+import top.yukonga.miuix.kmp.icon.glass.UploadCloud as GlassUploadCloud
 
 // Route 是 @Serializable sealed 层级，直接多态编码整个栈；新增路由自动获得持久化能力，无需手工注册
 private val NavBackStackSaver = Saver<SnapshotStateList<NavKey>, List<String>>(
@@ -263,273 +249,366 @@ fun AppNavigation(
     }
     val swipeDismiss = if (swipeDismissEnabled) swipeBackDirection else null
 
-    CompositionLocalProvider(
-        LocalNavigator provides navigator,
-        LocalMainPagerState provides mainPagerState,
+    val topLayer = remember { TopLayerState() }
+
+    val railState = if (useNavigationRail) {
+        rememberGlassNavigationRailState(
+            initialExpanded = storage?.getString(StorageKeys.NAV_RAIL_EXPANDED, "false") == "true",
+        )
+    } else {
+        null
+    }
+    if (railState != null) {
+        LaunchedEffect(railState.expanded, storage) {
+            storage?.putString(StorageKeys.NAV_RAIL_EXPANDED, railState.expanded.toString())
+        }
+    }
+    val sidebarBackdrop = if (useNavigationRail) rememberBlurBackdrop(themeConfig.blurEnabled) else null
+    var suppressNavTransition by remember { mutableStateOf(false) }
+    LaunchedEffect(backStack.size, backStack.lastOrNull()) {
+        if (suppressNavTransition) {
+            delay(50.milliseconds)
+            suppressNavTransition = false
+        }
+    }
+    val navTransition = if (suppressNavTransition) InstantNavTransition else NavTransitions.MiuixDefault
+    Scaffold(
+        containerColor = Color.Transparent,
+        contentWindowInsets = WindowInsets(0),
     ) {
-        NavDisplay(
-            backStack = backStack,
-            onBack = { navigator.pop() },
-            effects = NavDisplayEffects(
-                cornerClipRadius = rememberNavSystemCornerRadius(),
-            ),
+        CompositionLocalProvider(
+            LocalTopLayer provides topLayer,
+            LocalNavigator provides navigator,
+            LocalMainPagerState provides mainPagerState,
         ) {
-            entry<Route.Main>(swipeDismiss = swipeDismiss) {
-                MainPage(
-                    homeViewModel,
-                    proxyViewModel,
-                    subscriptionViewModel,
-                    navigator,
-                    mainPagerState,
-                    bootStartManager,
-                    themeConfig,
-                    storage,
-                    onHideTaskCardChange,
-                    hasRootPermission,
-                    useNavigationRail,
-                )
-            }
-            entry<Route.SubscriptionAdd>(swipeDismiss = swipeDismiss) {
-                SubscriptionAddScreen(
-                    viewModel = subscriptionViewModel,
-                    onBack = { navigator.pop() },
-                    onPickFile = {
-                        filePicker?.pickYamlFile { result ->
-                            if (result != null && subscriptionViewModel != null) {
-                                subscriptionViewModel.addFromFile(
-                                    fileName = result.fileName,
-                                    content = result.content,
-                                    onComplete = {
-                                        navigator.popUntil { key -> key is Route.Main }
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .then(if (useNavigationRail) Modifier.background(MiuixTheme.colorScheme.surface) else Modifier)
+                    .then(if (useNavigationRail) Modifier.clipToBounds() else Modifier),
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .then(if (sidebarBackdrop != null) Modifier.layerBackdrop(sidebarBackdrop) else Modifier),
+                ) {
+                    CompositionLocalProvider(
+                        LocalTopAppBarTitleAlpha provides (if (railState != null) {
+                            { railState.progress }
+                        } else {
+                            { 1f }
+                        }),
+                        LocalTopBarStartInset provides (if (railState != null) {
+                            { (GlassNavigationRailDefaults.Margin + GlassNavigationRailDefaults.ExpandedWidth) * railState.progress }
+                        } else {
+                            { 0.dp }
+                        }),
+                    ) {
+                        NavDisplay(
+                            backStack = backStack,
+                            onBack = { navigator.pop() },
+                            transition = navTransition,
+                            effects = NavDisplayEffects(
+                                cornerClipRadius = if (useNavigationRail) 0.dp else rememberNavSystemCornerRadius(),
+                            ),
+                        ) {
+                            entry<Route.Main>(swipeDismiss = swipeDismiss) {
+                                MainPage(
+                                    homeViewModel,
+                                    proxyViewModel,
+                                    subscriptionViewModel,
+                                    navigator,
+                                    mainPagerState,
+                                    bootStartManager,
+                                    themeConfig,
+                                    storage,
+                                    onHideTaskCardChange,
+                                    hasRootPermission,
+                                    useNavigationRail,
+                                )
+                            }
+                            entry<Route.SubscriptionAdd>(swipeDismiss = swipeDismiss) {
+                                SubscriptionAddScreen(
+                                    viewModel = subscriptionViewModel,
+                                    onBack = { navigator.pop() },
+                                    onPickFile = {
+                                        filePicker?.pickYamlFile { result ->
+                                            if (result != null && subscriptionViewModel != null) {
+                                                subscriptionViewModel.addFromFile(
+                                                    fileName = result.fileName,
+                                                    content = result.content,
+                                                    onComplete = {
+                                                        navigator.popUntil { key -> key is Route.Main }
+                                                    },
+                                                )
+                                            }
+                                        }
+                                    },
+                                    onNavigateUrl = { navigator.push(Route.SubscriptionAddUrl()) },
+                                    onScanQR = if (onScanQR != null) {
+                                        {
+                                            onScanQR { url ->
+                                                if (url != null) {
+                                                    navigator.push(Route.SubscriptionAddUrl(initialUrl = url))
+                                                }
+                                            }
+                                        }
+                                    } else null,
+                                )
+                            }
+                            entry<Route.SubscriptionAddUrl>(swipeDismiss = swipeDismiss) { route ->
+                                subscriptionViewModel?.let {
+                                    SubscriptionAddUrlScreen(
+                                        viewModel = it,
+                                        initialUrl = route.initialUrl,
+                                        initialName = route.initialName,
+                                        initialIntervalMinutes = route.initialIntervalMinutes,
+                                        onBack = { navigator.pop() },
+                                        onSaved = { navigator.popUntil { key -> key is Route.Main } },
+                                    )
+                                }
+                            }
+                            entry<Route.SubscriptionEdit>(swipeDismiss = swipeDismiss) { route ->
+                                subscriptionViewModel?.let {
+                                    SubscriptionEditScreen(
+                                        uuid = route.uuid,
+                                        viewModel = it,
+                                        onBack = { navigator.pop() },
+                                        onSaved = { navigator.pop() },
+                                        onNavigateOverrides = { navigator.push(Route.SubscriptionOverrides(route.uuid)) },
+                                    )
+                                }
+                            }
+                            entry<Route.SubscriptionOverrides>(swipeDismiss = swipeDismiss) { route ->
+                                if (subscriptionViewModel != null && overrideProfileViewModel != null) {
+                                    SubscriptionOverridesScreen(
+                                        subscriptionId = route.uuid,
+                                        subscriptionViewModel = subscriptionViewModel,
+                                        overrideViewModel = overrideProfileViewModel,
+                                        onBack = { navigator.pop() },
+                                    )
+                                }
+                            }
+                            entry<Route.OverrideList>(swipeDismiss = swipeDismiss) {
+                                overrideProfileViewModel?.let { vm ->
+                                    OverrideListScreen(
+                                        viewModel = vm,
+                                        onBack = { navigator.pop() },
+                                        onAdd = { navigator.push(Route.OverrideEdit()) },
+                                        onEdit = { id -> navigator.push(Route.OverrideEdit(id)) },
+                                        onEditFile = { id -> navigator.push(Route.OverrideFileEditor(id)) },
+                                    )
+                                }
+                            }
+                            entry<Route.OverrideEdit>(swipeDismiss = swipeDismiss) { route ->
+                                overrideProfileViewModel?.let { vm ->
+                                    OverrideEditScreen(
+                                        overrideId = route.id,
+                                        viewModel = vm,
+                                        onBack = { navigator.pop() },
+                                        onSaved = { navigator.pop() },
+                                        onPickFile = { callback -> filePicker?.pickYamlFile(callback) },
+                                    )
+                                }
+                            }
+                            entry<Route.OverrideFileEditor>(swipeDismiss = swipeDismiss) { route ->
+                                overrideProfileViewModel?.let { vm ->
+                                    OverrideFileEditorScreen(route.id, vm, onBack = { navigator.pop() })
+                                }
+                            }
+                            entry<Route.Log>(swipeDismiss = swipeDismiss) {
+                                logViewModel?.let {
+                                    LogScreen(
+                                        viewModel = it,
+                                        onBack = { navigator.pop() },
+                                    )
+                                }
+                            }
+                            entry<Route.Provider>(swipeDismiss = swipeDismiss) {
+                                providerViewModel?.let {
+                                    ProviderScreen(
+                                        viewModel = it,
+                                        onBack = { navigator.pop() },
+                                    )
+                                }
+                            }
+                            entry<Route.Connection>(swipeDismiss = swipeDismiss) {
+                                connectionViewModel?.let {
+                                    ConnectionScreen(
+                                        viewModel = it,
+                                        onBack = { navigator.pop() },
+                                    )
+                                }
+                            }
+                            entry<Route.DnsQuery>(swipeDismiss = swipeDismiss) {
+                                dnsQueryViewModel?.let {
+                                    DnsQueryScreen(
+                                        viewModel = it,
+                                        onBack = { navigator.pop() },
+                                    )
+                                }
+                            }
+                            entry<Route.VpnSettings>(swipeDismiss = swipeDismiss) {
+                                storage?.let {
+                                    VpnSettingsScreen(
+                                        storage = it,
+                                        isSystemProxySupported = true,
+                                        onBack = { navigator.pop() },
+                                    )
+                                }
+                            }
+                            entry<Route.RootSettings>(swipeDismiss = swipeDismiss) {
+                                storage?.let {
+                                    val homeState = homeViewModel?.uiState?.collectAsStateWithLifecycle()?.value
+                                    RootSettingsScreen(
+                                        storage = it,
+                                        isProxyRunning = homeState?.isRunning == true || homeState?.isStarting == true,
+                                        onBack = { navigator.pop() },
+                                    )
+                                }
+                            }
+                            entry<Route.NetworkSettings>(swipeDismiss = swipeDismiss) {
+                                networkSettingsViewModel?.let {
+                                    NetworkSettingsScreen(
+                                        viewModel = it,
+                                        onBack = { navigator.pop() },
+                                    )
+                                }
+                            }
+                            entry<Route.MetaSettings>(swipeDismiss = swipeDismiss) {
+                                metaSettingsViewModel?.let {
+                                    MetaSettingsScreen(
+                                        viewModel = it,
+                                        onBack = { navigator.pop() },
+                                    )
+                                }
+                            }
+                            entry<Route.AppProxy>(swipeDismiss = swipeDismiss) {
+                                appProxyViewModel?.let {
+                                    AppProxyScreen(
+                                        viewModel = it,
+                                        onBack = { navigator.pop() },
+                                    )
+                                }
+                            }
+                            entry<Route.WifiPolicy>(swipeDismiss = swipeDismiss) {
+                                storage?.let {
+                                    WifiPolicyScreen(
+                                        storage = it,
+                                        controller = wifiPolicyController,
+                                        onRequestPermission = onRequestWifiPermission,
+                                        onBack = { navigator.pop() },
+                                    )
+                                }
+                            }
+                            entry<Route.ThemeSettings>(swipeDismiss = swipeDismiss) {
+                                storage?.let {
+                                    ThemeSettingsScreen(
+                                        storage = it,
+                                        themeConfig = themeConfig,
+                                        onThemeConfigChange = onThemeConfigChange,
+                                        onPredictiveBackChange = onPredictiveBackChange,
+                                        swipeDismissEnabled = swipeDismissEnabled,
+                                        onSwipeDismissChange = { enabled ->
+                                            swipeDismissEnabled = enabled
+                                            it.putString(StorageKeys.SWIPE_DISMISS, enabled.toString())
+                                        },
+                                        onBack = { navigator.pop() },
+                                    )
+                                }
+                            }
+                            entry<Route.ExternalControl>(swipeDismiss = swipeDismiss) {
+                                externalControlViewModel?.let {
+                                    ExternalControlScreen(
+                                        viewModel = it,
+                                        onBack = { navigator.pop() },
+                                    )
+                                }
+                            }
+                            entry<Route.Automation>(swipeDismiss = swipeDismiss) {
+                                automationViewModel?.let {
+                                    AutomationScreen(
+                                        viewModel = it,
+                                        onBack = { navigator.pop() },
+                                    )
+                                }
+                            }
+                            entry<Route.BackupRestore>(swipeDismiss = swipeDismiss) {
+                                if (backupViewModel != null && storage != null) {
+                                    BackupRestoreScreen(
+                                        viewModel = backupViewModel,
+                                        storage = storage,
+                                        filePicker = filePicker,
+                                        onRestartApp = onRestartApp,
+                                        onBack = { navigator.pop() },
+                                    )
+                                }
+                            }
+                            entry<Route.FileManager>(swipeDismiss = swipeDismiss) {
+                                FileManagerScreen(
+                                    subscriptionViewModel = subscriptionViewModel,
+                                    onBack = { navigator.pop() },
+                                    onOpenFile = { uuid, relPath ->
+                                        navigator.push(Route.FileManagerEditor(uuid, relPath))
                                     },
                                 )
                             }
-                        }
-                    },
-                    onNavigateUrl = { navigator.push(Route.SubscriptionAddUrl()) },
-                    onScanQR = if (onScanQR != null) {
-                        {
-                            onScanQR { url ->
-                                if (url != null) {
-                                    navigator.push(Route.SubscriptionAddUrl(initialUrl = url))
-                                }
+                            entry<Route.FileManagerEditor>(swipeDismiss = swipeDismiss) { route ->
+                                FileManagerEditorScreen(
+                                    uuid = route.uuid,
+                                    relativePath = route.relativePath,
+                                    subscriptionViewModel = subscriptionViewModel,
+                                    onBack = { navigator.pop() },
+                                )
+                            }
+                            entry<Route.About>(swipeDismiss = swipeDismiss) {
+                                val uriHandler = LocalUriHandler.current
+                                AboutScreen(
+                                    onBack = { navigator.pop() },
+                                    mihomoVersion = mihomoVersion,
+                                    onOpenUrl = { url -> uriHandler.openUri(url) },
+                                )
                             }
                         }
-                    } else null,
-                )
-            }
-            entry<Route.SubscriptionAddUrl>(swipeDismiss = swipeDismiss) { route ->
-                subscriptionViewModel?.let {
-                    SubscriptionAddUrlScreen(
-                        viewModel = it,
-                        initialUrl = route.initialUrl,
-                        initialName = route.initialName,
-                        initialIntervalMinutes = route.initialIntervalMinutes,
-                        onBack = { navigator.pop() },
-                        onSaved = { navigator.popUntil { key -> key is Route.Main } },
-                    )
+                    }
                 }
-            }
-            entry<Route.SubscriptionEdit>(swipeDismiss = swipeDismiss) { route ->
-                subscriptionViewModel?.let {
-                    SubscriptionEditScreen(
-                        uuid = route.uuid,
-                        viewModel = it,
-                        onBack = { navigator.pop() },
-                        onSaved = { navigator.pop() },
-                        onNavigateOverrides = { navigator.push(Route.SubscriptionOverrides(route.uuid)) },
-                    )
-                }
-            }
-            entry<Route.SubscriptionOverrides>(swipeDismiss = swipeDismiss) { route ->
-                if (subscriptionViewModel != null && overrideProfileViewModel != null) {
-                    SubscriptionOverridesScreen(
-                        subscriptionId = route.uuid,
-                        subscriptionViewModel = subscriptionViewModel,
-                        overrideViewModel = overrideProfileViewModel,
-                        onBack = { navigator.pop() },
-                    )
-                }
-            }
-            entry<Route.OverrideList>(swipeDismiss = swipeDismiss) {
-                overrideProfileViewModel?.let { vm ->
-                    OverrideListScreen(
-                        viewModel = vm,
-                        onBack = { navigator.pop() },
-                        onAdd = { navigator.push(Route.OverrideEdit()) },
-                        onEdit = { id -> navigator.push(Route.OverrideEdit(id)) },
-                        onEditFile = { id -> navigator.push(Route.OverrideFileEditor(id)) },
-                    )
-                }
-            }
-            entry<Route.OverrideEdit>(swipeDismiss = swipeDismiss) { route ->
-                overrideProfileViewModel?.let { vm ->
-                    OverrideEditScreen(
-                        overrideId = route.id,
-                        viewModel = vm,
-                        onBack = { navigator.pop() },
-                        onSaved = { navigator.pop() },
-                        onPickFile = { callback -> filePicker?.pickYamlFile(callback) },
-                    )
-                }
-            }
-            entry<Route.OverrideFileEditor>(swipeDismiss = swipeDismiss) { route ->
-                overrideProfileViewModel?.let { vm ->
-                    OverrideFileEditorScreen(route.id, vm, onBack = { navigator.pop() })
-                }
-            }
-            entry<Route.Log>(swipeDismiss = swipeDismiss) {
-                logViewModel?.let {
-                    LogScreen(
-                        viewModel = it,
-                        onBack = { navigator.pop() },
-                    )
-                }
-            }
-            entry<Route.Provider>(swipeDismiss = swipeDismiss) {
-                providerViewModel?.let {
-                    ProviderScreen(
-                        viewModel = it,
-                        onBack = { navigator.pop() },
-                    )
-                }
-            }
-            entry<Route.Connection>(swipeDismiss = swipeDismiss) {
-                connectionViewModel?.let {
-                    ConnectionScreen(
-                        viewModel = it,
-                        onBack = { navigator.pop() },
-                    )
-                }
-            }
-            entry<Route.DnsQuery>(swipeDismiss = swipeDismiss) {
-                dnsQueryViewModel?.let {
-                    DnsQueryScreen(
-                        viewModel = it,
-                        onBack = { navigator.pop() },
-                    )
-                }
-            }
-            entry<Route.VpnSettings>(swipeDismiss = swipeDismiss) {
-                storage?.let {
-                    VpnSettingsScreen(
-                        storage = it,
-                        isSystemProxySupported = true,
-                        onBack = { navigator.pop() },
-                    )
-                }
-            }
-            entry<Route.RootSettings>(swipeDismiss = swipeDismiss) {
-                storage?.let {
-                    val homeState = homeViewModel?.uiState?.collectAsStateWithLifecycle()?.value
-                    RootSettingsScreen(
-                        storage = it,
-                        isProxyRunning = homeState?.isRunning == true || homeState?.isStarting == true,
-                        onBack = { navigator.pop() },
-                    )
-                }
-            }
-            entry<Route.NetworkSettings>(swipeDismiss = swipeDismiss) {
-                networkSettingsViewModel?.let {
-                    NetworkSettingsScreen(
-                        viewModel = it,
-                        onBack = { navigator.pop() },
-                    )
-                }
-            }
-            entry<Route.MetaSettings>(swipeDismiss = swipeDismiss) {
-                metaSettingsViewModel?.let {
-                    MetaSettingsScreen(
-                        viewModel = it,
-                        onBack = { navigator.pop() },
-                    )
-                }
-            }
-            entry<Route.AppProxy>(swipeDismiss = swipeDismiss) {
-                appProxyViewModel?.let {
-                    AppProxyScreen(
-                        viewModel = it,
-                        onBack = { navigator.pop() },
-                    )
-                }
-            }
-            entry<Route.WifiPolicy>(swipeDismiss = swipeDismiss) {
-                storage?.let {
-                    WifiPolicyScreen(
-                        storage = it,
-                        controller = wifiPolicyController,
-                        onRequestPermission = onRequestWifiPermission,
-                        onBack = { navigator.pop() },
-                    )
-                }
-            }
-            entry<Route.ThemeSettings>(swipeDismiss = swipeDismiss) {
-                storage?.let {
-                    ThemeSettingsScreen(
-                        storage = it,
-                        themeConfig = themeConfig,
-                        onThemeConfigChange = onThemeConfigChange,
-                        onPredictiveBackChange = onPredictiveBackChange,
-                        swipeDismissEnabled = swipeDismissEnabled,
-                        onSwipeDismissChange = { enabled ->
-                            swipeDismissEnabled = enabled
-                            it.putString(StorageKeys.SWIPE_DISMISS, enabled.toString())
+                if (railState != null) {
+                    val homeLabel = stringResource(R.string.nav_home)
+                    val proxyLabel = stringResource(R.string.nav_proxy)
+                    val subscriptionLabel = stringResource(R.string.nav_subscription)
+                    val settingsLabel = stringResource(R.string.nav_settings)
+                    val glassItems = remember(homeLabel, proxyLabel, subscriptionLabel, settingsLabel) {
+                        listOf(
+                            GlassNavigationItem(icon = MiuixIcons.Glass.HomeOutline, label = homeLabel, contentDescription = homeLabel),
+                            GlassNavigationItem(icon = MiuixIcons.Glass.GlassTune, label = proxyLabel, contentDescription = proxyLabel),
+                            GlassNavigationItem(
+                                icon = MiuixIcons.Glass.GlassUploadCloud,
+                                label = subscriptionLabel,
+                                contentDescription = subscriptionLabel,
+                            ),
+                            GlassNavigationItem(
+                                icon = MiuixIcons.Glass.SettingsOutline,
+                                label = settingsLabel,
+                                contentDescription = settingsLabel
+                            ),
+                        )
+                    }
+                    val currentRoute = backStack.lastOrNull()
+                    GlassNavigationRail(
+                        items = glassItems,
+                        selectedIndex = if (currentRoute is Route.Main) mainPagerState.selectedPage else -1,
+                        onSelect = { index ->
+                            if (currentRoute !is Route.Main) {
+                                suppressNavTransition = true
+                                navigator.popUntil { route -> route is Route.Main }
+                            }
+                            mainPagerState.animateToPage(index)
                         },
-                        onBack = { navigator.pop() },
+                        backdrop = sidebarBackdrop,
+                        state = railState,
                     )
                 }
-            }
-            entry<Route.ExternalControl>(swipeDismiss = swipeDismiss) {
-                externalControlViewModel?.let {
-                    ExternalControlScreen(
-                        viewModel = it,
-                        onBack = { navigator.pop() },
-                    )
-                }
-            }
-            entry<Route.Automation>(swipeDismiss = swipeDismiss) {
-                automationViewModel?.let {
-                    AutomationScreen(
-                        viewModel = it,
-                        onBack = { navigator.pop() },
-                    )
-                }
-            }
-            entry<Route.BackupRestore>(swipeDismiss = swipeDismiss) {
-                if (backupViewModel != null && storage != null) {
-                    BackupRestoreScreen(
-                        viewModel = backupViewModel,
-                        storage = storage,
-                        filePicker = filePicker,
-                        onRestartApp = onRestartApp,
-                        onBack = { navigator.pop() },
-                    )
-                }
-            }
-            entry<Route.FileManager>(swipeDismiss = swipeDismiss) {
-                FileManagerScreen(
-                    subscriptionViewModel = subscriptionViewModel,
-                    onBack = { navigator.pop() },
-                    onOpenFile = { uuid, relPath ->
-                        navigator.push(Route.FileManagerEditor(uuid, relPath))
-                    },
-                )
-            }
-            entry<Route.FileManagerEditor>(swipeDismiss = swipeDismiss) { route ->
-                FileManagerEditorScreen(
-                    uuid = route.uuid,
-                    relativePath = route.relativePath,
-                    subscriptionViewModel = subscriptionViewModel,
-                    onBack = { navigator.pop() },
-                )
-            }
-            entry<Route.About>(swipeDismiss = swipeDismiss) {
-                val uriHandler = LocalUriHandler.current
-                AboutScreen(
-                    onBack = { navigator.pop() },
-                    mihomoVersion = mihomoVersion,
-                    onOpenUrl = { url -> uriHandler.openUri(url) },
-                )
+                TopLayerHost(topLayer)
             }
         }
     }
@@ -552,7 +631,7 @@ private fun MainPage(
     val homeUiState = homeViewModel?.uiState?.collectAsStateWithLifecycle()?.value ?: HomeUiState()
     val selectedPage = mainPagerState.selectedPage
     val interceptPagerGestures =
-        themeConfig.pagerInterceptionMode == PagerInterceptionMode.CrossAxisInterceptor
+        themeConfig.pagerInterceptionMode == PagerInterceptionMode.CrossAxis
     val nativePagerNestedScrollConnection = PagerDefaults.pageNestedScrollConnection(
         state = mainPagerState.pagerState,
         orientation = Orientation.Horizontal,
@@ -567,6 +646,7 @@ private fun MainPage(
         HorizontalPager(
             modifier = pagerModifier.pagerGestureOverride(
                 pagerState = mainPagerState.pagerState,
+                flingBehavior = pagerFlingBehavior,
                 mode = themeConfig.pagerInterceptionMode,
             ),
             state = mainPagerState.pagerState,
@@ -634,216 +714,92 @@ private fun MainPage(
         }
     }
 
-    if (useNavigationRail) {
-        // 宽屏：侧边 NavigationRail 取代底部 NavigationBar，纵向空间全部让给内容
-        val railState = rememberNavigationRailState(
-            initialValue = if (storage?.getString(StorageKeys.NAV_RAIL_EXPANDED, "false") == "true") {
-                NavigationRailValue.Expanded
-            } else {
-                NavigationRailValue.Collapsed
-            },
-        )
-        LaunchedEffect(railState.currentValue, storage) {
-            storage?.putString(StorageKeys.NAV_RAIL_EXPANDED, railState.isExpanded.toString())
-        }
-        Scaffold(modifier = Modifier.fillMaxSize()) { _ ->
-            Row(Modifier.fillMaxSize()) {
-                NavigationRail(state = railState) {
-                    NavigationRailItem(
-                        selected = selectedPage == 0,
-                        onClick = { mainPagerState.animateToPage(0) },
-                        icon = MiuixIcons.Home,
-                        label = stringResource(R.string.nav_home),
-                    )
-                    NavigationRailItem(
-                        selected = selectedPage == 1,
-                        onClick = { mainPagerState.animateToPage(1) },
-                        icon = MiuixIcons.Tune,
-                        label = stringResource(R.string.nav_proxy),
-                    )
-                    NavigationRailItem(
-                        selected = selectedPage == 2,
-                        onClick = { mainPagerState.animateToPage(2) },
-                        icon = MiuixIcons.UploadCloud,
-                        label = stringResource(R.string.nav_subscription),
-                    )
-                    NavigationRailItem(
-                        selected = selectedPage == 3,
-                        onClick = { mainPagerState.animateToPage(3) },
-                        icon = MiuixIcons.Settings,
-                        label = stringResource(R.string.nav_settings),
-                    )
-                }
-                pagerContent(
-                    Modifier
-                        .weight(1f)
-                        .fillMaxHeight()
-                        // rail 已吸收起始侧的刘海/导航栏 inset；末尾侧无 rail，在此补齐并对后代标记为已消费
-                        .consumeWindowInsets(
-                            WindowInsets.displayCutout.union(WindowInsets.navigationBars)
-                                .only(WindowInsetsSides.Start),
-                        )
-                        .windowInsetsPadding(
-                            WindowInsets.systemBars.union(WindowInsets.displayCutout)
-                                .only(WindowInsetsSides.End),
-                        ),
-                    WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding(),
+    PageBackdropBox(modifier = Modifier.fillMaxSize()) {
+        val homeLabel = stringResource(R.string.nav_home)
+        val proxyLabel = stringResource(R.string.nav_proxy)
+        val subscriptionLabel = stringResource(R.string.nav_subscription)
+        val settingsLabel = stringResource(R.string.nav_settings)
+
+        if (useNavigationRail) {
+            val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+            pagerContent(Modifier.fillMaxSize(), bottomInset)
+        } else {
+            val bottomBarBackdrop = rememberBlurBackdrop(themeConfig.blurEnabled)
+            val bottomBarBlurActive = bottomBarBackdrop != null
+            val navigationItems = remember(homeLabel, proxyLabel, subscriptionLabel, settingsLabel) {
+                listOf(
+                    NavigationItem(label = homeLabel, icon = MiuixIcons.Glass.HomeOutline),
+                    NavigationItem(label = proxyLabel, icon = MiuixIcons.Glass.GlassTune),
+                    NavigationItem(label = subscriptionLabel, icon = MiuixIcons.Glass.GlassUploadCloud),
+                    NavigationItem(label = settingsLabel, icon = MiuixIcons.Glass.SettingsOutline),
                 )
             }
-        }
-    } else {
-        val bottomBarBackdrop = rememberBlurBackdrop(themeConfig.blurEnabled)
-        val bottomBarBlurActive = bottomBarBackdrop != null
-        val barColor = if (bottomBarBlurActive) Color.Transparent else MiuixTheme.colorScheme.surface
-        val floatingBarColor = if (bottomBarBlurActive) Color.Transparent else MiuixTheme.colorScheme.surfaceContainer
-        val floatingPillRadius = 50.dp
-        val floatingBarShape = RoundedCornerShape(floatingPillRadius)
-        val isDark = LocalAppDarkMode.current
-        val floatingHighlight = remember(isDark) {
-            if (isDark) Highlight.GlassStrokeMiddleDark else Highlight.GlassStrokeMiddleLight
-        }
-        val floatingBarModifier = if (bottomBarBackdrop != null) {
-            Modifier.textureBlur(
-                backdrop = bottomBarBackdrop,
-                shape = floatingBarShape,
-                blurRadius = 25f,
-                colors = BlurDefaults.blurColors(
-                    blendColors = listOf(
-                        BlendColorEntry(
-                            color = MiuixTheme.colorScheme.surfaceContainer.copy(alpha = 0.6f),
-                        ),
+            val glassNavigationItems = remember(homeLabel, proxyLabel, subscriptionLabel, settingsLabel) {
+                listOf(
+                    GlassNavigationItem(
+                        icon = MiuixIcons.Glass.HomeOutline,
+                        label = homeLabel,
+                        contentDescription = homeLabel,
                     ),
-                ),
-                highlight = floatingHighlight,
-            )
-        } else {
-            Modifier
-        }
-        val bottomBarDisplayMode = when (themeConfig.bottomBarMode) {
-            BottomBarMode.IconAndText -> NavigationBarDisplayMode.IconAndText
-            BottomBarMode.IconOnly -> NavigationBarDisplayMode.IconOnly
-        }
-        val showBottomBarLabels = themeConfig.bottomBarMode == BottomBarMode.IconAndText
-        val navigationItems = listOf(
-            NavigationItem(label = stringResource(R.string.nav_home), icon = MiuixIcons.Home),
-            NavigationItem(label = stringResource(R.string.nav_proxy), icon = MiuixIcons.Tune),
-            NavigationItem(label = stringResource(R.string.nav_subscription), icon = MiuixIcons.UploadCloud),
-            NavigationItem(label = stringResource(R.string.nav_settings), icon = MiuixIcons.Settings),
-        )
+                    GlassNavigationItem(
+                        icon = MiuixIcons.Glass.GlassTune,
+                        label = proxyLabel,
+                        contentDescription = proxyLabel,
+                    ),
+                    GlassNavigationItem(
+                        icon = MiuixIcons.Glass.GlassUploadCloud,
+                        label = subscriptionLabel,
+                        contentDescription = subscriptionLabel,
+                    ),
+                    GlassNavigationItem(
+                        icon = MiuixIcons.Glass.SettingsOutline,
+                        label = settingsLabel,
+                        contentDescription = settingsLabel,
+                    ),
+                )
+            }
 
-        Scaffold(
-            modifier = Modifier.fillMaxSize(),
-            bottomBar = {
-                if (themeConfig.floatingBottomBar) {
-                    if (themeConfig.floatingBottomBarStyle == FloatingBottomBarStyle.IosLike) {
-                        IosLiquidGlassNavigationBar(
-                            items = navigationItems,
-                            selectedIndex = selectedPage,
-                            onItemClick = { index -> mainPagerState.animateToPage(index) },
-                            backdrop = bottomBarBackdrop,
-                            isBlurActive = bottomBarBlurActive,
-                            isDark = isDark,
-                            showLabels = showBottomBarLabels,
-                        )
-                    } else {
-                        FloatingNavigationBar(
-                            modifier = floatingBarModifier,
-                            color = floatingBarColor,
-                            cornerRadius = floatingPillRadius,
-                        ) {
-                            navigationItems.forEachIndexed { index, item ->
-                                MiuixFloatingNavigationBarItem(
-                                    item = item,
-                                    selected = selectedPage == index,
-                                    onClick = { mainPagerState.animateToPage(index) },
-                                    showLabel = showBottomBarLabels,
-                                )
-                            }
+            Scaffold(
+                modifier = Modifier.fillMaxSize(),
+                bottomBar = {
+                    when (themeConfig.floatingBottomBarStyle) {
+                        FloatingBottomBarStyle.Glass -> {
+                            GlassNavigationBar(
+                                items = glassNavigationItems,
+                                selectedIndex = selectedPage,
+                                onSelect = { mainPagerState.animateToPage(it) },
+                                backdrop = if (bottomBarBlurActive) bottomBarBackdrop else null,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 24.dp),
+                            )
+                        }
+
+                        FloatingBottomBarStyle.IosLike -> {
+                            IosLiquidGlassNavigationBar(
+                                items = navigationItems,
+                                selectedIndex = selectedPage,
+                                onItemClick = { index -> mainPagerState.animateToPage(index) },
+                                backdrop = bottomBarBackdrop,
+                                isBlurActive = bottomBarBlurActive,
+                                isDark = LocalAppDarkMode.current,
+                                showLabels = true,
+                            )
                         }
                     }
-                } else {
-                    // 渐进模糊仅作用于顶栏；底栏保持高斯
-                    BlurredBar(
-                        backdrop = bottomBarBackdrop,
-                        blurActive = bottomBarBlurActive,
-                        blurStyle = TopBarBlurStyle.Gaussian,
-                    ) {
-                        NavigationBar(
-                            color = barColor,
-                            mode = bottomBarDisplayMode,
-                        ) {
-                            navigationItems.forEachIndexed { index, item ->
-                                NavigationBarItem(
-                                    selected = selectedPage == index,
-                                    onClick = { mainPagerState.animateToPage(index) },
-                                    icon = item.icon,
-                                    label = item.label,
-                                )
-                            }
-                        }
-                    }
-                }
-            },
-        ) { padding ->
-            pagerContent(
-                if (bottomBarBackdrop != null) {
-                    Modifier
-                        .fillMaxSize()
-                        .layerBackdrop(bottomBarBackdrop)
-                } else {
-                    Modifier.fillMaxSize()
                 },
-                padding.calculateBottomPadding(),
-            )
-        }
-    }
-}
-
-@Composable
-private fun MiuixFloatingNavigationBarItem(
-    item: NavigationItem,
-    selected: Boolean,
-    onClick: () -> Unit,
-    showLabel: Boolean,
-    modifier: Modifier = Modifier,
-) {
-    val interactionSource = remember { MutableInteractionSource() }
-    val isPressed by interactionSource.collectIsPressedAsState()
-    val onSurfaceContainerColor = MiuixTheme.colorScheme.onSurfaceContainer
-    val tint = when {
-        isPressed -> onSurfaceContainerColor.copy(alpha = if (selected) 0.7f else 0.5f)
-        selected -> onSurfaceContainerColor
-        else -> onSurfaceContainerColor.copy(alpha = 0.6f)
-    }
-
-    Column(
-        modifier = modifier
-            .defaultMinSize(minWidth = if (showLabel) 56.dp else 48.dp, minHeight = 48.dp)
-            .selectable(
-                selected = selected,
-                onClick = onClick,
-                role = Role.Tab,
-                interactionSource = interactionSource,
-                indication = null,
-            )
-            .padding(horizontal = if (showLabel) 8.dp else 6.dp, vertical = 5.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Icon(
-            modifier = Modifier.size(22.dp),
-            imageVector = item.icon,
-            contentDescription = if (showLabel) null else item.label,
-            tint = tint,
-        )
-        if (showLabel) {
-            Text(
-                text = item.label,
-                color = tint,
-                fontSize = 11.sp,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+            ) { padding ->
+                pagerContent(
+                    if (bottomBarBackdrop != null) {
+                        Modifier
+                            .fillMaxSize()
+                            .layerBackdrop(bottomBarBackdrop)
+                    } else {
+                        Modifier.fillMaxSize()
+                    },
+                    padding.calculateBottomPadding(),
+                )
+            }
         }
     }
 }
@@ -931,3 +887,11 @@ private fun MainScreenBackHandler(
         },
     )
 }
+
+private val InstantNavTransition: NavTransition = navGraphicsTransition(
+    opaqueDepth = 1f,
+    dismissDirection = NavSwipeDirection.None,
+    motion = NavMotion(
+        programmatic = NavSettleSpec.Tween(durationMillis = 0, easing = LinearEasing),
+    ),
+) {}

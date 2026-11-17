@@ -21,7 +21,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
@@ -33,15 +32,18 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import top.yukonga.mishka.R
 import top.yukonga.mishka.domain.model.OverrideProfile
 import top.yukonga.mishka.ui.component.AdaptiveTopAppBar
+import top.yukonga.mishka.ui.component.GlassDialogTextButton
 import top.yukonga.mishka.ui.component.HintCard
+import top.yukonga.mishka.ui.component.TopBarIconButton
 import top.yukonga.mishka.ui.component.blur.BlurredBar
+import top.yukonga.mishka.ui.component.blur.LocalPageBackdrop
+import top.yukonga.mishka.ui.component.blur.PageBackdropBox
 import top.yukonga.mishka.ui.component.blur.rememberBlurBackdrop
+import top.yukonga.mishka.ui.component.overScrollVertical
 import top.yukonga.mishka.ui.theme.StatusColors
-import top.yukonga.mishka.ui.util.WideContentBox
 import top.yukonga.mishka.ui.util.horizontalCutoutPadding
 import top.yukonga.mishka.util.formatEpochMillisAsLocal
 import top.yukonga.mishka.viewmodel.OverrideProfileViewModel
-import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
 import top.yukonga.miuix.kmp.basic.Icon
@@ -49,18 +51,18 @@ import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.Text
-import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.blur.layerBackdrop
+import top.yukonga.miuix.kmp.glass.GlassDialog
+import top.yukonga.miuix.kmp.glass.GlassDialogButtonRole
 import top.yukonga.miuix.kmp.icon.MiuixIcons
-import top.yukonga.miuix.kmp.icon.extended.Add
 import top.yukonga.miuix.kmp.icon.extended.Delete
 import top.yukonga.miuix.kmp.icon.extended.MoreCircle
 import top.yukonga.miuix.kmp.icon.extended.Refresh
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.PressFeedbackType
-import top.yukonga.miuix.kmp.utils.overScrollVertical
 import top.yukonga.miuix.kmp.utils.scrollEndHaptic
-import top.yukonga.miuix.kmp.window.WindowDialog
+import top.yukonga.miuix.kmp.icon.glass.Add as GlassAdd
+import top.yukonga.miuix.kmp.icon.glass.Refresh as GlassRefresh
 
 @Composable
 fun OverrideListScreen(
@@ -75,54 +77,45 @@ fun OverrideListScreen(
     val scrollBehavior = MiuixScrollBehavior()
     val backdrop = rememberBlurBackdrop()
     val blurActive = backdrop != null
-    val barColor = if (blurActive) Color.Transparent else MiuixTheme.colorScheme.surface
 
-    Scaffold(
-        topBar = {
-            BlurredBar(backdrop = backdrop, blurActive = blurActive) {
-                AdaptiveTopAppBar(
-                    title = stringResource(R.string.settings_overrides),
-                    color = barColor,
-                    scrollBehavior = scrollBehavior,
-                    navigationIcon = { OverrideBackButton(onBack) },
-                    actions = {
-                        if (state.profiles.any { it.isRemote }) {
-                            IconButton(onClick = viewModel::updateAll, enabled = !state.isLoading) {
-                                Icon(
-                                    imageVector = MiuixIcons.Refresh,
+    PageBackdropBox {
+        Scaffold(
+            topBar = {
+                BlurredBar(backdrop = backdrop, blurActive = blurActive) {
+                    AdaptiveTopAppBar(
+                        title = stringResource(R.string.settings_overrides),
+                        scrollBehavior = scrollBehavior,
+                        navigationIcon = { OverrideBackButton(onBack) },
+                        actions = {
+                            if (state.profiles.any { it.isRemote }) {
+                                TopBarIconButton(
+                                    onClick = viewModel::updateAll,
+                                    enabled = !state.isLoading,
+                                    glassIcon = MiuixIcons.Glass.GlassRefresh,
                                     contentDescription = stringResource(R.string.subscription_update_all),
-                                    tint = MiuixTheme.colorScheme.onSurface,
                                 )
                             }
-                        }
-                        IconButton(
-                            onClick = { viewModel.clearError(); onAdd() },
-                            enabled = !state.isLoading,
-                        ) {
-                            Icon(
-                                imageVector = MiuixIcons.Add,
+                            TopBarIconButton(
+                                onClick = { viewModel.clearError(); onAdd() },
+                                enabled = !state.isLoading,
+                                glassIcon = MiuixIcons.Glass.GlassAdd,
                                 contentDescription = stringResource(R.string.override_add),
-                                tint = MiuixTheme.colorScheme.onSurface,
                             )
-                        }
-                    },
-                )
-            }
-        },
-    ) { innerPadding ->
-        WideContentBox { sidePadding ->
+                        },
+                    )
+                }
+            },
+        ) { innerPadding ->
             LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
-                    .horizontalCutoutPadding()
                     .then(if (backdrop != null) Modifier.layerBackdrop(backdrop) else Modifier)
+                    .horizontalCutoutPadding()
                     .scrollEndHaptic()
-                    .overScrollVertical()
+                    .overScrollVertical(scrollBehavior)
                     .nestedScroll(scrollBehavior.nestedScrollConnection),
                 contentPadding = PaddingValues(
                     top = innerPadding.calculateTopPadding(),
-                    start = sidePadding,
-                    end = sidePadding,
                 ),
             ) {
                 item(key = "top_spacer") { Spacer(Modifier.height(12.dp)) }
@@ -258,8 +251,9 @@ private fun OverrideItem(
         }
     }
 
-    WindowDialog(
+    GlassDialog(
         show = showDeleteDialog,
+        backdrop = LocalPageBackdrop.current,
         title = stringResource(R.string.override_delete_title),
         summary = stringResource(R.string.override_delete_summary, profile.name),
         onDismissRequest = { showDeleteDialog = false },
@@ -268,15 +262,15 @@ private fun OverrideItem(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            TextButton(
+            GlassDialogTextButton(
                 text = stringResource(R.string.common_cancel),
                 modifier = Modifier.weight(1f),
                 onClick = { showDeleteDialog = false },
             )
-            TextButton(
+            GlassDialogTextButton(
                 text = stringResource(R.string.common_confirm),
                 modifier = Modifier.weight(1f),
-                colors = ButtonDefaults.textButtonColorsPrimary(),
+                role = GlassDialogButtonRole.Primary,
                 onClick = {
                     showDeleteDialog = false
                     onDelete()

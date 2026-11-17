@@ -12,10 +12,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import top.yukonga.mishka.R
-import top.yukonga.miuix.kmp.basic.ButtonDefaults
-import top.yukonga.miuix.kmp.basic.TextButton
+import top.yukonga.mishka.ui.component.blur.LocalPageBackdrop
 import top.yukonga.miuix.kmp.basic.TextField
-import top.yukonga.miuix.kmp.window.WindowDialog
+import top.yukonga.miuix.kmp.glass.GlassDialog
+import top.yukonga.miuix.kmp.glass.GlassDialogButtonRole
 
 /**
  * 列表编辑对话框，用于编辑 DNS 服务器、域名列表等。
@@ -30,8 +30,9 @@ fun ListEditDialog(
     onConfirm: (List<String>?) -> Unit,
     onReset: () -> Unit,
 ) {
-    WindowDialog(
+    GlassDialog(
         show = show,
+        backdrop = LocalPageBackdrop.current,
         title = title,
         onDismissRequest = onDismiss,
     ) {
@@ -45,7 +46,7 @@ fun ListEditDialog(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            TextButton(
+            GlassDialogTextButton(
                 text = stringResource(R.string.common_clear),
                 modifier = Modifier.weight(1f),
                 onClick = {
@@ -53,10 +54,10 @@ fun ListEditDialog(
                     onDismiss()
                 },
             )
-            TextButton(
+            GlassDialogTextButton(
                 text = stringResource(R.string.common_confirm),
                 modifier = Modifier.weight(1f),
-                colors = ButtonDefaults.textButtonColorsPrimary(),
+                role = GlassDialogButtonRole.Primary,
                 onClick = {
                     val text = textState.text.toString()
                     val list = text.lines().map { it.trim() }.filter { it.isNotEmpty() }
@@ -65,7 +66,7 @@ fun ListEditDialog(
                 },
             )
         }
-        TextButton(
+        GlassDialogTextButton(
             text = stringResource(R.string.common_not_modified),
             modifier = Modifier
                 .fillMaxWidth()

@@ -50,19 +50,12 @@ fun ThemePaletteStyle.label(): String = stringResource(
     },
 )
 
+
 @Composable
 fun FloatingBottomBarStyle.label(): String = stringResource(
     when (this) {
-        FloatingBottomBarStyle.Miuix -> R.string.settings_theme_floating_bottom_bar_style_miuix
+        FloatingBottomBarStyle.Glass -> R.string.settings_theme_floating_bottom_bar_style_glass
         FloatingBottomBarStyle.IosLike -> R.string.settings_theme_floating_bottom_bar_style_ios_like
-    },
-)
-
-@Composable
-fun BottomBarMode.label(): String = stringResource(
-    when (this) {
-        BottomBarMode.IconAndText -> R.string.settings_theme_bottom_bar_icon_and_text
-        BottomBarMode.IconOnly -> R.string.settings_theme_bottom_bar_icon_only
     },
 )
 
@@ -70,8 +63,7 @@ fun BottomBarMode.label(): String = stringResource(
 fun PagerInterceptionMode.label(): String = stringResource(
     when (this) {
         PagerInterceptionMode.Native -> R.string.settings_theme_pager_gesture_native
-        PagerInterceptionMode.CrossAxisInterceptor -> R.string.settings_theme_pager_gesture_cross_axis
-        PagerInterceptionMode.TapToHalt -> R.string.settings_theme_pager_gesture_ios_like
+        PagerInterceptionMode.CrossAxis -> R.string.settings_theme_pager_gesture_cross_axis
     },
 )
 

@@ -295,8 +295,7 @@ class WifiPolicyMonitorService : Service() {
 
     private fun ensureDirectMode(notificationResId: Int? = null): Boolean {
         storage.putString(StorageKeys.WIFI_POLICY_RUNTIME_MODE, "direct")
-        if (!isProxyActive()) return false
-        return restartOrQueueModeRestart("direct", notificationResId)
+        return isProxyActive() && restartOrQueueModeRestart("direct", notificationResId)
     }
 
     private fun restartOrQueueModeRestart(mode: String, notificationResId: Int?): Boolean {

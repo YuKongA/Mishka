@@ -1,11 +1,9 @@
 package top.yukonga.mishka.ui.util
 
 import androidx.compose.animation.animateContentSize
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.displayCutout
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.systemBars
@@ -13,19 +11,18 @@ import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.offset
+import top.yukonga.mishka.ui.component.blur.LocalTopBarStartInset
 import top.yukonga.mishka.ui.theme.LocalPlatformDensity
 import top.yukonga.miuix.kmp.anim.folmeSpring
 
 /** 宽屏阈值：窗口宽度达到此值时启用侧边导航栏与内容居中（平板、横屏、展开态折叠屏、桌面）。 */
 private val WideScreenMinWidth = 600.dp
-
-/** 宽屏下内容的最大宽度，超出后两侧留白居中，避免超宽窗口下卡片被过度拉伸。 */
-val MaxContentWidth: Dp = 800.dp
 
 /** 当前窗口是否达到宽屏尺寸。宽屏切换到 NavigationRail + 固定小标题栏 + 内容居中。 */
 @Composable
@@ -36,41 +33,34 @@ fun rememberIsWideScreen(): Boolean {
 }
 
 /**
- * 宽屏内容居中容器：按当前可用宽度算出单侧留白量并经 [content] 回传，交给内部滚动列表加进自己的
- * `contentPadding`——列表本身保持全宽（滚动手势覆盖整屏、两侧无死区），仅其中的内容被居中限制到
- * [MaxContentWidth]。窄屏（可用宽度不足上限）留白为 0，等同无操作。
- *
- * 是否居中必须复用 [rememberIsWideScreen] 的判定：外壳（NavigationRail/底栏）用缩放前密度量
- * 600dp，而本容器的 BoxWithConstraints 在 densityScale 覆盖后的 LocalDensity 下量宽——若各自
- * 独立比较 600dp，densityScale != 1 时会出现「手机外壳 + 内容莫名内缩」或「rail 外壳 + 内容不居中」
- * 的组合。以外壳判定为唯一权威，留白量本身仍在缩放后空间计算（contentPadding 消费缩放后 dp）。
- */
-@Composable
-fun WideContentBox(
-    modifier: Modifier = Modifier,
-    content: @Composable (sidePadding: Dp) -> Unit,
-) {
-    val isWideScreen = rememberIsWideScreen()
-    BoxWithConstraints(modifier = modifier.fillMaxSize()) {
-        val sidePadding = if (isWideScreen) {
-            ((maxWidth - MaxContentWidth) / 2).coerceAtLeast(0.dp)
-        } else {
-            0.dp
-        }
-        content(sidePadding)
-    }
-}
-
-/**
  * 为内容补上水平方向（起始 + 末尾）的屏幕缺口 / 侧边导航栏 inset padding。二级页 Scaffold 内容默认
  * 只吃了顶部 inset，横屏遇到侧边刘海 / 挖孔 / 手势条时内容会压到缺口下——在内容根容器加此 modifier
  * 让内容避开。竖屏或无侧边缺口时 inset 为 0、等同无操作。顶栏由 `TopAppBar` 自己的
  * `defaultWindowInsetsPadding` 处理，与此互不重叠。
  */
 @Composable
-fun Modifier.horizontalCutoutPadding(): Modifier = windowInsetsPadding(
-    WindowInsets.displayCutout.union(WindowInsets.navigationBars).only(WindowInsetsSides.Horizontal),
-)
+fun Modifier.sidebarStartInset(): Modifier {
+    val startInset = LocalTopBarStartInset.current
+    return layout { measurable, constraints ->
+        val insetPx = startInset().roundToPx().coerceIn(0, constraints.maxWidth)
+        if (insetPx == 0) {
+            val placeable = measurable.measure(constraints)
+            layout(placeable.width, placeable.height) { placeable.placeRelative(0, 0) }
+        } else {
+            val placeable = measurable.measure(constraints.offset(horizontal = -insetPx))
+            layout(placeable.width + insetPx, placeable.height) {
+                placeable.placeRelative(insetPx, 0)
+            }
+        }
+    }
+}
+
+@Composable
+fun Modifier.horizontalCutoutPadding(applySidebarInset: Boolean = true): Modifier = this
+    .windowInsetsPadding(
+        WindowInsets.displayCutout.union(WindowInsets.navigationBars).only(WindowInsetsSides.Horizontal),
+    )
+    .then(if (applySidebarInset) Modifier.sidebarStartInset() else Modifier)
 
 /**
  * BottomSheet 内容的底部安全区。miuix 的 sheet 只装了 `imePadding()`，`captionBar`（小窗 / 桌面窗口模式的系统

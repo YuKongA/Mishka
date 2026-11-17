@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.collections.immutable.ImmutableList
 import top.yukonga.mishka.R
+import top.yukonga.mishka.ui.component.blur.LocalPageBackdrop
 import top.yukonga.mishka.ui.theme.StatusColors
 import top.yukonga.mishka.ui.util.sheetContentSafePadding
 import top.yukonga.mishka.ui.util.sheetHeightTransition
@@ -34,11 +35,11 @@ import top.yukonga.miuix.kmp.basic.CircularProgressIndicator
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.glass.GlassBottomSheet
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Close
 import top.yukonga.miuix.kmp.theme.LocalDismissState
 import top.yukonga.miuix.kmp.theme.MiuixTheme
-import top.yukonga.miuix.kmp.window.WindowBottomSheet
 
 /**
  * 速度卡详情：当前跑得最快的几条连接，回答「这几 MB/s 是谁在跑」。速率的来历见 [ConnectionRate]。
@@ -51,8 +52,9 @@ internal fun SpeedDetailSheet(
     rates: ImmutableList<ConnectionRate>?,
     onDismiss: () -> Unit,
 ) {
-    WindowBottomSheet(
+    GlassBottomSheet(
         show = show,
+        backdrop = LocalPageBackdrop.current,
         title = stringResource(R.string.home_speed_detail),
         onDismissRequest = onDismiss,
         endAction = {

@@ -347,7 +347,7 @@ object ProfileFileOps {
             val target = File(subscriptionDir, fileName)
             if (source.exists() && !target.exists()) {
                 try {
-                    java.nio.file.Files.createSymbolicLink(target.toPath(), source.toPath())
+                    Files.createSymbolicLink(target.toPath(), source.toPath())
                 } catch (_: Exception) {
                     try {
                         source.copyTo(target, overwrite = false)

@@ -3,7 +3,7 @@ package top.yukonga.mishka.platform
 import android.content.ComponentName
 import android.content.pm.PackageManager
 
-class BootStartManager constructor(private val context: PlatformContext) {
+class BootStartManager(private val context: PlatformContext) {
 
     private fun getBootReceiverComponent(): ComponentName {
         return ComponentName(context.packageName, "${context.packageName}.service.BootReceiver")

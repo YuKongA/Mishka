@@ -14,7 +14,7 @@ data class AppInfo(
     val isSystemApp: Boolean,
 )
 
-class AppListProvider constructor(private val context: PlatformContext) {
+class AppListProvider(private val context: PlatformContext) {
 
     suspend fun resolveUids(packageNames: Set<String>): Set<Int> = withContext(Dispatchers.IO) {
         if (packageNames.isEmpty()) return@withContext emptySet()

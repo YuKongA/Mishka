@@ -1,5 +1,6 @@
 package top.yukonga.mishka.ui.screen.overrides
 
+import android.annotation.SuppressLint
 import androidx.compose.foundation.LocalOverscrollFactory
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -14,7 +15,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -23,6 +23,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import top.yukonga.mishka.R
 import top.yukonga.mishka.domain.model.OverrideFormat
 import top.yukonga.mishka.platform.showToast
+import top.yukonga.mishka.ui.component.AdaptiveTopAppBar
+import top.yukonga.mishka.ui.component.TopBarIconButton
 import top.yukonga.mishka.ui.component.blur.BlurredBar
 import top.yukonga.mishka.ui.component.blur.rememberBlurBackdrop
 import top.yukonga.mishka.ui.theme.LocalAppDarkMode
@@ -30,21 +32,17 @@ import top.yukonga.mishka.ui.theme.StatusColors
 import top.yukonga.mishka.ui.util.horizontalCutoutPadding
 import top.yukonga.mishka.viewmodel.OverrideProfileViewModel
 import top.yukonga.miuix.kmp.basic.Card
-import top.yukonga.miuix.kmp.basic.CircularProgressIndicator
-import top.yukonga.miuix.kmp.basic.Icon
-import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.Scaffold
-import top.yukonga.miuix.kmp.basic.SmallTopAppBar
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.icon.MiuixIcons
-import top.yukonga.miuix.kmp.icon.extended.Ok
-import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.scripta.editor.CodeEditor
 import top.yukonga.scripta.editor.EditorColors
 import top.yukonga.scripta.editor.EditorLanguage
 import top.yukonga.scripta.editor.rememberCodeEditorController
+import top.yukonga.miuix.kmp.icon.glass.Ok as GlassOk
 
+@SuppressLint("LocalContextGetResourceValueCall")
 @Composable
 fun OverrideFileEditorScreen(
     overrideId: String,
@@ -73,19 +71,21 @@ fun OverrideFileEditorScreen(
 
     val backdrop = rememberBlurBackdrop()
     val blurActive = backdrop != null
-    val barColor = if (blurActive) Color.Transparent else MiuixTheme.colorScheme.surface
 
     Scaffold(
         topBar = {
             BlurredBar(backdrop = backdrop, blurActive = blurActive) {
-                SmallTopAppBar(
+                AdaptiveTopAppBar(
                     title = profile.name,
-                    color = barColor,
+                    expandable = false,
                     navigationIcon = { OverrideBackButton(onBack) },
                     actions = {
                         val canSave = controller.isModified && !state.isLoading && !saving
-                        IconButton(
+                        TopBarIconButton(
                             enabled = canSave,
+                            isLoading = saving || state.isLoading,
+                            glassIcon = MiuixIcons.Glass.GlassOk,
+                            contentDescription = stringResource(R.string.common_save),
                             onClick = {
                                 val version = controller.documentVersion
                                 val content = controller.getText(controller.lineEnding)
@@ -96,18 +96,7 @@ fun OverrideFileEditorScreen(
                                     showToast(context.getString(R.string.file_manager_saved))
                                 }
                             },
-                        ) {
-                            if (saving || state.isLoading) {
-                                CircularProgressIndicator(size = 20.dp, strokeWidth = 2.dp)
-                            } else {
-                                Icon(
-                                    imageVector = MiuixIcons.Ok,
-                                    contentDescription = stringResource(R.string.common_save),
-                                    tint = if (canSave) MiuixTheme.colorScheme.onSurface
-                                    else MiuixTheme.colorScheme.disabledOnSecondaryVariant,
-                                )
-                            }
-                        }
+                        )
                     },
                 )
             }
@@ -116,8 +105,8 @@ fun OverrideFileEditorScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .horizontalCutoutPadding()
                 .then(if (backdrop != null) Modifier.layerBackdrop(backdrop) else Modifier)
+                .horizontalCutoutPadding()
                 .padding(top = innerPadding.calculateTopPadding()),
         ) {
             if (state.error.isNotEmpty()) {

@@ -73,7 +73,11 @@ class OverrideProfileStore(
     fun specs(ids: List<String>, replacement: OverrideReplacement? = null): List<OverrideSpec> = ids.mapNotNull { id ->
         find(id)?.let { profile ->
             if (replacement?.id == id) {
-                OverrideSpec(profile.name, replacement.format.extension, File(fileManager.getMihomoWorkDir(), replacement.relativePath).path)
+                OverrideSpec(
+                    profile.name,
+                    replacement.format.extension,
+                    File(fileManager.getMihomoWorkDir(), replacement.relativePath).path
+                )
             } else {
                 OverrideSpec(profile.name, profile.format.extension, File(fileManager.getMihomoWorkDir(), contentPath(profile)).path)
             }

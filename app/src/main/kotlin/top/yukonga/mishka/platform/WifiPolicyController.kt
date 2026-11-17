@@ -27,7 +27,7 @@ enum class WifiPolicyAction(val storageValue: String) {
     }
 }
 
-class WifiPolicyController constructor(private val context: PlatformContext) {
+class WifiPolicyController(private val context: PlatformContext) {
 
     fun hasRequiredPermission(): Boolean = AndroidWifiPolicy.hasRequiredPermission(context)
 

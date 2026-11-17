@@ -16,7 +16,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -27,10 +26,12 @@ import top.yukonga.mishka.platform.FilePickResult
 import top.yukonga.mishka.ui.component.AdaptiveTopAppBar
 import top.yukonga.mishka.ui.component.CardItem
 import top.yukonga.mishka.ui.component.blur.BlurredBar
+import top.yukonga.mishka.ui.component.blur.LocalPageBackdrop
+import top.yukonga.mishka.ui.component.blur.PageBackdropBox
 import top.yukonga.mishka.ui.component.blur.rememberBlurBackdrop
 import top.yukonga.mishka.ui.component.groupedCardItems
+import top.yukonga.mishka.ui.component.overScrollVertical
 import top.yukonga.mishka.ui.theme.StatusColors
-import top.yukonga.mishka.ui.util.WideContentBox
 import top.yukonga.mishka.ui.util.horizontalCutoutPadding
 import top.yukonga.mishka.viewmodel.OverrideProfileViewModel
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
@@ -42,10 +43,8 @@ import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.blur.layerBackdrop
+import top.yukonga.miuix.kmp.glass.GlassDropdownPreference
 import top.yukonga.miuix.kmp.preference.ArrowPreference
-import top.yukonga.miuix.kmp.preference.OverlayDropdownPreference
-import top.yukonga.miuix.kmp.theme.MiuixTheme
-import top.yukonga.miuix.kmp.utils.overScrollVertical
 import top.yukonga.miuix.kmp.utils.scrollEndHaptic
 
 private enum class AddMethod { Remote, Blank, Local }
@@ -82,33 +81,29 @@ fun OverrideEditScreen(
     val scrollBehavior = MiuixScrollBehavior()
     val backdrop = rememberBlurBackdrop()
     val blurActive = backdrop != null
-    val barColor = if (blurActive) Color.Transparent else MiuixTheme.colorScheme.surface
 
-    Scaffold(
-        topBar = {
-            BlurredBar(backdrop = backdrop, blurActive = blurActive) {
-                AdaptiveTopAppBar(
-                    title = stringResource(if (profile == null) R.string.override_add else R.string.override_edit),
-                    color = barColor,
-                    scrollBehavior = scrollBehavior,
-                    navigationIcon = { OverrideBackButton(onBack) },
-                )
-            }
-        },
-    ) { innerPadding ->
-        WideContentBox { sidePadding ->
+    PageBackdropBox {
+        Scaffold(
+            topBar = {
+                BlurredBar(backdrop = backdrop, blurActive = blurActive) {
+                    AdaptiveTopAppBar(
+                        title = stringResource(if (profile == null) R.string.override_add else R.string.override_edit),
+                        scrollBehavior = scrollBehavior,
+                        navigationIcon = { OverrideBackButton(onBack) },
+                    )
+                }
+            },
+        ) { innerPadding ->
             LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
-                    .horizontalCutoutPadding()
                     .then(if (backdrop != null) Modifier.layerBackdrop(backdrop) else Modifier)
+                    .horizontalCutoutPadding()
                     .scrollEndHaptic()
-                    .overScrollVertical()
+                    .overScrollVertical(scrollBehavior)
                     .nestedScroll(scrollBehavior.nestedScrollConnection),
                 contentPadding = PaddingValues(
                     top = innerPadding.calculateTopPadding(),
-                    start = sidePadding,
-                    end = sidePadding,
                 ),
             ) {
                 if (profile == null) {
@@ -118,8 +113,9 @@ fun OverrideEditScreen(
                         outerBottomPadding = 6.dp,
                         items = listOf(
                             CardItem("method") {
-                                OverlayDropdownPreference(
+                                GlassDropdownPreference(
                                     title = stringResource(R.string.override_add_method),
+                                    backdrop = LocalPageBackdrop.current,
                                     items = AddMethod.entries.map { stringResource(it.label) },
                                     selectedIndex = method.ordinal,
                                     onSelectedIndexChange = { method = AddMethod.entries[it] },
@@ -194,8 +190,9 @@ fun OverrideEditScreen(
                     outerBottomPadding = 12.dp,
                     items = listOf(
                         CardItem("format") {
-                            OverlayDropdownPreference(
+                            GlassDropdownPreference(
                                 title = stringResource(R.string.override_format),
+                                backdrop = LocalPageBackdrop.current,
                                 items = OverrideFormat.entries.map { it.label },
                                 selectedIndex = format.ordinal,
                                 onSelectedIndexChange = { format = OverrideFormat.entries[it] },

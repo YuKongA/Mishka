@@ -5,7 +5,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import top.yukonga.mishka.R
-import top.yukonga.miuix.kmp.preference.OverlayDropdownPreference
+import top.yukonga.mishka.ui.component.blur.LocalPageBackdrop
+import top.yukonga.miuix.kmp.glass.GlassDropdownPreference
 
 /**
  * 三态偏好组件，用于覆写设置中的三态 Boolean。
@@ -33,8 +34,9 @@ fun TriStatePreference(
         false -> 2
     }
 
-    OverlayDropdownPreference(
+    GlassDropdownPreference(
         title = title,
+        backdrop = LocalPageBackdrop.current,
         modifier = modifier,
         summary = items[selectedIndex],
         items = items,

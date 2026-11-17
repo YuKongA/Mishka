@@ -19,6 +19,7 @@ object StorageKeys {
     const val ROOT_MIHOMO_SECRET = "root_mihomo_secret"
     const val ROOT_START_TIME = "root_start_time"
     const val ROOT_ACTIVE_SUBSCRIPTION_ID = "root_active_subscription_id"
+
     // 本次 ROOT 进程实际绑定的 loopback DNS 端口；attach 时必须复用，不能重新选端口
     const val ROOT_DNS_PORT = "root_dns_port"
 
@@ -98,9 +99,7 @@ object StorageKeys {
     const val THEME_ACCENT_COLOR = "theme_accent_color"
     const val THEME_BLUR = "theme_blur"
     const val THEME_BLUR_STYLE = "theme_blur_style"
-    const val THEME_FLOATING_BOTTOM_BAR = "theme_floating_bottom_bar"
     const val THEME_FLOATING_BOTTOM_BAR_STYLE = "theme_floating_bottom_bar_style"
-    const val THEME_BOTTOM_BAR_MODE = "theme_bottom_bar_mode"
     const val THEME_PAGER_GESTURE_MODE = "theme_pager_gesture_mode"
     const val THEME_DENSITY_SCALE = "theme_density_scale"
     const val NAV_RAIL_EXPANDED = "nav_rail_expanded"

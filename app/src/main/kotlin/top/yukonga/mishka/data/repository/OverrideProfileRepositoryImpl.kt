@@ -130,7 +130,8 @@ class OverrideProfileRepositoryImpl(
         mutate {
             val subscription = subscriptions.loadRuntimeSubscription(subscriptionId)
                 ?: throw IllegalArgumentException("Profile $subscriptionId not found")
-            val next = subscription.copy(overrideIds = overrideIds.toPersistentList(), overrideSortPreference = sortPreference.toPersistentList())
+            val next =
+                subscription.copy(overrideIds = overrideIds.toPersistentList(), overrideSortPreference = sortPreference.toPersistentList())
             validate(next, null)
             subscriptions.setOverrideSelection(subscriptionId, overrideIds, sortPreference)
         }

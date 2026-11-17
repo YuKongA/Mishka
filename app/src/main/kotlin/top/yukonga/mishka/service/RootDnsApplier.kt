@@ -158,7 +158,11 @@ internal object RootDnsApplier {
         for (iface in tetherIfaces) {
             val escaped = RootHelper.escapeShellSingleQuoted(iface)
             for (proto in listOf("udp", "tcp")) {
-                rule("mangle", CHAIN_PRE, "-i $escaped -p $proto --dport $DNS_PORT -j MARK --set-xmark $MARK/$MASK ${tag("pre-mark-$proto")}")
+                rule(
+                    "mangle",
+                    CHAIN_PRE,
+                    "-i $escaped -p $proto --dport $DNS_PORT -j MARK --set-xmark $MARK/$MASK ${tag("pre-mark-$proto")}"
+                )
                 rule("mangle", CHAIN_PRE, "-i $escaped -p $proto --dport $DNS_PORT -j ACCEPT ${tag("pre-accept-$proto")}")
             }
         }
@@ -183,7 +187,7 @@ internal object RootDnsApplier {
         sb.appendLine("$xt -t nat -N $CHAIN_NAT")
         for (proto in listOf("udp", "tcp")) {
             val args = "-p $proto --dport $DNS_PORT -m mark --mark $MARK/$MASK " +
-                "-j DNAT --to-destination $dnatTarget ${tag("nat-$proto")}"
+                    "-j DNAT --to-destination $dnatTarget ${tag("nat-$proto")}"
             sb.appendLine("$xt -t nat -A $CHAIN_NAT $args")
             checks.appendLine("$xt -t nat -C $CHAIN_NAT $args")
         }

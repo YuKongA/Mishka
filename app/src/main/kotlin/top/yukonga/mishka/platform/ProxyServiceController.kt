@@ -344,8 +344,7 @@ class ProxyServiceController(private val context: Context) {
     }
 
     fun hasVpnPermission(): Boolean {
-        if (getTunMode() != TunMode.Vpn) return true
-        return VpnService.prepare(context) == null
+        return getTunMode() != TunMode.Vpn || VpnService.prepare(context) == null
     }
 
     fun hasRootPermission(): Boolean {

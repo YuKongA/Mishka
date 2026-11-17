@@ -22,12 +22,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.DpSize
-import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import top.yukonga.mishka.R
 import top.yukonga.mishka.platform.PlatformStorage
@@ -36,11 +33,15 @@ import top.yukonga.mishka.platform.WifiPolicyAction
 import top.yukonga.mishka.platform.WifiPolicyController
 import top.yukonga.mishka.platform.showToast
 import top.yukonga.mishka.ui.component.AdaptiveTopAppBar
+import top.yukonga.mishka.ui.component.BackNavigationIcon
 import top.yukonga.mishka.ui.component.CardItem
 import top.yukonga.mishka.ui.component.blur.BlurredBar
+import top.yukonga.mishka.ui.component.blur.LocalPageBackdrop
+import top.yukonga.mishka.ui.component.blur.PageBackdropBox
 import top.yukonga.mishka.ui.component.blur.rememberBlurBackdrop
 import top.yukonga.mishka.ui.component.groupedCardItems
-import top.yukonga.mishka.ui.util.WideContentBox
+import top.yukonga.mishka.ui.component.overScrollVertical
+import top.yukonga.mishka.ui.util.horizontalCutoutPadding
 import top.yukonga.miuix.kmp.basic.BasicComponent
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
@@ -49,15 +50,13 @@ import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.blur.layerBackdrop
+import top.yukonga.miuix.kmp.glass.GlassDropdownPreference
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Add
-import top.yukonga.miuix.kmp.icon.extended.Back
 import top.yukonga.miuix.kmp.icon.extended.Delete
 import top.yukonga.miuix.kmp.preference.ArrowPreference
-import top.yukonga.miuix.kmp.preference.OverlayDropdownPreference
 import top.yukonga.miuix.kmp.preference.SwitchPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
-import top.yukonga.miuix.kmp.utils.overScrollVertical
 import top.yukonga.miuix.kmp.utils.scrollEndHaptic
 
 @Composable
@@ -237,45 +236,30 @@ fun WifiPolicyScreen(
 
     val backdrop = rememberBlurBackdrop()
     val blurActive = backdrop != null
-    val barColor = if (blurActive) Color.Transparent else MiuixTheme.colorScheme.surface
 
-    Scaffold(
-        topBar = {
-            BlurredBar(backdrop = backdrop, blurActive = blurActive) {
-                AdaptiveTopAppBar(
-                    title = stringResource(R.string.wifi_policy_title),
-                    color = barColor,
-                    scrollBehavior = scrollBehavior,
-                    navigationIcon = {
-                        IconButton(onClick = onBack) {
-                            val layoutDirection = LocalLayoutDirection.current
-                            Icon(
-                                imageVector = MiuixIcons.Back,
-                                contentDescription = stringResource(R.string.common_back),
-                                tint = MiuixTheme.colorScheme.onSurface,
-                                modifier = Modifier.graphicsLayer {
-                                    scaleX = if (layoutDirection == LayoutDirection.Rtl) -1f else 1f
-                                },
-                            )
-                        }
-                    },
-                )
-            }
-        },
-    ) { innerPadding ->
-        WideContentBox { sidePadding ->
+    PageBackdropBox {
+        Scaffold(
+            topBar = {
+                BlurredBar(backdrop = backdrop, blurActive = blurActive) {
+                    AdaptiveTopAppBar(
+                        title = stringResource(R.string.wifi_policy_title),
+                        scrollBehavior = scrollBehavior,
+                        navigationIcon = { BackNavigationIcon(onBack) },
+                    )
+                }
+            },
+        ) { innerPadding ->
             LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
                     .then(if (backdrop != null) Modifier.layerBackdrop(backdrop) else Modifier)
+                    .horizontalCutoutPadding()
                     .scrollEndHaptic()
-                    .overScrollVertical()
+                    .overScrollVertical(scrollBehavior)
                     .nestedScroll(scrollBehavior.nestedScrollConnection)
                     .imePadding(),
                 contentPadding = PaddingValues(
                     top = innerPadding.calculateTopPadding(),
-                    start = sidePadding,
-                    end = sidePadding,
                 ),
             ) {
                 item { SmallTitle(text = stringResource(R.string.wifi_policy_basic)) }
@@ -319,8 +303,9 @@ fun WifiPolicyScreen(
                             )
                         },
                         CardItem("action") {
-                            OverlayDropdownPreference(
+                            GlassDropdownPreference(
                                 title = stringResource(R.string.wifi_policy_action),
+                                backdrop = LocalPageBackdrop.current,
                                 summary = actionSummary,
                                 items = actionItems,
                                 selectedIndex = if (action == WifiPolicyAction.DirectMode) 1 else 0,

@@ -28,21 +28,23 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import top.yukonga.mishka.R
 import top.yukonga.mishka.platform.TunMode
+import top.yukonga.mishka.ui.component.GlassDialogTextButton
+import top.yukonga.mishka.ui.component.blur.LocalPageBackdrop
 import top.yukonga.mishka.ui.theme.RunState
 import top.yukonga.mishka.ui.theme.StatusColors
 import top.yukonga.mishka.viewmodel.HomeUiState
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.CardDefaults
 import top.yukonga.miuix.kmp.basic.DropdownDefaults
-import top.yukonga.miuix.kmp.basic.DropdownEntry
-import top.yukonga.miuix.kmp.basic.DropdownItem
+import top.yukonga.miuix.kmp.basic.DropdownImpl
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.Text
-import top.yukonga.miuix.kmp.popup.WindowDropdownDialog
+import top.yukonga.miuix.kmp.glass.GlassDialog
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.PressFeedbackType
 
@@ -254,26 +256,38 @@ private fun OptionSelectDialog(
 ) {
     val currentOnSelect by rememberUpdatedState(onSelect)
     val selected = current.lowercase()
-    // onSelect 不进 key：调用点每次重组都可能给出新 lambda，会让整个 entry 白重建
-    val entry = remember(options, selected) {
-        DropdownEntry(
-            options.map { (value, label) ->
-                DropdownItem(
-                    text = label,
-                    selected = value == selected,
-                    onClick = { currentOnSelect(value) },
-                )
-            },
-        )
-    }
 
-    WindowDropdownDialog(
-        entry = entry,
-        title = title,
-        dialogButtonString = stringResource(R.string.common_cancel),
+    GlassDialog(
         show = show,
-        onDismiss = onDismiss,
-        onDismissFinished = {},
-        dropdownColors = DropdownDefaults.dialogDropdownColors(),
-    )
+        backdrop = LocalPageBackdrop.current,
+        title = title,
+        insideMargin = DpSize(0.dp, 24.dp),
+        onDismissRequest = onDismiss,
+    ) {
+        val dropdownColors = DropdownDefaults.dialogDropdownColors()
+        Column {
+            options.forEachIndexed { index, (value, label) ->
+                DropdownImpl(
+                    text = label,
+                    optionSize = options.size,
+                    isSelected = value == selected,
+                    index = index,
+                    dropdownColors = dropdownColors,
+                    dialogMode = true,
+                    onSelectedIndexChange = {
+                        currentOnSelect(value)
+                        onDismiss()
+                    },
+                )
+            }
+            Spacer(Modifier.height(12.dp))
+            GlassDialogTextButton(
+                text = stringResource(R.string.common_cancel),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp),
+                onClick = onDismiss,
+            )
+        }
+    }
 }

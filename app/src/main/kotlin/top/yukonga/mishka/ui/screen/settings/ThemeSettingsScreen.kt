@@ -31,7 +31,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
@@ -40,11 +39,15 @@ import top.yukonga.mishka.R
 import top.yukonga.mishka.platform.PlatformStorage
 import top.yukonga.mishka.platform.StorageKeys
 import top.yukonga.mishka.ui.component.AdaptiveTopAppBar
+import top.yukonga.mishka.ui.component.BackNavigationIcon
 import top.yukonga.mishka.ui.component.CardItem
+import top.yukonga.mishka.ui.component.GlassDialogTextButton
 import top.yukonga.mishka.ui.component.blur.BlurredBar
+import top.yukonga.mishka.ui.component.blur.LocalPageBackdrop
+import top.yukonga.mishka.ui.component.blur.PageBackdropBox
 import top.yukonga.mishka.ui.component.blur.rememberBlurBackdrop
 import top.yukonga.mishka.ui.component.groupedCardItems
-import top.yukonga.mishka.ui.theme.BottomBarMode
+import top.yukonga.mishka.ui.component.overScrollVertical
 import top.yukonga.mishka.ui.theme.FloatingBottomBarStyle
 import top.yukonga.mishka.ui.theme.MaxDensityScale
 import top.yukonga.mishka.ui.theme.MinDensityScale
@@ -59,29 +62,24 @@ import top.yukonga.mishka.ui.theme.summary
 import top.yukonga.mishka.ui.theme.themeColorModeLabel
 import top.yukonga.mishka.ui.theme.writeThemeConfig
 import top.yukonga.mishka.ui.util.horizontalCutoutPadding
-import top.yukonga.miuix.kmp.basic.ButtonDefaults
-import top.yukonga.miuix.kmp.basic.Icon
-import top.yukonga.miuix.kmp.basic.IconButton
+import top.yukonga.mishka.ui.util.rememberIsWideScreen
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.Slider
 import top.yukonga.miuix.kmp.basic.SliderDefaults
 import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.Text
-import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.basic.TextField
-import top.yukonga.miuix.kmp.blur.isRuntimeShaderSupported
 import top.yukonga.miuix.kmp.blur.layerBackdrop
-import top.yukonga.miuix.kmp.icon.MiuixIcons
-import top.yukonga.miuix.kmp.icon.extended.Back
+import top.yukonga.miuix.kmp.glass.GlassDialog
+import top.yukonga.miuix.kmp.glass.GlassDialogButtonRole
+import top.yukonga.miuix.kmp.glass.GlassDropdownPreference
+import top.yukonga.miuix.kmp.material.isRuntimeShaderSupported
 import top.yukonga.miuix.kmp.preference.ArrowPreference
-import top.yukonga.miuix.kmp.preference.OverlayDropdownPreference
 import top.yukonga.miuix.kmp.preference.SwitchPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.PagerInterceptionMode
-import top.yukonga.miuix.kmp.utils.overScrollVertical
 import top.yukonga.miuix.kmp.utils.scrollEndHaptic
-import top.yukonga.miuix.kmp.window.WindowDialog
 import kotlin.math.roundToInt
 
 @Composable
@@ -137,9 +135,6 @@ fun ThemeSettingsScreen(
     val floatingBottomBarStyleItems = floatingBottomBarStyles.map { style -> style.label() }
     val selectedFloatingBottomBarStyleIndex =
         floatingBottomBarStyles.indexOf(themeConfig.floatingBottomBarStyle).coerceAtLeast(0)
-    val bottomBarModes = BottomBarMode.entries.toList()
-    val bottomBarModeItems = bottomBarModes.map { mode -> mode.label() }
-    val selectedBottomBarModeIndex = bottomBarModes.indexOf(themeConfig.bottomBarMode).coerceAtLeast(0)
     val pagerInterceptionModes = PagerInterceptionMode.entries.toList()
     val pagerInterceptionModeItems = pagerInterceptionModes.map { mode -> mode.label() }
     val selectedPagerInterceptionModeIndex =
@@ -149,290 +144,262 @@ fun ThemeSettingsScreen(
     val topBarBlurStyleSummaries = topBarBlurStyles.map { style -> style.summary() }
     val selectedTopBarBlurStyleIndex = topBarBlurStyles.indexOf(themeConfig.topBarBlurStyle).coerceAtLeast(0)
     val isBlurSupported = isRuntimeShaderSupported()
+    val isWideScreen = rememberIsWideScreen()
 
     val backdrop = rememberBlurBackdrop()
     val blurActive = backdrop != null
-    val barColor = if (blurActive) Color.Transparent else MiuixTheme.colorScheme.surface
 
-    Scaffold(
-        topBar = {
-            BlurredBar(backdrop = backdrop, blurActive = blurActive) {
-                AdaptiveTopAppBar(
-                    title = stringResource(R.string.settings_theme_title),
-                    color = barColor,
-                    scrollBehavior = scrollBehavior,
-                    navigationIcon = {
-                        IconButton(onClick = onBack) {
-                            Icon(
-                                imageVector = MiuixIcons.Back,
-                                contentDescription = stringResource(R.string.common_back),
-                                tint = MiuixTheme.colorScheme.onSurface,
+    PageBackdropBox {
+        Scaffold(
+            topBar = {
+                BlurredBar(backdrop = backdrop, blurActive = blurActive) {
+                    AdaptiveTopAppBar(
+                        title = stringResource(R.string.settings_theme_title),
+                        scrollBehavior = scrollBehavior,
+                        navigationIcon = { BackNavigationIcon(onBack) },
+                    )
+                }
+            },
+        ) { innerPadding ->
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .then(if (backdrop != null) Modifier.layerBackdrop(backdrop) else Modifier)
+                    .horizontalCutoutPadding()
+                    .scrollEndHaptic()
+                    .overScrollVertical(scrollBehavior)
+                    .nestedScroll(scrollBehavior.nestedScrollConnection),
+                contentPadding = PaddingValues(
+                    top = innerPadding.calculateTopPadding(),
+                ),
+            ) {
+                item { SmallTitle(text = stringResource(R.string.settings_theme_group_color)) }
+                groupedCardItems(
+                    keyPrefix = "theme_color",
+                    items = listOf(
+                        CardItem("mode") {
+                            GlassDropdownPreference(
+                                title = stringResource(R.string.settings_theme_mode),
+                                backdrop = LocalPageBackdrop.current,
+                                summary = themeItems.getOrElse(themeConfig.colorMode) { themeItems.first() },
+                                items = themeItems,
+                                selectedIndex = themeConfig.colorMode,
+                                onSelectedIndexChange = { index ->
+                                    updateTheme(themeConfig.copy(colorMode = index))
+                                },
                             )
-                        }
-                    },
+                        },
+                        CardItem("monet") {
+                            SwitchPreference(
+                                title = stringResource(R.string.settings_theme_monet),
+                                summary = stringResource(R.string.settings_theme_monet_summary),
+                                checked = themeConfig.useMonet,
+                                onCheckedChange = { checked ->
+                                    updateTheme(themeConfig.copy(useMonet = checked))
+                                },
+                            )
+                            AnimatedVisibility(
+                                visible = themeConfig.useMonet,
+                                enter = expandVertically(expandFrom = Alignment.Top) + fadeIn(),
+                                exit = shrinkVertically(shrinkTowards = Alignment.Top) + fadeOut(),
+                            ) {
+                                Column {
+                                    GlassDropdownPreference(
+                                        title = stringResource(R.string.settings_theme_palette_style),
+                                        backdrop = LocalPageBackdrop.current,
+                                        summary = paletteItems.getOrElse(selectedPaletteIndex) { paletteItems.first() },
+                                        items = paletteItems,
+                                        selectedIndex = selectedPaletteIndex,
+                                        onSelectedIndexChange = { index ->
+                                            updateTheme(themeConfig.copy(paletteStyle = paletteStyles[index]))
+                                        },
+                                    )
+                                    GlassDropdownPreference(
+                                        title = stringResource(R.string.settings_theme_accent_title),
+                                        backdrop = LocalPageBackdrop.current,
+                                        summary = accentItems.getOrElse(selectedAccentIndex) { accentItems.first() },
+                                        items = accentItems,
+                                        selectedIndex = selectedAccentIndex,
+                                        onSelectedIndexChange = { index ->
+                                            updateTheme(themeConfig.copy(accentColor = accentOptions[index]))
+                                        },
+                                    )
+                                    SwitchPreference(
+                                        title = stringResource(R.string.settings_theme_pure_black),
+                                        summary = stringResource(R.string.settings_theme_pure_black_summary),
+                                        checked = themeConfig.pureBlack,
+                                        onCheckedChange = { checked ->
+                                            updateTheme(themeConfig.copy(pureBlack = checked))
+                                        },
+                                    )
+                                }
+                            }
+                        },
+                    ),
                 )
-            }
-        },
-    ) { innerPadding ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .horizontalCutoutPadding()
-                .then(if (backdrop != null) Modifier.layerBackdrop(backdrop) else Modifier)
-                .scrollEndHaptic()
-                .overScrollVertical()
-                .nestedScroll(scrollBehavior.nestedScrollConnection),
-            contentPadding = PaddingValues(top = innerPadding.calculateTopPadding()),
-        ) {
-            item { SmallTitle(text = stringResource(R.string.settings_theme_group_color)) }
-            groupedCardItems(
-                keyPrefix = "theme_color",
-                items = listOf(
-                    CardItem("mode") {
-                        OverlayDropdownPreference(
-                            title = stringResource(R.string.settings_theme_mode),
-                            summary = themeItems.getOrElse(themeConfig.colorMode) { themeItems.first() },
-                            items = themeItems,
-                            selectedIndex = themeConfig.colorMode,
-                            onSelectedIndexChange = { index ->
-                                updateTheme(themeConfig.copy(colorMode = index))
-                            },
-                        )
-                    },
-                    CardItem("monet") {
-                        SwitchPreference(
-                            title = stringResource(R.string.settings_theme_monet),
-                            summary = stringResource(R.string.settings_theme_monet_summary),
-                            checked = themeConfig.useMonet,
-                            onCheckedChange = { checked ->
-                                updateTheme(themeConfig.copy(useMonet = checked))
-                            },
-                        )
-                        AnimatedVisibility(
-                            visible = themeConfig.useMonet,
-                            enter = expandVertically(expandFrom = Alignment.Top) + fadeIn(),
-                            exit = shrinkVertically(shrinkTowards = Alignment.Top) + fadeOut(),
-                        ) {
-                            Column {
-                                OverlayDropdownPreference(
-                                    title = stringResource(R.string.settings_theme_palette_style),
-                                    summary = paletteItems.getOrElse(selectedPaletteIndex) { paletteItems.first() },
-                                    items = paletteItems,
-                                    selectedIndex = selectedPaletteIndex,
-                                    onSelectedIndexChange = { index ->
-                                        updateTheme(themeConfig.copy(paletteStyle = paletteStyles[index]))
+
+                item { SmallTitle(text = stringResource(R.string.settings_theme_group_interface)) }
+                groupedCardItems(
+                    keyPrefix = "theme_interface",
+                    items = buildList {
+                        add(CardItem("blur") {
+                            SwitchPreference(
+                                title = stringResource(R.string.settings_theme_blur),
+                                summary = stringResource(R.string.settings_theme_blur_summary),
+                                checked = themeConfig.blurEnabled && isBlurSupported,
+                                onCheckedChange = { checked ->
+                                    updateTheme(themeConfig.copy(blurEnabled = checked))
+                                },
+                                enabled = isBlurSupported,
+                            )
+                            AnimatedVisibility(
+                                visible = false,
+                                enter = expandVertically(expandFrom = Alignment.Top) + fadeIn(),
+                                exit = shrinkVertically(shrinkTowards = Alignment.Top) + fadeOut(),
+                            ) {
+                                GlassDropdownPreference(
+                                    title = stringResource(R.string.settings_theme_blur_style),
+                                    backdrop = LocalPageBackdrop.current,
+                                    summary = topBarBlurStyleSummaries.getOrElse(selectedTopBarBlurStyleIndex) {
+                                        topBarBlurStyleSummaries.first()
                                     },
-                                )
-                                OverlayDropdownPreference(
-                                    title = stringResource(R.string.settings_theme_accent_title),
-                                    summary = accentItems.getOrElse(selectedAccentIndex) { accentItems.first() },
-                                    items = accentItems,
-                                    selectedIndex = selectedAccentIndex,
+                                    items = topBarBlurStyleItems,
+                                    selectedIndex = selectedTopBarBlurStyleIndex,
                                     onSelectedIndexChange = { index ->
-                                        updateTheme(themeConfig.copy(accentColor = accentOptions[index]))
-                                    },
-                                )
-                                SwitchPreference(
-                                    title = stringResource(R.string.settings_theme_pure_black),
-                                    summary = stringResource(R.string.settings_theme_pure_black_summary),
-                                    checked = themeConfig.pureBlack,
-                                    onCheckedChange = { checked ->
-                                        updateTheme(themeConfig.copy(pureBlack = checked))
+                                        updateTheme(themeConfig.copy(topBarBlurStyle = topBarBlurStyles[index]))
                                     },
                                 )
                             }
+                        })
+                        if (onPredictiveBackChange != null) {
+                            add(CardItem("predictiveBack") {
+                                SwitchPreference(
+                                    title = stringResource(R.string.settings_predictive_back),
+                                    summary = stringResource(R.string.settings_predictive_back_summary),
+                                    checked = isPredictiveBackEnabled,
+                                    onCheckedChange = { checked ->
+                                        storage.putString(StorageKeys.PREDICTIVE_BACK, checked.toString())
+                                        isPredictiveBackEnabled = checked
+                                        onPredictiveBackChange(checked)
+                                    },
+                                )
+                            })
                         }
+                        add(CardItem("densityScale") {
+                            ArrowPreference(
+                                title = stringResource(R.string.settings_theme_density_scale),
+                                summary = stringResource(R.string.settings_theme_density_scale_summary),
+                                endActions = {
+                                    Text(
+                                        text = formatDensityScalePercent(densityScaleDraft),
+                                        fontSize = MiuixTheme.textStyles.body2.fontSize,
+                                        color = MiuixTheme.colorScheme.onSurfaceVariantActions,
+                                    )
+                                },
+                                bottomAction = {
+                                    Slider(
+                                        value = densityScaleDraft.coerceIn(
+                                            MinDensityScale * 100f,
+                                            MaxDensityScale * 100f,
+                                        ),
+                                        onValueChange = { value ->
+                                            densityScaleDraft = value
+                                        },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        valueRange = (MinDensityScale * 100f)..(MaxDensityScale * 100f),
+                                        onValueChangeFinished = {
+                                            updateDensityScale(densityScaleDraft)
+                                        },
+                                        showKeyPoints = true,
+                                        keyPoints = listOf(80f, 90f, 100f, 110f),
+                                        // magnetThreshold 是 range 占比：0.01 = 1%，仅在关键点附近轻微吸附
+                                        magnetThreshold = 0.01f,
+                                        hapticEffect = SliderDefaults.SliderHapticEffect.Step,
+                                    )
+                                },
+                                onClick = ::openDensityScaleDialog,
+                                holdDownState = showDensityScaleDialog,
+                            )
+                        })
                     },
-                ),
-            )
+                )
 
-            item { SmallTitle(text = stringResource(R.string.settings_theme_group_interface)) }
-            groupedCardItems(
-                keyPrefix = "theme_interface",
-                items = buildList {
-                    add(CardItem("blur") {
-                        SwitchPreference(
-                            title = stringResource(R.string.settings_theme_blur),
-                            summary = stringResource(R.string.settings_theme_blur_summary),
-                            checked = themeConfig.blurEnabled && isBlurSupported,
-                            onCheckedChange = { checked ->
-                                updateTheme(themeConfig.copy(blurEnabled = checked))
-                            },
-                            enabled = isBlurSupported,
-                        )
-                        AnimatedVisibility(
-                            visible = themeConfig.blurEnabled && isBlurSupported,
-                            enter = expandVertically(expandFrom = Alignment.Top) + fadeIn(),
-                            exit = shrinkVertically(shrinkTowards = Alignment.Top) + fadeOut(),
-                        ) {
-                            OverlayDropdownPreference(
-                                title = stringResource(R.string.settings_theme_blur_style),
-                                summary = topBarBlurStyleSummaries.getOrElse(selectedTopBarBlurStyleIndex) {
-                                    topBarBlurStyleSummaries.first()
-                                },
-                                items = topBarBlurStyleItems,
-                                selectedIndex = selectedTopBarBlurStyleIndex,
-                                onSelectedIndexChange = { index ->
-                                    updateTheme(themeConfig.copy(topBarBlurStyle = topBarBlurStyles[index]))
-                                },
-                            )
-                        }
-                    })
-                    if (onPredictiveBackChange != null) {
-                        add(CardItem("predictiveBack") {
-                            SwitchPreference(
-                                title = stringResource(R.string.settings_predictive_back),
-                                summary = stringResource(R.string.settings_predictive_back_summary),
-                                checked = isPredictiveBackEnabled,
-                                onCheckedChange = { checked ->
-                                    storage.putString(StorageKeys.PREDICTIVE_BACK, checked.toString())
-                                    isPredictiveBackEnabled = checked
-                                    onPredictiveBackChange(checked)
-                                },
-                            )
-                        })
-                    }
-                    add(CardItem("densityScale") {
-                        ArrowPreference(
-                            title = stringResource(R.string.settings_theme_density_scale),
-                            summary = stringResource(R.string.settings_theme_density_scale_summary),
-                            endActions = {
-                                Text(
-                                    text = formatDensityScalePercent(densityScaleDraft),
-                                    fontSize = MiuixTheme.textStyles.body2.fontSize,
-                                    color = MiuixTheme.colorScheme.onSurfaceVariantActions,
-                                )
-                            },
-                            bottomAction = {
-                                Slider(
-                                    value = densityScaleDraft.coerceIn(
-                                        MinDensityScale * 100f,
-                                        MaxDensityScale * 100f,
-                                    ),
-                                    onValueChange = { value ->
-                                        densityScaleDraft = value
-                                    },
-                                    modifier = Modifier.fillMaxWidth(),
-                                    valueRange = (MinDensityScale * 100f)..(MaxDensityScale * 100f),
-                                    onValueChangeFinished = {
-                                        updateDensityScale(densityScaleDraft)
-                                    },
-                                    showKeyPoints = true,
-                                    keyPoints = listOf(80f, 90f, 100f, 110f),
-                                    // magnetThreshold 是 range 占比：0.01 = 1%，仅在关键点附近轻微吸附
-                                    magnetThreshold = 0.01f,
-                                    hapticEffect = SliderDefaults.SliderHapticEffect.Step,
-                                )
-                            },
-                            onClick = ::openDensityScaleDialog,
-                            holdDownState = showDensityScaleDialog,
-                        )
-                    })
-                },
-            )
-
-            item { SmallTitle(text = stringResource(R.string.settings_theme_group_navigation)) }
-            groupedCardItems(
-                keyPrefix = "theme_navigation",
-                items = buildList {
-                    add(CardItem("pagerGesture") {
-                        OverlayDropdownPreference(
-                            title = stringResource(R.string.settings_theme_pager_gesture),
-                            summary = pagerInterceptionModeItems.getOrElse(
-                                selectedPagerInterceptionModeIndex,
-                            ) { pagerInterceptionModeItems.first() },
-                            items = pagerInterceptionModeItems,
-                            selectedIndex = selectedPagerInterceptionModeIndex,
-                            onSelectedIndexChange = { index ->
-                                updateTheme(
-                                    themeConfig.copy(
-                                        pagerInterceptionMode = pagerInterceptionModes[index],
-                                    ),
-                                )
-                            },
-                        )
-                    })
-                    if (onSwipeDismissChange != null) {
-                        add(CardItem("swipeDismiss") {
-                            SwitchPreference(
-                                title = stringResource(R.string.settings_swipe_dismiss),
-                                summary = stringResource(R.string.settings_swipe_dismiss_summary),
-                                checked = swipeDismissEnabled,
-                                onCheckedChange = { checked -> onSwipeDismissChange(checked) },
-                            )
-                        })
-                    }
-                    add(CardItem("floating") {
-                        SwitchPreference(
-                            title = stringResource(R.string.settings_theme_floating_bottom_bar),
-                            summary = stringResource(R.string.settings_theme_floating_bottom_bar_summary),
-                            checked = themeConfig.floatingBottomBar,
-                            onCheckedChange = { checked ->
-                                updateTheme(themeConfig.copy(floatingBottomBar = checked))
-                            },
-                        )
-                        AnimatedVisibility(
-                            visible = themeConfig.floatingBottomBar,
-                            enter = expandVertically(expandFrom = Alignment.Top) + fadeIn(),
-                            exit = shrinkVertically(shrinkTowards = Alignment.Top) + fadeOut(),
-                        ) {
-                            OverlayDropdownPreference(
-                                title = stringResource(R.string.settings_theme_floating_bottom_bar_style),
-                                summary = floatingBottomBarStyleItems.getOrElse(
-                                    selectedFloatingBottomBarStyleIndex,
-                                ) { floatingBottomBarStyleItems.first() },
-                                items = floatingBottomBarStyleItems,
-                                selectedIndex = selectedFloatingBottomBarStyleIndex,
+                item { SmallTitle(text = stringResource(R.string.settings_theme_group_navigation)) }
+                groupedCardItems(
+                    keyPrefix = "theme_navigation",
+                    items = buildList {
+                        add(CardItem("pagerGesture") {
+                            GlassDropdownPreference(
+                                title = stringResource(R.string.settings_theme_pager_gesture),
+                                backdrop = LocalPageBackdrop.current,
+                                summary = pagerInterceptionModeItems.getOrElse(
+                                    selectedPagerInterceptionModeIndex,
+                                ) { pagerInterceptionModeItems.first() },
+                                items = pagerInterceptionModeItems,
+                                selectedIndex = selectedPagerInterceptionModeIndex,
                                 onSelectedIndexChange = { index ->
                                     updateTheme(
                                         themeConfig.copy(
-                                            floatingBottomBarStyle = floatingBottomBarStyles[index],
+                                            pagerInterceptionMode = pagerInterceptionModes[index],
                                         ),
                                     )
                                 },
                             )
-                        }
-                    })
-                    add(CardItem("mode") {
-                        OverlayDropdownPreference(
-                            title = stringResource(R.string.settings_theme_bottom_bar_mode),
-                            summary = bottomBarModeItems.getOrElse(
-                                selectedBottomBarModeIndex,
-                            ) { bottomBarModeItems.first() },
-                            items = bottomBarModeItems,
-                            selectedIndex = selectedBottomBarModeIndex,
-                            onSelectedIndexChange = { index ->
-                                updateTheme(
-                                    themeConfig.copy(
-                                        bottomBarMode = bottomBarModes[index],
-                                    ),
+                        })
+                        if (onSwipeDismissChange != null) {
+                            add(CardItem("swipeDismiss") {
+                                SwitchPreference(
+                                    title = stringResource(R.string.settings_swipe_dismiss),
+                                    summary = stringResource(R.string.settings_swipe_dismiss_summary),
+                                    checked = swipeDismissEnabled,
+                                    onCheckedChange = { checked -> onSwipeDismissChange(checked) },
                                 )
-                            },
-                        )
-                    })
-                },
-            )
-            item {
-                Spacer(
-                    Modifier
-                        .height(24.dp)
-                        .navigationBarsPadding()
+                            })
+                        }
+                        if (!isWideScreen) {
+                            add(CardItem("floatingStyle") {
+                                GlassDropdownPreference(
+                                    title = stringResource(R.string.settings_theme_floating_bottom_bar_style),
+                                    backdrop = LocalPageBackdrop.current,
+                                    summary = floatingBottomBarStyleItems.getOrElse(
+                                        selectedFloatingBottomBarStyleIndex,
+                                    ) { floatingBottomBarStyleItems.first() },
+                                    items = floatingBottomBarStyleItems,
+                                    selectedIndex = selectedFloatingBottomBarStyleIndex,
+                                    onSelectedIndexChange = { index ->
+                                        updateTheme(
+                                            themeConfig.copy(
+                                                floatingBottomBarStyle = floatingBottomBarStyles[index],
+                                            ),
+                                        )
+                                    },
+                                )
+                            })
+                        }
+                    },
                 )
+                item {
+                    Spacer(
+                        Modifier
+                            .height(24.dp)
+                            .navigationBarsPadding()
+                    )
+                }
+
             }
-
         }
-    }
 
-    DensityScaleDialog(
-        show = showDensityScaleDialog,
-        textState = densityScaleTextState,
-        currentPercent = { densityScaleDraft },
-        onDismiss = { showDensityScaleDialog = false },
-        onConfirm = { percent ->
-            updateDensityScale(percent)
-            showDensityScaleDialog = false
-        },
-    )
+        DensityScaleDialog(
+            show = showDensityScaleDialog,
+            textState = densityScaleTextState,
+            currentPercent = { densityScaleDraft },
+            onDismiss = { showDensityScaleDialog = false },
+            onConfirm = { percent ->
+                updateDensityScale(percent)
+                showDensityScaleDialog = false
+            },
+        )
+    }
 }
 
 @Composable
@@ -443,8 +410,9 @@ private fun DensityScaleDialog(
     onDismiss: () -> Unit,
     onConfirm: (Float) -> Unit,
 ) {
-    WindowDialog(
+    GlassDialog(
         show = show,
+        backdrop = LocalPageBackdrop.current,
         title = stringResource(R.string.settings_theme_density_scale),
         summary = stringResource(R.string.settings_theme_density_scale_summary),
         onDismissRequest = onDismiss,
@@ -467,15 +435,15 @@ private fun DensityScaleDialog(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            TextButton(
+            GlassDialogTextButton(
                 text = stringResource(R.string.common_cancel),
                 modifier = Modifier.weight(1f),
                 onClick = onDismiss,
             )
-            TextButton(
+            GlassDialogTextButton(
                 text = stringResource(R.string.common_confirm),
                 modifier = Modifier.weight(1f),
-                colors = ButtonDefaults.textButtonColorsPrimary(),
+                role = GlassDialogButtonRole.Primary,
                 onClick = {
                     // 空输入/非法输入回退当前值，确认后总是关闭，不做静默 no-op
                     val percent = textState.text.toString().toIntOrNull()?.toFloat() ?: currentPercent()

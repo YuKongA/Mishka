@@ -1,6 +1,6 @@
 package top.yukonga.mishka.ui.screen.log
 
-import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -25,53 +25,44 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.positionInWindow
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import top.yukonga.mishka.R
 import top.yukonga.mishka.domain.model.LogMessage
 import top.yukonga.mishka.ui.component.AdaptiveTopAppBar
-import top.yukonga.mishka.ui.component.SearchBarFake
-import top.yukonga.mishka.ui.component.SearchBox
-import top.yukonga.mishka.ui.component.SearchPager
-import top.yukonga.mishka.ui.component.SearchResultStatusEffect
-import top.yukonga.mishka.ui.component.SearchStatus
+import top.yukonga.mishka.ui.component.BackNavigationIcon
+import top.yukonga.mishka.ui.component.GlassSearchOverlay
+import top.yukonga.mishka.ui.component.TopBarIconButton
 import top.yukonga.mishka.ui.component.blur.BlurredBar
 import top.yukonga.mishka.ui.component.blur.rememberBlurBackdrop
-import top.yukonga.mishka.ui.component.rememberSearchBarTopPadding
-import top.yukonga.mishka.ui.component.rememberSearchScreenStatus
+import top.yukonga.mishka.ui.component.glassSearchBarTransition
+import top.yukonga.mishka.ui.component.overScrollVertical
+import top.yukonga.mishka.ui.component.rememberGlassSearchBarAlpha
 import top.yukonga.mishka.ui.util.horizontalCutoutPadding
 import top.yukonga.mishka.viewmodel.LogViewModel
 import top.yukonga.miuix.kmp.basic.Card
-import top.yukonga.miuix.kmp.basic.Icon
-import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.icon.MiuixIcons
-import top.yukonga.miuix.kmp.icon.extended.Back
-import top.yukonga.miuix.kmp.icon.extended.Delete
 import top.yukonga.miuix.kmp.squircle.squircleBackground
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.overScrollVertical
 import top.yukonga.miuix.kmp.utils.scrollEndHaptic
+import top.yukonga.miuix.kmp.icon.glass.Delete as GlassDelete
+import top.yukonga.miuix.kmp.icon.glass.Search as GlassSearch
 
 @Composable
 fun LogScreen(
@@ -82,24 +73,14 @@ fun LogScreen(
     val logs by viewModel.logs.collectAsStateWithLifecycle()
     val scrollBehavior = MiuixScrollBehavior()
     val listState = rememberLazyListState()
-    val density = LocalDensity.current
+    var searchExpanded by remember { mutableStateOf(false) }
 
     DisposableEffect(Unit) {
         viewModel.connect()
         onDispose { viewModel.disconnect() }
     }
 
-    val searchStatusState = rememberSearchScreenStatus(stringResource(R.string.log_search))
-    var searchStatus by searchStatusState
-
-    // 搜索词只作过滤的 key，不写回 ViewModel：回写会在组合期触发状态写
-    val searchText = searchStatus.searchText
-    val filteredLogs = remember(searchText, logs) {
-        viewModel.filteredLogs(searchText)
-    }
-    SearchResultStatusEffect(searchStatusState, filteredLogs.isEmpty())
-
-    val dynamicTopPadding = rememberSearchBarTopPadding(scrollBehavior)
+    val barAlpha = rememberGlassSearchBarAlpha(searchExpanded)
 
     // 仅当用户已滚到底部时自动跟随新日志，否则不抢夺滚动位置
     val autoScrollEnabled by remember {
@@ -119,136 +100,48 @@ fun LogScreen(
     val lastLogId = logs.lastOrNull()?.id
     LaunchedEffect(lastLogId) {
         // 搜索态下主列表被弹出层盖住，滚它也看不见，收起后还会停在错位置
-        if (lastLogId != null && autoScrollEnabled && searchStatus.isCollapsed()) {
+        if (lastLogId != null && autoScrollEnabled && !searchExpanded) {
             listState.animateScrollToItem(logs.lastIndex)
         }
     }
 
     val backdrop = rememberBlurBackdrop()
     val blurActive = backdrop != null
-    val barColor = if (blurActive) Color.Transparent else MiuixTheme.colorScheme.surface
 
-    Scaffold(
-        topBar = {
-            BlurredBar(backdrop = backdrop, blurActive = blurActive) {
-                searchStatus.TopAppBarAnim(
-                    backgroundColor = if (blurActive) Color.Transparent else MiuixTheme.colorScheme.surface,
-                ) {
+    Box(modifier = Modifier
+        .fillMaxSize()
+        .background(MiuixTheme.colorScheme.surface)) {
+        Scaffold(
+            modifier = Modifier.glassSearchBarTransition(searchExpanded) { barAlpha.value },
+            topBar = {
+                BlurredBar(backdrop = backdrop, blurActive = blurActive) {
                     AdaptiveTopAppBar(
                         title = stringResource(R.string.log_title),
-                        color = barColor,
                         scrollBehavior = scrollBehavior,
-                        navigationIcon = {
-                            IconButton(onClick = onBack) {
-                                val layoutDirection = LocalLayoutDirection.current
-                                Icon(
-                                    imageVector = MiuixIcons.Back,
-                                    contentDescription = stringResource(R.string.common_back),
-                                    tint = MiuixTheme.colorScheme.onSurface,
-                                    modifier = Modifier.graphicsLayer {
-                                        scaleX = if (layoutDirection == LayoutDirection.Rtl) -1f else 1f
-                                    },
-                                )
-                            }
-                        },
+                        navigationIcon = { BackNavigationIcon(onBack) },
                         actions = {
-                            IconButton(onClick = { viewModel.clearLogs() }) {
-                                Icon(
-                                    imageVector = MiuixIcons.Delete,
-                                    contentDescription = stringResource(R.string.log_clear),
-                                    tint = MiuixTheme.colorScheme.onSurface,
-                                )
-                            }
-                        },
-                        bottomContent = {
-                            Box(
-                                modifier = Modifier
-                                    .graphicsLayer { alpha = if (searchStatus.isCollapsed()) 1f else 0f }
-                                    .onGloballyPositioned { coordinates ->
-                                        with(density) {
-                                            val newOffsetY = coordinates.positionInWindow().y.toDp()
-                                            if (searchStatus.offsetY != newOffsetY) {
-                                                searchStatus = searchStatus.copy(offsetY = newOffsetY)
-                                            }
-                                        }
-                                    }
-                                    .then(
-                                        if (searchStatus.isCollapsed()) {
-                                            Modifier.pointerInput(Unit) {
-                                                detectTapGestures {
-                                                    searchStatus = searchStatus.copy(current = SearchStatus.Status.EXPANDING)
-                                                }
-                                            }
-                                        } else Modifier,
-                                    ),
-                            ) {
-                                SearchBarFake(searchStatus.label, dynamicTopPadding)
-                            }
+                            TopBarIconButton(
+                                onClick = { searchExpanded = true },
+                                glassIcon = MiuixIcons.Glass.GlassSearch,
+                                contentDescription = stringResource(R.string.log_search),
+                            )
+                            TopBarIconButton(
+                                onClick = { viewModel.clearLogs() },
+                                glassIcon = MiuixIcons.Glass.GlassDelete,
+                                contentDescription = stringResource(R.string.log_clear),
+                            )
                         },
                     )
                 }
-            }
-        },
-        popupHost = {
-            searchStatus.SearchPager(
-                onSearchStatusChange = { searchStatus = it },
-                defaultResult = {},
-                searchBarTopPadding = dynamicTopPadding,
-            ) {
-                val imeBottomPadding = WindowInsets.ime.asPaddingValues().calculateBottomPadding()
-                LazyColumn(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .overScrollVertical(),
-                ) {
-                    item {
-                        Spacer(Modifier.height(12.dp))
-                    }
-
-                    if (filteredLogs.isEmpty()) {
-                        item(key = "search_empty") {
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 32.dp),
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                            ) {
-                                Text(
-                                    text = stringResource(R.string.log_no_match),
-                                    fontSize = 16.sp,
-                                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                                )
-                            }
-                        }
-                    } else {
-                        items(
-                            items = filteredLogs,
-                            key = { it.id },
-                            contentType = { "log" },
-                        ) { indexedLog ->
-                            LogCard(indexedLog.message)
-                        }
-                    }
-
-                    item {
-                        Spacer(
-                            Modifier
-                                .height(imeBottomPadding)
-                                .navigationBarsPadding(),
-                        )
-                    }
-                }
-            }
-        },
-    ) { innerPadding ->
-        searchStatus.SearchBox {
+            },
+        ) { innerPadding ->
             LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
-                    .horizontalCutoutPadding()
                     .then(if (backdrop != null) Modifier.layerBackdrop(backdrop) else Modifier)
+                    .horizontalCutoutPadding()
                     .scrollEndHaptic()
-                    .overScrollVertical()
+                    .overScrollVertical(scrollBehavior)
                     .nestedScroll(scrollBehavior.nestedScrollConnection),
                 state = listState,
                 contentPadding = PaddingValues(
@@ -291,6 +184,59 @@ fun LogScreen(
                     Spacer(
                         Modifier
                             .height(24.dp)
+                            .navigationBarsPadding(),
+                    )
+                }
+            }
+        }
+
+        GlassSearchOverlay(
+            expanded = searchExpanded,
+            onDismissRequest = { searchExpanded = false },
+            label = stringResource(R.string.log_search),
+        ) { query ->
+            val filteredLogs = remember(query, logs) {
+                viewModel.filteredLogs(query)
+            }
+            val imeBottomPadding = WindowInsets.ime.asPaddingValues().calculateBottomPadding()
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .overScrollVertical(),
+            ) {
+                item {
+                    Spacer(Modifier.height(6.dp))
+                }
+
+                if (filteredLogs.isEmpty()) {
+                    item(key = "search_empty") {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 32.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                        ) {
+                            Text(
+                                text = stringResource(R.string.log_no_match),
+                                fontSize = 16.sp,
+                                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                            )
+                        }
+                    }
+                } else {
+                    items(
+                        items = filteredLogs,
+                        key = { it.id },
+                        contentType = { "log" },
+                    ) { indexedLog ->
+                        LogCard(indexedLog.message)
+                    }
+                }
+
+                item {
+                    Spacer(
+                        Modifier
+                            .height(imeBottomPadding)
                             .navigationBarsPadding(),
                     )
                 }

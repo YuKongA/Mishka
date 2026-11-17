@@ -17,9 +17,10 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import top.yukonga.mishka.ui.theme.LocalAppDarkMode
-import top.yukonga.miuix.kmp.blur.isRuntimeShaderSupported
+import top.yukonga.miuix.kmp.material.isRuntimeShaderSupported
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import kotlin.math.floor
+import kotlin.time.Duration.Companion.milliseconds
 
 @Composable
 fun BgEffectBackground(
@@ -61,7 +62,7 @@ fun BgEffectBackground(
                 // 不可见时挂起色阶推进：draw 里读 colorStage，spring 每帧都会让它重绘。
                 // snapshotFlow 在协程里读 alpha，不像 by 解包那样把它带进组合期
                 snapshotFlow { currentAlpha() > 0f }.first { it }
-                delay((preset.colorInterpPeriod * 500).toLong())
+                delay((preset.colorInterpPeriod * 500).toLong().milliseconds)
                 colorStage.animateTo(
                     targetValue = targetStage,
                     animationSpec = spring(dampingRatio = 0.9f, stiffness = 35f),

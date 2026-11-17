@@ -494,10 +494,7 @@ object RootTetherHijacker {
         if (mangle6.contains(COMMENT_TAG_PREFIX) || mangle6.contains(CHAIN_NAME)) return true
         // BYPASS / PROXY-fallback 不走 iptables，只靠 ip rule；priority 属 Mishka 独占区间
         val v4Rules = runWithOutput("ip rule show").output
-        if (v4Rules.lineSequence().any { it.startsWith("$PRIORITY_V4:") || it.startsWith("$PRIORITY_FWMARK:") }) {
-            return true
-        }
-        return false
+        return v4Rules.lineSequence().any { it.startsWith("$PRIORITY_V4:") || it.startsWith("$PRIORITY_FWMARK:") }
     }
 
     /**

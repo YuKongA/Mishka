@@ -1,8 +1,8 @@
 package top.yukonga.mishka.ui.component.effect
 
 import androidx.compose.ui.graphics.Brush
-import top.yukonga.miuix.kmp.blur.RuntimeShader
-import top.yukonga.miuix.kmp.blur.asBrush
+import top.yukonga.miuix.kmp.material.RuntimeShader
+import top.yukonga.miuix.kmp.material.asBrush
 import kotlin.math.cos
 import kotlin.math.sin
 

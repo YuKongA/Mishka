@@ -45,40 +45,37 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import top.yukonga.mishka.BuildConfig
 import top.yukonga.mishka.R
+import top.yukonga.mishka.ui.component.AdaptiveTopAppBar
+import top.yukonga.mishka.ui.component.BackNavigationIcon
 import top.yukonga.mishka.ui.component.blur.BlurredBar
 import top.yukonga.mishka.ui.component.blur.ColorBlendToken
 import top.yukonga.mishka.ui.component.blur.rememberBlurBackdrop
 import top.yukonga.mishka.ui.component.blur.rememberBlurEnabled
 import top.yukonga.mishka.ui.component.effect.BgEffectBackground
+import top.yukonga.mishka.ui.component.overScrollVertical
 import top.yukonga.mishka.ui.theme.LocalAppDarkMode
 import top.yukonga.mishka.ui.util.horizontalCutoutPadding
+import top.yukonga.mishka.ui.util.sidebarStartInset
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.CardDefaults
-import top.yukonga.miuix.kmp.basic.Icon
-import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.ScrollBehavior
 import top.yukonga.miuix.kmp.basic.SmallTitle
-import top.yukonga.miuix.kmp.basic.SmallTopAppBar
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.blur.BlendColorEntry
 import top.yukonga.miuix.kmp.blur.BlurBlendMode
 import top.yukonga.miuix.kmp.blur.BlurColors
-import top.yukonga.miuix.kmp.blur.isRuntimeShaderSupported
 import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
 import top.yukonga.miuix.kmp.blur.textureBlur
-import top.yukonga.miuix.kmp.icon.MiuixIcons
-import top.yukonga.miuix.kmp.icon.extended.Back
+import top.yukonga.miuix.kmp.material.isRuntimeShaderSupported
 import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme.colorScheme
-import top.yukonga.miuix.kmp.utils.overScrollVertical
 import top.yukonga.miuix.kmp.utils.scrollEndHaptic
 
 @Composable
@@ -116,31 +113,19 @@ fun AboutScreen(
 
     val backdrop = rememberBlurBackdrop()
     val blurActive = backdrop != null && heroCollapsed
-    val barColor = if (heroCollapsed && !blurActive) colorScheme.surface else Color.Transparent
 
     Scaffold(
         topBar = {
             BlurredBar(backdrop = backdrop, blurActive = blurActive) {
-                SmallTopAppBar(
-                    modifier = Modifier.horizontalCutoutPadding(),
+                AdaptiveTopAppBar(
                     title = stringResource(R.string.about_title),
+                    contentModifier = Modifier.horizontalCutoutPadding(applySidebarInset = false),
+                    expandable = false,
                     scrollBehavior = scrollBehavior,
-                    color = barColor,
-                    titleColor = colorScheme.onSurface.copy(alpha = titleAlpha),
+                    titleColor = colorScheme.onSurface,
+                    titleAlpha = { titleAlpha },
                     defaultWindowInsetsPadding = false,
-                    navigationIcon = {
-                        val layoutDirection = LocalLayoutDirection.current
-                        IconButton(onClick = onBack) {
-                            Icon(
-                                imageVector = MiuixIcons.Back,
-                                contentDescription = stringResource(R.string.common_back),
-                                tint = colorScheme.onSurface,
-                                modifier = Modifier.graphicsLayer {
-                                    scaleX = if (layoutDirection == LayoutDirection.Rtl) -1f else 1f
-                                },
-                            )
-                        }
-                    },
+                    navigationIcon = { BackNavigationIcon(onBack) },
                 )
             }
         },
@@ -228,6 +213,7 @@ private fun AboutContent(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .sidebarStartInset()
                 .padding(
                     top = logoPadding.calculateTopPadding() + 52.dp,
                     start = logoPadding.calculateStartPadding(layoutDirection),
@@ -316,8 +302,9 @@ private fun AboutContent(
             state = lazyListState,
             modifier = Modifier
                 .fillMaxSize()
+                .sidebarStartInset()
                 .scrollEndHaptic()
-                .overScrollVertical()
+                .overScrollVertical(scrollBehavior)
                 .nestedScroll(scrollBehavior.nestedScrollConnection),
             contentPadding = PaddingValues(
                 top = scrollPadding.calculateTopPadding(),

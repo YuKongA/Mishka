@@ -10,11 +10,12 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import top.yukonga.mishka.R
+import top.yukonga.mishka.ui.component.blur.LocalPageBackdrop
 import top.yukonga.mishka.viewmodel.RefreshProgress
 import top.yukonga.miuix.kmp.basic.CircularProgressIndicator
 import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.glass.GlassDialog
 import top.yukonga.miuix.kmp.theme.MiuixTheme
-import top.yukonga.miuix.kmp.window.WindowDialog
 
 /**
  * Provider 刷新进度对话框。不可手动关闭，调用方根据 refresh == null 控制 show。
@@ -27,10 +28,11 @@ fun ProviderRefreshDialog(
     show: Boolean,
     progress: RefreshProgress?,
 ) {
-    WindowDialog(
+    GlassDialog(
         show = show,
+        backdrop = LocalPageBackdrop.current,
         title = stringResource(R.string.provider_updating_title),
-        onDismissRequest = null,
+        onDismissRequest = {},
         content = {
             val text = when {
                 progress == null -> ""
