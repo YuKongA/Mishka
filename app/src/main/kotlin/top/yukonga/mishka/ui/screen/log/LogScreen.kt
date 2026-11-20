@@ -23,7 +23,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.computedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -84,7 +84,7 @@ fun LogScreen(
 
     // 仅当用户已滚到底部时自动跟随新日志，否则不抢夺滚动位置
     val autoScrollEnabled by remember {
-        derivedStateOf {
+        computedStateOf {
             val info = listState.layoutInfo
             val visible = info.visibleItemsInfo
             if (visible.isEmpty()) true

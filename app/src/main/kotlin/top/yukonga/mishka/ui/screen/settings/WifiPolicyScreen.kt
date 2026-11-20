@@ -12,6 +12,10 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.text.input.TextFieldState
+import androidx.compose.foundation.text.input.clearText
+import androidx.compose.foundation.text.input.rememberTextFieldState
+import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Wifi
 import androidx.compose.runtime.Composable
@@ -88,7 +92,7 @@ fun WifiPolicyScreen(
     var currentSsid by remember {
         mutableStateOf(controller?.currentSsid())
     }
-    var newSsid by remember { mutableStateOf("") }
+    val ssidState = rememberTextFieldState()
 
     val permissionRequired = stringResource(R.string.wifi_policy_permission_required)
     val ssidEmpty = stringResource(R.string.wifi_policy_ssid_empty)
@@ -165,13 +169,13 @@ fun WifiPolicyScreen(
     }
 
     fun addSsid() {
-        val value = normalizeInputSsid(newSsid)
+        val value = normalizeInputSsid(ssidState.text.toString())
         when {
             value.isEmpty() -> showToast(ssidEmpty)
             value in ssids -> showToast(ssidDuplicate)
             else -> {
                 persistSsids(ssids + value)
-                newSsid = ""
+                ssidState.clearText()
             }
         }
     }
@@ -182,7 +186,7 @@ fun WifiPolicyScreen(
             if (candidate == null) {
                 showToast(currentWifiEmpty)
             } else {
-                newSsid = candidate
+                ssidState.setTextAndPlaceCursorAtEnd(candidate)
                 refreshStatus()
             }
         }
@@ -199,8 +203,7 @@ fun WifiPolicyScreen(
     val ssidCardItems = listOf(
         CardItem("ssidInput") {
             SsidInputRow(
-                value = newSsid,
-                onValueChange = { newSsid = it },
+                state = ssidState,
                 onScan = { fillCurrentSsid() },
                 onAdd = { addSsid() },
             )
@@ -339,8 +342,7 @@ fun WifiPolicyScreen(
 
 @Composable
 private fun SsidInputRow(
-    value: String,
-    onValueChange: (String) -> Unit,
+    state: TextFieldState,
     onScan: () -> Unit,
     onAdd: () -> Unit,
 ) {
@@ -365,8 +367,7 @@ private fun SsidInputRow(
             )
         }
         TextField(
-            value = value,
-            onValueChange = onValueChange,
+            state = state,
             // 与两侧 40dp 圆形按钮等高，默认 16dp 垂直内边距会把高度撑到 ~53dp
             modifier = Modifier
                 .weight(1f)

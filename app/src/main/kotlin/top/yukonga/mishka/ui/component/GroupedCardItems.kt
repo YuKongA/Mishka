@@ -10,6 +10,9 @@ import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -44,6 +47,20 @@ fun CardSegment(
     insidePadding: PaddingValues = PaddingValues(0.dp),
     content: @Composable ColumnScope.() -> Unit,
 ) {
+    val overlapBottom = !isLast && bottomCornerRadius == 0.dp && color.alpha == 1f
+    val seamBleed = if (overlapBottom) {
+        Modifier.drawBehind {
+            // 向下延伸 2px，避免 0.5x 降采样 RenderNode 光栅化时段间 AA 漏出黑缝。
+            val bleedTop = (size.height - 2f).coerceAtLeast(0f)
+            drawRect(
+                color = color,
+                topLeft = Offset(0f, bleedTop),
+                size = Size(size.width, size.height - bleedTop + 2f),
+            )
+        }
+    } else {
+        Modifier
+    }
     val background = if (topCornerRadius == 0.dp && bottomCornerRadius == 0.dp) {
         Modifier.background(color)
     } else {
@@ -59,6 +76,7 @@ fun CardSegment(
                     top = outerTopPadding,
                     bottom = outerBottomPadding,
                 )
+                .then(seamBleed)
                 .then(background)
                 .padding(insidePadding),
             content = content,

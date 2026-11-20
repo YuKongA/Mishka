@@ -18,7 +18,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
-import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.computedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
@@ -60,6 +60,7 @@ import top.yukonga.mishka.platform.WifiPolicyController
 import top.yukonga.mishka.ui.component.LocalTopLayer
 import top.yukonga.mishka.ui.component.TopLayerHost
 import top.yukonga.mishka.ui.component.TopLayerState
+import top.yukonga.mishka.ui.component.blur.LocalTopAppBarCenterObstructionStart
 import top.yukonga.mishka.ui.component.blur.LocalTopAppBarTitleAlpha
 import top.yukonga.mishka.ui.component.blur.LocalTopBarStartInset
 import top.yukonga.mishka.ui.component.blur.PageBackdropBox
@@ -298,6 +299,13 @@ fun AppNavigation(
                         } else {
                             { 1f }
                         }),
+                        LocalTopAppBarCenterObstructionStart provides (if (
+                            railState != null && !railState.expanded && railState.collapsedWidth > 0.dp
+                        ) {
+                            railState.collapsedStart
+                        } else {
+                            Dp.Unspecified
+                        }),
                         LocalTopBarStartInset provides (if (railState != null) {
                             { (GlassNavigationRailDefaults.Margin + GlassNavigationRailDefaults.ExpandedWidth) * railState.progress }
                         } else {
@@ -313,19 +321,23 @@ fun AppNavigation(
                             ),
                         ) {
                             entry<Route.Main>(swipeDismiss = swipeDismiss) {
-                                MainPage(
-                                    homeViewModel,
-                                    proxyViewModel,
-                                    subscriptionViewModel,
-                                    navigator,
-                                    mainPagerState,
-                                    bootStartManager,
-                                    themeConfig,
-                                    storage,
-                                    onHideTaskCardChange,
-                                    hasRootPermission,
-                                    useNavigationRail,
-                                )
+                                CompositionLocalProvider(
+                                    LocalTopAppBarCenterObstructionStart provides Dp.Unspecified,
+                                ) {
+                                    MainPage(
+                                        homeViewModel,
+                                        proxyViewModel,
+                                        subscriptionViewModel,
+                                        navigator,
+                                        mainPagerState,
+                                        bootStartManager,
+                                        themeConfig,
+                                        storage,
+                                        onHideTaskCardChange,
+                                        hasRootPermission,
+                                        useNavigationRail,
+                                    )
+                                }
                             }
                             entry<Route.SubscriptionAdd>(swipeDismiss = swipeDismiss) {
                                 SubscriptionAddScreen(
@@ -870,7 +882,7 @@ private fun MainScreenBackHandler(
     navigator: Navigator,
 ) {
     val isPagerBackHandlerEnabled by remember {
-        derivedStateOf {
+        computedStateOf {
             navigator.current() is Route.Main &&
                     navigator.backStackSize() == 1 &&
                     mainState.selectedPage != 0

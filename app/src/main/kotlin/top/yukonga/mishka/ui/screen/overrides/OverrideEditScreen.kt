@@ -8,9 +8,12 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.text.input.rememberTextFieldState
+import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -66,10 +69,12 @@ fun OverrideEditScreen(
 
     ClearOverrideErrorOnExit(viewModel)
     var method by rememberSaveable { mutableStateOf(AddMethod.Remote) }
-    var name by rememberSaveable(overrideId) { mutableStateOf(profile?.name.orEmpty()) }
-    var url by rememberSaveable(overrideId) {
-        mutableStateOf(profile?.takeIf { it.isRemote }?.sourceLocation.orEmpty())
+    val nameState = key(overrideId) { rememberTextFieldState(initialText = profile?.name.orEmpty()) }
+    val urlState = key(overrideId) {
+        rememberTextFieldState(initialText = profile?.takeIf { it.isRemote }?.sourceLocation.orEmpty())
     }
+    val name = nameState.text.toString()
+    val url = urlState.text.toString()
     var format by rememberSaveable(overrideId) { mutableStateOf(profile?.format ?: OverrideFormat.Yaml) }
     var picked by remember { mutableStateOf<FilePickResult?>(null) }
     val isRemote = profile?.isRemote ?: (method == AddMethod.Remote)
@@ -128,8 +133,7 @@ fun OverrideEditScreen(
                 item(key = "name") {
                     SmallTitle(text = stringResource(R.string.override_name))
                     TextField(
-                        value = name,
-                        onValueChange = { name = it },
+                        state = nameState,
                         label = stringResource(R.string.override_name_placeholder),
                         useLabelAsPlaceholder = true,
                         modifier = Modifier
@@ -143,8 +147,7 @@ fun OverrideEditScreen(
                     item(key = "url") {
                         SmallTitle(text = stringResource(R.string.override_url))
                         TextField(
-                            value = url,
-                            onValueChange = { url = it },
+                            state = urlState,
                             label = stringResource(R.string.override_url_placeholder),
                             useLabelAsPlaceholder = true,
                             modifier = Modifier
@@ -169,7 +172,7 @@ fun OverrideEditScreen(
                                         onPickFile { result ->
                                             if (result != null) {
                                                 picked = result
-                                                if (name.isBlank()) name = result.fileName.substringBeforeLast('.')
+                                                if (nameState.text.isBlank()) nameState.setTextAndPlaceCursorAtEnd(result.fileName.substringBeforeLast('.'))
                                                 format = if (result.fileName.endsWith(".js", ignoreCase = true)) {
                                                     OverrideFormat.JavaScript
                                                 } else {

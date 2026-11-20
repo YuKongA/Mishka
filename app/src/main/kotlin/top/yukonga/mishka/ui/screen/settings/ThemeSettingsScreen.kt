@@ -1,6 +1,6 @@
 package top.yukonga.mishka.ui.screen.settings
 
-import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.CapturedAnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -19,7 +19,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.input.InputTransformation
 import androidx.compose.foundation.text.input.TextFieldState
-import androidx.compose.foundation.text.input.maxLength
+import androidx.compose.foundation.text.input.maxLengthReject
 import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
 import androidx.compose.runtime.Composable
@@ -198,7 +198,7 @@ fun ThemeSettingsScreen(
                                     updateTheme(themeConfig.copy(useMonet = checked))
                                 },
                             )
-                            AnimatedVisibility(
+                            CapturedAnimatedVisibility(
                                 visible = themeConfig.useMonet,
                                 enter = expandVertically(expandFrom = Alignment.Top) + fadeIn(),
                                 exit = shrinkVertically(shrinkTowards = Alignment.Top) + fadeOut(),
@@ -252,7 +252,7 @@ fun ThemeSettingsScreen(
                                 },
                                 enabled = isBlurSupported,
                             )
-                            AnimatedVisibility(
+                            CapturedAnimatedVisibility(
                                 visible = false,
                                 enter = expandVertically(expandFrom = Alignment.Top) + fadeIn(),
                                 exit = shrinkVertically(shrinkTowards = Alignment.Top) + fadeOut(),
@@ -420,7 +420,7 @@ private fun DensityScaleDialog(
         TextField(
             state = textState,
             modifier = Modifier.fillMaxWidth(),
-            inputTransformation = DigitsOnlyTransformation.maxLength(3),
+            inputTransformation = DigitsOnlyTransformation.maxLengthReject(3),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
             trailingIcon = {
                 Text(

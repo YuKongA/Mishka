@@ -1,4 +1,4 @@
-# Miuix 0.9.5-beta01 Glass 迁移指南
+# Miuix 0.9.5-beta01 ~ beta02 Glass 迁移指南
 
 面向 Compose + miuix 应用的通用迁移参考，涵盖组件替换、采样架构与关键踩坑约束。
 
@@ -43,6 +43,7 @@
 | --- | --- | --- |
 | `TopAppBar` / `SmallTopAppBar` | `GlassTopAppBar` | 父容器禁止 `clipToBounds()`（会切掉 `bandOverhang` 渐隐带与阴影）；配合 `overScrollVertical(onOffsetChanged = { scrollBehavior.state.overscrollOffset = it })` 置于 `.nestedScroll(...)` 前；`bottomContent` 含 `GlassSegmentedTabRow` 时列表顶部不加重复 `Spacer` |
 | `NavigationBar` | `GlassNavigationBar` | 图标切换为 `MiuixIcons.Glass.*`；未开模糊时 `backdrop = null` |
+| `IosLiquidGlassNavigationBar` | 补水平安全区 inset | 外层 `BoxWithConstraints` 增加 `WindowInsets.displayCutout.union(WindowInsets.navigationBars).only(WindowInsetsSides.Horizontal)` |
 | `NavigationRail` | `GlassNavigationRail` | 见第 4 节 |
 | `IconButton` / `MiuixIcons.Back` | `GlassIconButton` + `MiuixIcons.Glass.*` | 图标尺寸 `28.dp` |
 | `WindowListPopup` | `GlassIconDropdownMenu` / `GlassTransformPopup` | 锚点按钮加 `.glassPopupAnchor(anchor)`，内部 `Icon` **必须**加 `.glassPopupAnchorContent(anchor)`，否则变形动画时原图标不隐藏且错位 |
@@ -72,6 +73,7 @@
 - `NavDisplay` 保持 `Modifier.fillMaxSize()` 全屏铺满，通过 `CompositionLocal` 下发动态值：
   - `LocalTopBarStartInset`：`{ (GlassNavigationRailDefaults.Margin + GlassNavigationRailDefaults.ExpandedWidth) * railState.progress }`
   - `LocalTopAppBarTitleAlpha`：`{ railState.progress }`（折叠态胶囊居中于顶栏上方时淡出标题；刚过宽屏阈值时顶栏右侧按钮不宜过多，以免与胶囊重叠）
+  - `LocalTopAppBarCenterObstructionStart`：折叠态侧边栏（`!railState.expanded && collapsedWidth > 0.dp`）提供 `railState.collapsedStart` 给 `GlassTopAppBar` / `TopAppBar` 的 `centerObstructionStart`，主 Tab（`Route.Main`）内覆盖为 `Dp.Unspecified`
 - 顶栏通过 `contentModifier`、正文与全屏覆盖层（如 `GlassSearchOverlay`）各自应用起始缩进，实现「背景全屏、内容避让」。
 
 ---
@@ -84,3 +86,14 @@
    `railState.progress`、`scrollBehavior.state.contentOffset` 等每帧变化的值严禁在组合期用 `by` 解包或直接传给 `Modifier.padding(dp)`，必须以 lambda 透传至 `layout` / `graphicsLayer` / `draw` / `titleAlpha` 阶段读取。
 3. **避免起始缩进重复叠加**：
    顶栏内部已消费 `LocalTopBarStartInset` 时，外部传入的 `contentModifier`（如同时处理刘海安全区）需关闭侧栏缩进，防止双倍偏移。
+4. **滚动阈值防抖**：
+   判断 `isContentScrolled` 时使用 `scrollBehavior.state.contentOffset < -1f`（而非 `< 0f`），避免亚像素或回弹边缘抖动误触发。
+
+---
+
+## 6. Compose 1.13.0 与渲染细节（0.9.5-beta02 同步）
+
+- **状态与动画新 API**：`derivedStateOf` 迁移至 `computedStateOf`；`AnimatedVisibility` 迁移至 `CapturedAnimatedVisibility`。
+- **输入框状态化**：`TextField` / `BasicTextField` 统一使用 `TextFieldState`（`rememberTextFieldState`、`TextFieldLineLimits.SingleLine`、`onKeyboardAction`、`decorator`）；字符长度限制用 `maxLengthReject` / `maxLengthTrim` 替代已废弃的 `maxLength`。
+- **容器尺寸基准**：根部用 `BoxWithConstraints(Modifier.fillMaxSize())` 注入 `LocalContainerSize`，宽屏与视口计算优先读取它再回退 `LocalWindowInfo.current.containerSize`。
+- **分段卡片防漏缝**：自绘分段卡片（`CardSegment`）在 `!isLast && bottomCornerRadius == 0.dp && color.alpha == 1f` 时向下 `drawBehind` 延伸 2px，避免 0.5x 降采样 RenderNode 光栅化产生抗锯齿黑缝。

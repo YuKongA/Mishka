@@ -10,15 +10,16 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.input.InputTransformation
+import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -46,6 +47,10 @@ import top.yukonga.miuix.kmp.icon.extended.Info
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.scrollEndHaptic
 
+private val DigitsOnlyTransformation = InputTransformation {
+    if (asCharSequence().any { !it.isDigit() }) revertAllChanges()
+}
+
 /**
  * URL 导入配置页面
  */
@@ -60,13 +65,13 @@ fun SubscriptionAddUrlScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val scrollBehavior = MiuixScrollBehavior()
-    var inputName by remember { mutableStateOf(initialName) }
-    var inputUrl by remember { mutableStateOf(initialUrl) }
-    var userAgent by remember { mutableStateOf("") }
-    var ageSecretKey by remember { mutableStateOf("") }
-    var intervalMinutes by remember {
-        mutableStateOf(if (initialIntervalMinutes > 0) initialIntervalMinutes.toString() else "")
-    }
+    val nameState = rememberTextFieldState(initialText = initialName)
+    val urlState = rememberTextFieldState(initialText = initialUrl)
+    val userAgentState = rememberTextFieldState()
+    val ageSecretKeyState = rememberTextFieldState()
+    val intervalState = rememberTextFieldState(
+        initialText = if (initialIntervalMinutes > 0) initialIntervalMinutes.toString() else "",
+    )
 
     val backdrop = rememberBlurBackdrop()
     val blurActive = backdrop != null
@@ -125,8 +130,7 @@ fun SubscriptionAddUrlScreen(
                 }
                 item(key = "name_field") {
                     TextField(
-                        value = inputName,
-                        onValueChange = { inputName = it },
+                        state = nameState,
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 12.dp)
@@ -140,8 +144,7 @@ fun SubscriptionAddUrlScreen(
                 }
                 item(key = "url_field") {
                     TextField(
-                        value = inputUrl,
-                        onValueChange = { inputUrl = it },
+                        state = urlState,
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 12.dp)
@@ -155,8 +158,7 @@ fun SubscriptionAddUrlScreen(
                 }
                 item(key = "user_agent_field") {
                     TextField(
-                        value = userAgent,
-                        onValueChange = { userAgent = it },
+                        state = userAgentState,
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 12.dp)
@@ -170,8 +172,7 @@ fun SubscriptionAddUrlScreen(
                 }
                 item(key = "age_secret_key_field") {
                     TextField(
-                        value = ageSecretKey,
-                        onValueChange = { ageSecretKey = it },
+                        state = ageSecretKeyState,
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 12.dp)
@@ -183,8 +184,9 @@ fun SubscriptionAddUrlScreen(
                 item(key = "interval_field") {
                     SmallTitle(text = stringResource(R.string.subscription_auto_update))
                     TextField(
-                        value = intervalMinutes,
-                        onValueChange = { intervalMinutes = it.filter { c -> c.isDigit() } },
+                        state = intervalState,
+                        inputTransformation = DigitsOnlyTransformation,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         label = stringResource(R.string.subscription_auto_update_placeholder),
                         useLabelAsPlaceholder = true,
                         modifier = Modifier
@@ -197,17 +199,17 @@ fun SubscriptionAddUrlScreen(
                     TextButton(
                         text = stringResource(R.string.common_save),
                         onClick = {
-                            val intervalMs = (intervalMinutes.toLongOrNull() ?: 0) * 60000
+                            val intervalMs = (intervalState.text.toString().toLongOrNull() ?: 0) * 60000
                             viewModel.addSubscription(
-                                name = inputName.trim(),
-                                url = inputUrl,
+                                name = nameState.text.toString().trim(),
+                                url = urlState.text.toString(),
                                 interval = intervalMs,
-                                userAgent = userAgent.trim(),
-                                ageSecretKey = ageSecretKey.trim(),
+                                userAgent = userAgentState.text.toString().trim(),
+                                ageSecretKey = ageSecretKeyState.text.toString().trim(),
                                 onComplete = onSaved,
                             )
                         },
-                        enabled = inputUrl.isNotBlank() && !uiState.isLoading,
+                        enabled = urlState.text.isNotBlank() && !uiState.isLoading,
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 12.dp)

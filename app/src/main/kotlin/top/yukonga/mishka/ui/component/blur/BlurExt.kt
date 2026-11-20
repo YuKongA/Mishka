@@ -27,6 +27,7 @@ val LocalTopBarBlurStyle = staticCompositionLocalOf { TopBarBlurStyle.Gaussian }
 val LocalTopAppBarBackdrop = staticCompositionLocalOf<LayerBackdrop?> { null }
 val LocalPageBackdrop = staticCompositionLocalOf<LayerBackdrop?> { null }
 val LocalTopAppBarTitleAlpha = staticCompositionLocalOf<() -> Float> { { 1f } }
+val LocalTopAppBarCenterObstructionStart = staticCompositionLocalOf { Dp.Unspecified }
 val LocalTopBarStartInset = staticCompositionLocalOf<() -> Dp> { { 0.dp } }
 
 @Composable

@@ -18,6 +18,7 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.offset
 import top.yukonga.mishka.ui.component.blur.LocalTopBarStartInset
+import top.yukonga.mishka.ui.theme.LocalContainerSize
 import top.yukonga.mishka.ui.theme.LocalPlatformDensity
 import top.yukonga.miuix.kmp.anim.folmeSpring
 
@@ -27,7 +28,7 @@ private val WideScreenMinWidth = 600.dp
 /** 当前窗口是否达到宽屏尺寸。宽屏切换到 NavigationRail + 固定小标题栏 + 内容居中。 */
 @Composable
 fun rememberIsWideScreen(): Boolean {
-    val containerSize = LocalWindowInfo.current.containerSize
+    val containerSize = LocalContainerSize.current ?: LocalWindowInfo.current.containerSize
     val density = LocalPlatformDensity.current ?: LocalDensity.current
     return with(density) { containerSize.width.toDp() >= WideScreenMinWidth }
 }

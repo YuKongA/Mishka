@@ -26,8 +26,10 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.input.TextFieldLineLimits
+import androidx.compose.foundation.text.input.clearText
+import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
@@ -119,7 +121,8 @@ internal fun GlassSearchOverlay(
         transitionSpec = { tween(150, delayMillis = if (targetState) 100 else 0, easing = LinearEasing) },
         label = "glassSearchCancelMaterial",
     ) { if (it) 1f else 0f }
-    var query by remember { mutableStateOf("") }
+    val queryState = rememberTextFieldState()
+    val query = queryState.text.toString()
     val focusRequester = remember { FocusRequester() }
     val focusManager = LocalFocusManager.current
     val keyboard = LocalSoftwareKeyboardController.current
@@ -127,7 +130,7 @@ internal fun GlassSearchOverlay(
     val topInsets = WindowInsets.statusBars.only(WindowInsetsSides.Top)
     val active = expanded || transition.currentState || transition.isRunning
     LaunchedEffect(expanded) {
-        query = ""
+        queryState.clearText()
         if (expanded) {
             focusRequester.requestFocus()
             keyboard?.show()
@@ -176,14 +179,13 @@ internal fun GlassSearchOverlay(
                     .graphicsLayer { translationY = -topInsets.getTop(this) * (1f - progress.value) },
             ) {
                 BasicTextField(
-                    value = query,
-                    onValueChange = { query = it },
+                    state = queryState,
                     enabled = expanded,
-                    singleLine = true,
+                    lineLimits = TextFieldLineLimits.SingleLine,
                     textStyle = MiuixTheme.textStyles.body1.copy(color = colors.onSurface),
                     cursorBrush = SolidColor(colors.primary),
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                    keyboardActions = KeyboardActions(onDone = { keyboard?.hide() }),
+                    onKeyboardAction = { keyboard?.hide() },
                     modifier = Modifier
                         .fillMaxWidth()
                         .layout { measurable, constraints ->
@@ -196,7 +198,7 @@ internal fun GlassSearchOverlay(
                         }
                         .height(44.dp)
                         .focusRequester(focusRequester),
-                    decorationBox = { field ->
+                    decorator = { field ->
                         Row(
                             modifier = Modifier
                                 .fillMaxSize()
@@ -217,7 +219,7 @@ internal fun GlassSearchOverlay(
                             }
                             if (query.isNotEmpty()) {
                                 IconButton(onClick = {
-                                    query = ""
+                                    queryState.clearText()
                                     focusRequester.requestFocus()
                                 }, modifier = Modifier.size(24.dp)) {
                                     Icon(

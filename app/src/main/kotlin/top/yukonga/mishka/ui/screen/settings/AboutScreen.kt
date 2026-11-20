@@ -25,7 +25,7 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.computedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -90,7 +90,7 @@ fun AboutScreen(
     // 滚动进度是帧率级 State：保持 State 形式，读点限制在 topBar 与各 graphicsLayer，
     // 组合期以值读取会让整个 AboutContent 每帧重组
     val scrollProgressState = remember {
-        derivedStateOf {
+        computedStateOf {
             when {
                 lazyListState.firstVisibleItemIndex > 0 -> 1f
 
@@ -106,9 +106,9 @@ fun AboutScreen(
         }
     }
     // 布尔/夹紧后再 derive，等值去重让顶栏只在阈值区间内重组
-    val heroCollapsed by remember { derivedStateOf { scrollProgressState.value == 1f } }
+    val heroCollapsed by remember { computedStateOf { scrollProgressState.value == 1f } }
     val titleAlpha by remember {
-        derivedStateOf { ((scrollProgressState.value - 0.35f) / 0.65f).coerceIn(0f, 1f) }
+        computedStateOf { ((scrollProgressState.value - 0.35f) / 0.65f).coerceIn(0f, 1f) }
     }
 
     val backdrop = rememberBlurBackdrop()

@@ -5,7 +5,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.computedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
@@ -23,6 +23,7 @@ import top.yukonga.mishka.R
 import top.yukonga.mishka.ui.component.blur.LocalBlurEnabled
 import top.yukonga.mishka.ui.component.blur.LocalTopAppBarBackdrop
 import top.yukonga.mishka.ui.component.blur.LocalTopAppBarTitleAlpha
+import top.yukonga.mishka.ui.component.blur.LocalTopAppBarCenterObstructionStart
 import top.yukonga.mishka.ui.component.blur.LocalTopBarStartInset
 import top.yukonga.mishka.ui.util.rememberIsWideScreen
 import top.yukonga.miuix.kmp.basic.CircularProgressIndicator
@@ -72,12 +73,13 @@ fun AdaptiveTopAppBar(
 ) {
     val backdrop = LocalTopAppBarBackdrop.current
     val barTitleAlpha = LocalTopAppBarTitleAlpha.current
+    val centerObstructionStart = LocalTopAppBarCenterObstructionStart.current
     val startInset = LocalTopBarStartInset.current
     val surfaceColor = MiuixTheme.colorScheme.surface
     val bandBrush = remember(surfaceColor) { GlassTopAppBarDefaults.bandBrush(surfaceColor) }
     val resolvedContentScrolled by remember(scrollBehavior, isContentScrolled) {
-        derivedStateOf {
-            isContentScrolled ?: (scrollBehavior?.state?.let { it.contentOffset < 0f } ?: false)
+        computedStateOf {
+            isContentScrolled ?: (scrollBehavior?.state?.let { it.contentOffset < -1f } ?: false)
         }
     }
     GlassTopAppBar(
@@ -93,6 +95,7 @@ fun AdaptiveTopAppBar(
         bandOverhang = GlassTopAppBarDefaults.BandOverhang,
         defaultWindowInsetsPadding = defaultWindowInsetsPadding,
         titleAlpha = { titleAlpha() * barTitleAlpha() },
+        centerObstructionStart = centerObstructionStart,
         navigationIcon = navigationIcon,
         actions = { Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { actions() } },
         bottomContent = bottomContent,

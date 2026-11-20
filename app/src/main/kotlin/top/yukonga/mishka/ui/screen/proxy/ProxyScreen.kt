@@ -1,6 +1,6 @@
 package top.yukonga.mishka.ui.screen.proxy
 
-import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.CapturedAnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.animateFloatAsState
@@ -86,6 +86,7 @@ import top.yukonga.mishka.ui.component.blur.LocalPageBackdrop
 import top.yukonga.mishka.ui.component.blur.rememberBlurBackdrop
 import top.yukonga.mishka.ui.component.overScrollVertical
 import top.yukonga.mishka.ui.platform.IconLoader
+import top.yukonga.mishka.ui.theme.LocalContainerSize
 import top.yukonga.mishka.ui.theme.LocalPlatformDensity
 import top.yukonga.mishka.ui.theme.StatusColors
 import top.yukonga.mishka.ui.util.horizontalCutoutPadding
@@ -153,7 +154,7 @@ fun ProxyScreen(
     )
     val scrollBehavior = MiuixScrollBehavior()
     val groups = uiState.groups
-    val containerSize = LocalWindowInfo.current.containerSize
+    val containerSize = LocalContainerSize.current ?: LocalWindowInfo.current.containerSize
     val density = LocalPlatformDensity.current ?: LocalDensity.current
     val maxAnimRows = remember(containerSize.height, density) {
         val windowHeightDp = with(density) { containerSize.height.toDp() }
@@ -606,7 +607,7 @@ private fun ProxyGroupHeader(
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        AnimatedVisibility(
+        CapturedAnimatedVisibility(
             visible = showIcon,
             enter = slideInHorizontally(tween(300)) { -it } +
                     expandHorizontally(tween(300), expandFrom = Alignment.Start),

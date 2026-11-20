@@ -1,6 +1,6 @@
 package top.yukonga.mishka.ui.screen.provider
 
-import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.CapturedAnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -299,7 +299,7 @@ private fun ProviderItem(
         // 避免闪现空原因文案并触发 liveRegion 播报
         var lastError by remember { mutableStateOf(error) }
         if (error != null) lastError = error
-        AnimatedVisibility(
+        CapturedAnimatedVisibility(
             visible = error != null,
             enter = expandVertically() + fadeIn(),
             exit = shrinkVertically() + fadeOut(),
