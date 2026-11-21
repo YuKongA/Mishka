@@ -31,9 +31,9 @@ import top.yukonga.mishka.platform.showToast
 import top.yukonga.mishka.ui.component.blur.LocalPageBackdrop
 import top.yukonga.miuix.kmp.basic.BasicComponent
 import top.yukonga.miuix.kmp.basic.Checkbox
-import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.glass.GlassDialog
 import top.yukonga.miuix.kmp.glass.GlassDialogButtonRole
+import top.yukonga.miuix.kmp.glass.GlassTextField
 
 /**
  * 热点接口名编辑对话框。多行 TextField（每行一个接口名）+ [检测当前接口] 辅助按钮。
@@ -72,7 +72,7 @@ fun TetherInterfaceEditDialog(
         summary = stringResource(R.string.root_tether_ifaces_hint),
         onDismissRequest = onDismiss,
     ) {
-        TextField(
+        GlassTextField(
             state = textState,
             modifier = Modifier.fillMaxWidth(),
         )

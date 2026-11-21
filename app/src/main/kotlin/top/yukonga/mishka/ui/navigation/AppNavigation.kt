@@ -122,8 +122,10 @@ import top.yukonga.miuix.kmp.glass.GlassNavigationRail
 import top.yukonga.miuix.kmp.glass.GlassNavigationRailDefaults
 import top.yukonga.miuix.kmp.glass.rememberGlassNavigationRailState
 import top.yukonga.miuix.kmp.icon.MiuixIcons
-import top.yukonga.miuix.kmp.icon.glass.HomeOutline
-import top.yukonga.miuix.kmp.icon.glass.SettingsOutline
+import top.yukonga.miuix.kmp.icon.glass.Cloud
+import top.yukonga.miuix.kmp.icon.glass.ControlCenter
+import top.yukonga.miuix.kmp.icon.glass.HomeFill
+import top.yukonga.miuix.kmp.icon.glass.SettingsFill
 import top.yukonga.miuix.kmp.nav.core.NavDisplay
 import top.yukonga.miuix.kmp.nav.core.NavDisplayEffects
 import top.yukonga.miuix.kmp.nav.core.NavKey
@@ -141,8 +143,6 @@ import top.yukonga.miuix.kmp.utils.PagerNavigationSpringSpec
 import top.yukonga.miuix.kmp.utils.pagerGestureOverride
 import top.yukonga.miuix.kmp.utils.springAnimateToPage
 import kotlin.time.Duration.Companion.milliseconds
-import top.yukonga.miuix.kmp.icon.glass.Tune as GlassTune
-import top.yukonga.miuix.kmp.icon.glass.UploadCloud as GlassUploadCloud
 
 // Route 是 @Serializable sealed 层级，直接多态编码整个栈；新增路由自动获得持久化能力，无需手工注册
 private val NavBackStackSaver = Saver<SnapshotStateList<NavKey>, List<String>>(
@@ -171,6 +171,9 @@ private val NavBackStackSaver = Saver<SnapshotStateList<NavKey>, List<String>>(
 val LocalMainPagerState = staticCompositionLocalOf<MainPagerState> {
     error("LocalMainPagerState not provided")
 }
+
+private val DefaultTopAppBarTitleAlpha: () -> Float = { 1f }
+private val DefaultTopBarStartInset: () -> Dp = { 0.dp }
 
 @Composable
 fun AppNavigation(
@@ -293,12 +296,22 @@ fun AppNavigation(
                         .fillMaxSize()
                         .then(if (sidebarBackdrop != null) Modifier.layerBackdrop(sidebarBackdrop) else Modifier),
                 ) {
-                    CompositionLocalProvider(
-                        LocalTopAppBarTitleAlpha provides (if (railState != null) {
+                    val topAppBarTitleAlpha = remember(railState) {
+                        if (railState != null) {
                             { railState.progress }
                         } else {
-                            { 1f }
-                        }),
+                            DefaultTopAppBarTitleAlpha
+                        }
+                    }
+                    val topBarStartInset = remember(railState) {
+                        if (railState != null) {
+                            { (GlassNavigationRailDefaults.Margin + GlassNavigationRailDefaults.ExpandedWidth) * railState.progress }
+                        } else {
+                            DefaultTopBarStartInset
+                        }
+                    }
+                    CompositionLocalProvider(
+                        LocalTopAppBarTitleAlpha provides topAppBarTitleAlpha,
                         LocalTopAppBarCenterObstructionStart provides (if (
                             railState != null && !railState.expanded && railState.collapsedWidth > 0.dp
                         ) {
@@ -306,11 +319,7 @@ fun AppNavigation(
                         } else {
                             Dp.Unspecified
                         }),
-                        LocalTopBarStartInset provides (if (railState != null) {
-                            { (GlassNavigationRailDefaults.Margin + GlassNavigationRailDefaults.ExpandedWidth) * railState.progress }
-                        } else {
-                            { 0.dp }
-                        }),
+                        LocalTopBarStartInset provides topBarStartInset,
                     ) {
                         NavDisplay(
                             backStack = backStack,
@@ -591,15 +600,15 @@ fun AppNavigation(
                     val settingsLabel = stringResource(R.string.nav_settings)
                     val glassItems = remember(homeLabel, proxyLabel, subscriptionLabel, settingsLabel) {
                         listOf(
-                            GlassNavigationItem(icon = MiuixIcons.Glass.HomeOutline, label = homeLabel, contentDescription = homeLabel),
-                            GlassNavigationItem(icon = MiuixIcons.Glass.GlassTune, label = proxyLabel, contentDescription = proxyLabel),
+                            GlassNavigationItem(icon = MiuixIcons.Glass.HomeFill, label = homeLabel, contentDescription = homeLabel),
+                            GlassNavigationItem(icon = MiuixIcons.Glass.ControlCenter, label = proxyLabel, contentDescription = proxyLabel),
                             GlassNavigationItem(
-                                icon = MiuixIcons.Glass.GlassUploadCloud,
+                                icon = MiuixIcons.Glass.Cloud,
                                 label = subscriptionLabel,
                                 contentDescription = subscriptionLabel,
                             ),
                             GlassNavigationItem(
-                                icon = MiuixIcons.Glass.SettingsOutline,
+                                icon = MiuixIcons.Glass.SettingsFill,
                                 label = settingsLabel,
                                 contentDescription = settingsLabel
                             ),
@@ -677,9 +686,7 @@ private fun MainPage(
                     bottomPadding = bottomPadding,
                     uiState = homeUiState,
                     viewModel = homeViewModel,
-                    onRestart = { homeViewModel?.restartProxy() },
                     onStop = { homeViewModel?.stopProxy() },
-                    onReload = { homeViewModel?.reloadConfig() },
                     onTestLatency = { homeViewModel?.testLatency() },
                     onNavigateLog = { navigator.push(Route.Log) },
                     onNavigateProvider = { navigator.push(Route.Provider) },
@@ -740,31 +747,31 @@ private fun MainPage(
             val bottomBarBlurActive = bottomBarBackdrop != null
             val navigationItems = remember(homeLabel, proxyLabel, subscriptionLabel, settingsLabel) {
                 listOf(
-                    NavigationItem(label = homeLabel, icon = MiuixIcons.Glass.HomeOutline),
-                    NavigationItem(label = proxyLabel, icon = MiuixIcons.Glass.GlassTune),
-                    NavigationItem(label = subscriptionLabel, icon = MiuixIcons.Glass.GlassUploadCloud),
-                    NavigationItem(label = settingsLabel, icon = MiuixIcons.Glass.SettingsOutline),
+                    NavigationItem(label = homeLabel, icon = MiuixIcons.Glass.HomeFill),
+                    NavigationItem(label = proxyLabel, icon = MiuixIcons.Glass.ControlCenter),
+                    NavigationItem(label = subscriptionLabel, icon = MiuixIcons.Glass.Cloud),
+                    NavigationItem(label = settingsLabel, icon = MiuixIcons.Glass.SettingsFill),
                 )
             }
             val glassNavigationItems = remember(homeLabel, proxyLabel, subscriptionLabel, settingsLabel) {
                 listOf(
                     GlassNavigationItem(
-                        icon = MiuixIcons.Glass.HomeOutline,
+                        icon = MiuixIcons.Glass.HomeFill,
                         label = homeLabel,
                         contentDescription = homeLabel,
                     ),
                     GlassNavigationItem(
-                        icon = MiuixIcons.Glass.GlassTune,
+                        icon = MiuixIcons.Glass.ControlCenter,
                         label = proxyLabel,
                         contentDescription = proxyLabel,
                     ),
                     GlassNavigationItem(
-                        icon = MiuixIcons.Glass.GlassUploadCloud,
+                        icon = MiuixIcons.Glass.Cloud,
                         label = subscriptionLabel,
                         contentDescription = subscriptionLabel,
                     ),
                     GlassNavigationItem(
-                        icon = MiuixIcons.Glass.SettingsOutline,
+                        icon = MiuixIcons.Glass.SettingsFill,
                         label = settingsLabel,
                         contentDescription = settingsLabel,
                     ),

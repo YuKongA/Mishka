@@ -5,17 +5,21 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.input.InputTransformation
 import androidx.compose.foundation.text.input.TextFieldState
@@ -31,9 +35,20 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import top.yukonga.mishka.R
 import top.yukonga.mishka.platform.PlatformStorage
@@ -49,34 +64,37 @@ import top.yukonga.mishka.ui.component.blur.rememberBlurBackdrop
 import top.yukonga.mishka.ui.component.groupedCardItems
 import top.yukonga.mishka.ui.component.overScrollVertical
 import top.yukonga.mishka.ui.theme.FloatingBottomBarStyle
+import top.yukonga.mishka.ui.theme.LocalAppDarkMode
 import top.yukonga.mishka.ui.theme.MaxDensityScale
 import top.yukonga.mishka.ui.theme.MinDensityScale
 import top.yukonga.mishka.ui.theme.ThemeAccentColor
-import top.yukonga.mishka.ui.theme.ThemeColorModes
 import top.yukonga.mishka.ui.theme.ThemeConfig
 import top.yukonga.mishka.ui.theme.ThemePaletteStyles
 import top.yukonga.mishka.ui.theme.TopBarBlurStyle
 import top.yukonga.mishka.ui.theme.label
 import top.yukonga.mishka.ui.theme.normalizeDensityScale
 import top.yukonga.mishka.ui.theme.summary
-import top.yukonga.mishka.ui.theme.themeColorModeLabel
 import top.yukonga.mishka.ui.theme.writeThemeConfig
 import top.yukonga.mishka.ui.util.horizontalCutoutPadding
 import top.yukonga.mishka.ui.util.rememberIsWideScreen
+import top.yukonga.miuix.kmp.basic.Card
+import top.yukonga.miuix.kmp.basic.CardDefaults
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.Slider
 import top.yukonga.miuix.kmp.basic.SliderDefaults
 import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.Text
-import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.glass.GlassDialog
 import top.yukonga.miuix.kmp.glass.GlassDialogButtonRole
 import top.yukonga.miuix.kmp.glass.GlassDropdownPreference
+import top.yukonga.miuix.kmp.glass.GlassTextField
 import top.yukonga.miuix.kmp.material.isRuntimeShaderSupported
 import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.preference.SwitchPreference
+import top.yukonga.miuix.kmp.squircle.squircleBorder
+import top.yukonga.miuix.kmp.squircle.squircleClip
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.PagerInterceptionMode
 import top.yukonga.miuix.kmp.utils.scrollEndHaptic
@@ -124,7 +142,8 @@ fun ThemeSettingsScreen(
         showDensityScaleDialog = true
     }
 
-    val themeItems = ThemeColorModes.map { mode -> themeColorModeLabel(mode) }
+    val isSystem = themeConfig.colorMode == 0
+    val isDark = LocalAppDarkMode.current
     val paletteStyles = ThemePaletteStyles
     val paletteItems = paletteStyles.map { style -> style.label() }
     val selectedPaletteIndex = paletteStyles.indexOf(themeConfig.paletteStyle).coerceAtLeast(0)
@@ -173,22 +192,55 @@ fun ThemeSettingsScreen(
                     top = innerPadding.calculateTopPadding(),
                 ),
             ) {
+                item(key = "themePreview") {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 12.dp)
+                            .selectableGroup(),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        ThemeModePreview(
+                            title = stringResource(R.string.settings_theme_light),
+                            dark = false,
+                            wide = isWideScreen,
+                            isSelected = !isDark,
+                            onClick = { updateTheme(themeConfig.copy(colorMode = 1)) },
+                            modifier = Modifier.weight(1f),
+                        )
+                        ThemeModePreview(
+                            title = stringResource(R.string.settings_theme_dark),
+                            dark = true,
+                            wide = isWideScreen,
+                            isSelected = isDark,
+                            onClick = { updateTheme(themeConfig.copy(colorMode = 2)) },
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                }
+
+                item(key = "followSystem") {
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp)
+                            .padding(bottom = 12.dp),
+                    ) {
+                        SwitchPreference(
+                            title = stringResource(R.string.settings_theme_system),
+                            checked = isSystem,
+                            onCheckedChange = { followSystem ->
+                                val newMode = if (followSystem) 0 else if (isDark) 2 else 1
+                                updateTheme(themeConfig.copy(colorMode = newMode))
+                            },
+                        )
+                    }
+                }
+
                 item { SmallTitle(text = stringResource(R.string.settings_theme_group_color)) }
                 groupedCardItems(
                     keyPrefix = "theme_color",
                     items = listOf(
-                        CardItem("mode") {
-                            GlassDropdownPreference(
-                                title = stringResource(R.string.settings_theme_mode),
-                                backdrop = LocalPageBackdrop.current,
-                                summary = themeItems.getOrElse(themeConfig.colorMode) { themeItems.first() },
-                                items = themeItems,
-                                selectedIndex = themeConfig.colorMode,
-                                onSelectedIndexChange = { index ->
-                                    updateTheme(themeConfig.copy(colorMode = index))
-                                },
-                            )
-                        },
                         CardItem("monet") {
                             SwitchPreference(
                                 title = stringResource(R.string.settings_theme_monet),
@@ -417,7 +469,7 @@ private fun DensityScaleDialog(
         summary = stringResource(R.string.settings_theme_density_scale_summary),
         onDismissRequest = onDismiss,
     ) {
-        TextField(
+        GlassTextField(
             state = textState,
             modifier = Modifier.fillMaxWidth(),
             inputTransformation = DigitsOnlyTransformation.maxLengthReject(3),
@@ -450,6 +502,91 @@ private fun DensityScaleDialog(
                     onConfirm(percent)
                 },
             )
+        }
+    }
+}
+
+@Composable
+private fun ThemeModePreview(
+    title: String,
+    dark: Boolean,
+    wide: Boolean,
+    isSelected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Card(
+        modifier = modifier.semantics(mergeDescendants = true) {
+            role = Role.RadioButton
+            selected = isSelected
+        },
+        cornerRadius = 26.dp,
+        insideMargin = PaddingValues(vertical = 6.dp),
+        colors = CardDefaults.defaultColors(color = Color.Transparent),
+        onClick = onClick,
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .squircleBorder(
+                    width = 3.dp,
+                    color = if (isSelected) MiuixTheme.colorScheme.primary else Color.Transparent,
+                    cornerRadius = 26.dp,
+                )
+                .padding(6.dp),
+        ) {
+            ThemeModeIllustration(dark = dark, wide = wide)
+        }
+        Text(
+            text = title,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 8.dp),
+            color = if (isSelected) MiuixTheme.colorScheme.primary else MiuixTheme.colorScheme.onSurfaceSecondary,
+            style = MiuixTheme.textStyles.body2,
+            fontWeight = FontWeight.Medium,
+            textAlign = TextAlign.Center,
+        )
+    }
+}
+
+@Composable
+private fun ThemeModeIllustration(
+    dark: Boolean,
+    wide: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    Canvas(
+        modifier = modifier
+            .fillMaxWidth()
+            .aspectRatio(if (wide) 2f else 1f)
+            .squircleClip(20.dp),
+    ) {
+        drawRect(
+            brush = Brush.verticalGradient(listOf(Color(0xFF406EFF), Color(0xFF55B9FA))),
+        )
+        val illustrationWidth = size.width * if (wide) 0.7f else 1f
+        val start = (size.width - illustrationWidth) / 2f
+        val unitX = illustrationWidth / 680f
+        val unitY = size.height / 680f
+        val cornerUnit = minOf(unitX, unitY)
+        val panelColor = if (dark) Color.Black.copy(alpha = 0.2f) else Color.White.copy(alpha = 0.2f)
+        val lineColor = if (dark) Color.White.copy(alpha = 0.35f) else Color(0xFF285ABC).copy(alpha = 0.6f)
+        for (top in listOf(148f, 356f)) {
+            drawRoundRect(
+                color = panelColor,
+                topLeft = Offset(start + 48f * unitX, top * unitY),
+                size = Size(584f * unitX, 176f * unitY),
+                cornerRadius = CornerRadius(44f * cornerUnit),
+            )
+            for ((offset, width) in listOf(52f to 460f, 100f to 312f)) {
+                drawRoundRect(
+                    color = lineColor,
+                    topLeft = Offset(start + 112f * unitX, (top + offset) * unitY),
+                    size = Size(width * unitX, 24f * unitY),
+                    cornerRadius = CornerRadius(12f * cornerUnit),
+                )
+            }
         }
     }
 }

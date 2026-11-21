@@ -66,8 +66,8 @@ import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.InputField
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.icon.MiuixIcons
-import top.yukonga.miuix.kmp.icon.basic.Search
-import top.yukonga.miuix.kmp.icon.basic.SearchCleanup
+import top.yukonga.miuix.kmp.icon.glass.Clear
+import top.yukonga.miuix.kmp.icon.glass.Search
 import top.yukonga.miuix.kmp.theme.MiuixTheme.colorScheme
 
 /**
@@ -249,7 +249,7 @@ fun SearchBar(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Icon(
-                    imageVector = MiuixIcons.Basic.Search,
+                    imageVector = MiuixIcons.Glass.Search,
                     contentDescription = null,
                     modifier = Modifier
                         .size(44.dp)
@@ -265,7 +265,7 @@ fun SearchBar(
                     exit = fadeOut() + scaleOut(),
                 ) {
                     Icon(
-                        imageVector = MiuixIcons.Basic.SearchCleanup,
+                        imageVector = MiuixIcons.Glass.Clear,
                         tint = colorScheme.onSurface,
                         contentDescription = null,
                         modifier = Modifier
@@ -305,7 +305,7 @@ fun SearchBarFake(
         label = label,
         leadingIcon = {
             Icon(
-                imageVector = MiuixIcons.Basic.Search,
+                imageVector = MiuixIcons.Glass.Search,
                 contentDescription = null,
                 modifier = Modifier
                     .size(44.dp)

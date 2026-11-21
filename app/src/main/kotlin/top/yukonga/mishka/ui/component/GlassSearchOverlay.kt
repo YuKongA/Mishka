@@ -34,9 +34,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithCache
@@ -296,28 +295,32 @@ internal fun Modifier.glassSearchBarTransition(expanded: Boolean, barAlpha: () -
         transitionSpec = { tween(if (targetState) 150 else 120, easing = LinearEasing) },
         label = "glassSearchTopBarBlur",
     ) { if (it) SEARCH_TOP_BAR_BLUR_RADIUS else 0f }
-    return drawWithCache {
-        val layer = obtainGraphicsLayer()
-        val halo = ceil(layerOutset).toInt()
-        val layerSize = IntSize(size.width.toInt() + halo * 2, size.height.toInt() + halo * 2)
-        onDrawWithContent {
-            val opacity = barAlpha().coerceIn(0f, 1f)
-            val currentScale = scale.value
-            val currentBlur = blur.value
-            if (opacity > 0f) {
-                if (opacity == 1f && currentScale == 1f && currentBlur == 0f) {
-                    drawContent()
-                } else {
-                    layer.record(density = this@drawWithCache, size = layerSize) {
-                        translate(halo.toFloat(), halo.toFloat()) { this@record.drawContent() }
+    val currentBarAlpha by rememberUpdatedState(barAlpha)
+    val transitionModifier = remember(layerOutset, scale, blur) {
+        Modifier.drawWithCache {
+            val layer = obtainGraphicsLayer()
+            val halo = ceil(layerOutset).toInt()
+            val layerSize = IntSize(size.width.toInt() + halo * 2, size.height.toInt() + halo * 2)
+            onDrawWithContent {
+                val opacity = currentBarAlpha().coerceIn(0f, 1f)
+                val currentScale = scale.value
+                val currentBlur = blur.value
+                if (opacity > 0f) {
+                    if (opacity == 1f && currentScale == 1f && currentBlur == 0f) {
+                        drawContent()
+                    } else {
+                        layer.record(density = this@drawWithCache, size = layerSize) {
+                            translate(halo.toFloat(), halo.toFloat()) { this@record.drawContent() }
+                        }
+                        layer.alpha = opacity
+                        layer.scaleX = currentScale
+                        layer.scaleY = currentScale
+                        layer.renderEffect = if (currentBlur > 0.5f) BlurEffect(currentBlur, currentBlur, TileMode.Decal) else null
+                        translate(-halo.toFloat(), -halo.toFloat()) { drawLayer(layer) }
                     }
-                    layer.alpha = opacity
-                    layer.scaleX = currentScale
-                    layer.scaleY = currentScale
-                    layer.renderEffect = if (currentBlur > 0.5f) BlurEffect(currentBlur, currentBlur, TileMode.Decal) else null
-                    translate(-halo.toFloat(), -halo.toFloat()) { drawLayer(layer) }
                 }
             }
         }
     }
+    return this.then(transitionModifier)
 }

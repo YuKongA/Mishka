@@ -55,7 +55,6 @@
     <string name="external_proxy_not_running">代理未运行</string>
 
     <!-- Service Errors -->
-    <string name="error_vpn_failed">VPN 建立失败: %1$s</string>
     <string name="error_vpn_denied">VPN 权限被拒绝</string>
     <string name="error_vpn_no_selected_apps">请至少选择一个已安装且不是 Mishka 的应用，再启动 VPN</string>
     <string name="error_vpn_not_ready">VPN 启动未完成，或控制 API 不可用</string>
@@ -69,7 +68,6 @@
     <string name="error_mihomo_start_failed">mihomo 启动失败:\n%1$s</string>
     <string name="error_generic_start_failed">启动失败: %1$s</string>
     <string name="error_foreground_failed">前台服务启动失败: %1$s</string>
-    <string name="error_fd_setup_failed">TUN 文件描述符准备失败: %1$s</string>
     <string name="error_tun_init_failed">TUN 初始化失败: %1$s</string>
     <string name="error_tproxy_unsupported">ROOT TPROXY 模式需要内核 xt_TPROXY / xt_socket 模块，当前设备不支持</string>
     <string name="error_no_active_profile">没有可用的订阅，请先导入订阅再启动代理</string>
@@ -123,9 +121,7 @@
     <string name="home_uptime_days_hours">%1$d 天 %2$d 时</string>
 
     <!-- Home - Action Buttons -->
-    <string name="home_restart">重启</string>
     <string name="home_stop">停止</string>
-    <string name="home_reload">热重载</string>
     <string name="home_start">启动</string>
     <string name="home_starting_btn">启动中...</string>
     <string name="home_stopping_btn">停止中...</string>
@@ -321,31 +317,30 @@
     <string name="settings_subscription_via_proxy">通过代理更新</string>
     <string name="settings_subscription_via_proxy_summary">更新订阅时使用代理</string>
     <string name="settings_restart_after_update">更新后重启代理</string>
-    <string name="settings_restart_after_update_summary">更新当前订阅后重启代理使新配置生效（会短暂中断连接）</string>
+    <string name="settings_restart_after_update_summary">更新当前订阅后重启代理使新配置生效</string>
     <string name="settings_auto_connect">启动时自动连接</string>
-    <string name="settings_auto_connect_summary">打开应用时若存在可用订阅则启动代理</string>
+    <string name="settings_auto_connect_summary">打开应用时自动启动可用订阅</string>
     <string name="settings_auto_restart">开机后自动重启</string>
     <string name="settings_auto_restart_summary">开机或应用升级后恢复上次运行的代理</string>
     <string name="settings_theme_title">外观与主题</string>
     <string name="settings_theme_group_color">颜色与主题</string>
     <string name="settings_theme_group_interface">界面与效果</string>
     <string name="settings_theme_group_navigation">导航</string>
-    <string name="settings_theme_summary">颜色、模糊效果与界面缩放，导航与手势选项</string>
-    <string name="settings_theme_mode">主题模式</string>
+    <string name="settings_theme_summary">颜色、模糊、缩放与手势</string>
     <string name="settings_theme_system">跟随系统</string>
     <string name="settings_theme_light">浅色</string>
     <string name="settings_theme_dark">深色</string>
     <string name="settings_theme_monet">Monet 取色</string>
     <string name="settings_theme_monet_summary">可用时使用系统动态取色</string>
     <string name="settings_theme_blur">模糊效果</string>
-    <string name="settings_theme_blur_summary">启用顶栏、底栏等表面的模糊效果</string>
+    <string name="settings_theme_blur_summary">启用顶栏与底栏表面模糊</string>
     <string name="settings_theme_blur_style">顶栏模糊样式</string>
     <string name="settings_theme_blur_style_gaussian">高斯</string>
     <string name="settings_theme_blur_style_progressive">渐进</string>
     <string name="settings_theme_blur_style_gaussian_summary">顶栏整体均匀模糊</string>
     <string name="settings_theme_blur_style_progressive_summary">顶部渐强模糊</string>
     <string name="settings_theme_density_scale">界面缩放</string>
-    <string name="settings_theme_density_scale_summary">调整全局显示比例（80% - 110%）</string>
+    <string name="settings_theme_density_scale_summary">全局显示比例（80% - 110%）</string>
     <string name="settings_theme_floating_bottom_bar_style">悬浮底栏样式</string>
     <string name="settings_theme_floating_bottom_bar_style_glass">玻璃</string>
     <string name="settings_theme_floating_bottom_bar_style_ios_like">iOS 风格（液态玻璃）</string>
@@ -375,9 +370,9 @@
     <string name="settings_theme_accent_green">绿色</string>
     <string name="settings_theme_accent_teal">青色</string>
     <string name="settings_predictive_back">预测性返回手势</string>
-    <string name="settings_predictive_back_summary">启用预测性返回动画效果</string>
+    <string name="settings_predictive_back_summary">启用预测性返回动画</string>
     <string name="settings_swipe_dismiss">横移返回手势</string>
-    <string name="settings_swipe_dismiss_summary">在页面任意位置横移即可返回上一页</string>
+    <string name="settings_swipe_dismiss_summary">任意位置右滑返回上一页</string>
     <string name="settings_hide_task_card">后台卡片隐藏</string>
     <string name="settings_hide_task_card_summary">在最近任务中隐藏任务卡片</string>
     <string name="settings_about">关于</string>
@@ -413,9 +408,9 @@
     <string name="root_tether_tproxy_unavailable_warning">当前内核缺少 xt_TPROXY 模块，已降级为兼容路径（吞吐略差，连接仍可用）。如需原生 TPROXY 性能，请更换支持该模块的内核。</string>
     <string name="root_tproxy_tether_note">TPROXY 模式下所有热点流量由内核规则自动代理，无需切换「绕过 / 走代理」。</string>
     <string name="root_tun_jumbo_mtu_title">大 MTU 与 GSO</string>
-    <string name="root_tun_jumbo_mtu_summary">大包聚合（mtu=9000、开启 gso）减少每包 syscall，提升吞吐。上游链路丢弃分片时可关闭。</string>
+    <string name="root_tun_jumbo_mtu_summary">mtu=9000 与 GSO 聚合，提升吞吐；丢分片时关闭</string>
     <string name="root_attach_force_reapply_title">重连时强制重建规则</string>
-    <string name="root_attach_force_reapply_summary">诊断开关：每次应用重新连接到正在运行的 mihomo 时强制重建 iptables 规则。仅当重连后热点规则丢失时开启。</string>
+    <string name="root_attach_force_reapply_summary">重连运行中内核时强制重建 iptables 规则（仅热点规则丢失时开启）</string>
 
     <!-- Network Settings -->
     <string name="network_settings_title">覆写设置</string>
@@ -440,7 +435,6 @@
     <string name="network_dns_default_nameserver">默认 Nameserver</string>
     <string name="network_dns_fakeip_filter">FakeIP 过滤</string>
     <string name="network_port_label">端口号 (0-65535)</string>
-    <string name="network_port_zero_hint">填写 0 表示禁用该端口</string>
     <string name="network_input_value">输入值</string>
     <string name="network_one_per_line">每行一条</string>
     <string name="settings_override_restart_hint">此页设置修改后需重启代理服务生效</string>
@@ -453,12 +447,12 @@
     <string name="wifi_policy_notify_switch">切换通知</string>
     <string name="wifi_policy_notify_switch_summary">仅在 Wi-Fi 策略改变代理状态时通知</string>
     <string name="wifi_policy_hide_monitor_notification">隐藏等待通知</string>
-    <string name="wifi_policy_hide_monitor_notification_summary">可选。隐藏监控通知可能降低后台自动恢复可靠性。</string>
+    <string name="wifi_policy_hide_monitor_notification_summary">可能降低后台自动恢复可靠性</string>
     <string name="wifi_policy_action">匹配后执行</string>
     <string name="wifi_policy_action_stop">关闭服务</string>
     <string name="wifi_policy_action_stop_summary">匹配 Wi-Fi 时停止代理，断开后自动启动</string>
     <string name="wifi_policy_action_direct">Direct 模式</string>
-    <string name="wifi_policy_action_direct_summary">无需重启，直接把运行中的代理切到 Direct 模式</string>
+    <string name="wifi_policy_action_direct_summary">直接将运行中代理切为直连模式</string>
     <string name="wifi_policy_ssids_title">Wi-Fi 名称</string>
     <string name="wifi_policy_ssid_add_placeholder">Wi-Fi 名称</string>
     <string name="wifi_policy_ssid_add">添加 SSID</string>
@@ -552,7 +546,7 @@
     <string name="backup_stop_proxy_first">请先停止代理再执行恢复</string>
     <string name="backup_failed">操作失败: %1$s</string>
     <string name="backup_restore_confirm_title">恢复备份</string>
-    <string name="backup_restore_confirm_summary">将用服务器上的备份覆盖本地订阅与设置，此操作无法撤销。是否继续？</string>
+    <string name="backup_restore_confirm_summary">将覆盖本地订阅与设置，此操作不可撤销。</string>
     <string name="backup_restore_done_title">恢复完成</string>
     <string name="backup_restore_done_summary">需要重启应用以加载恢复后的数据。</string>
     <string name="backup_restart_now">立即重启</string>

@@ -53,8 +53,8 @@ import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.glass.GlassBottomSheet
 import top.yukonga.miuix.kmp.icon.MiuixIcons
-import top.yukonga.miuix.kmp.icon.extended.Close
-import top.yukonga.miuix.kmp.icon.extended.Refresh
+import top.yukonga.miuix.kmp.icon.glass.Close
+import top.yukonga.miuix.kmp.icon.glass.Refresh
 import top.yukonga.miuix.kmp.squircle.squircleBackground
 import top.yukonga.miuix.kmp.theme.LocalDismissState
 import top.yukonga.miuix.kmp.theme.MiuixTheme
@@ -157,7 +157,7 @@ internal fun SubscriptionTrafficDialog(
             // 打开弹窗时已自动 GET 重读快照；此按钮触发真实更新（会消耗订阅服务器配额）
             IconButton(onClick = onUpdateAll, enabled = !isLoading) {
                 Icon(
-                    imageVector = MiuixIcons.Refresh,
+                    imageVector = MiuixIcons.Glass.Refresh,
                     contentDescription = stringResource(R.string.home_provider_update_all),
                     tint = MiuixTheme.colorScheme.onBackground,
                 )
@@ -167,7 +167,7 @@ internal fun SubscriptionTrafficDialog(
             val dismiss = LocalDismissState.current
             IconButton(onClick = { dismiss?.invoke() }) {
                 Icon(
-                    imageVector = MiuixIcons.Close,
+                    imageVector = MiuixIcons.Glass.Close,
                     contentDescription = stringResource(R.string.common_close),
                     tint = MiuixTheme.colorScheme.onBackground,
                 )

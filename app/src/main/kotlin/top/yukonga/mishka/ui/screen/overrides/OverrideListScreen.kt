@@ -55,9 +55,9 @@ import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.glass.GlassDialog
 import top.yukonga.miuix.kmp.glass.GlassDialogButtonRole
 import top.yukonga.miuix.kmp.icon.MiuixIcons
-import top.yukonga.miuix.kmp.icon.extended.Delete
-import top.yukonga.miuix.kmp.icon.extended.MoreCircle
-import top.yukonga.miuix.kmp.icon.extended.Refresh
+import top.yukonga.miuix.kmp.icon.glass.Delete
+import top.yukonga.miuix.kmp.icon.glass.MoreCircle
+import top.yukonga.miuix.kmp.icon.glass.Refresh
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.PressFeedbackType
 import top.yukonga.miuix.kmp.utils.scrollEndHaptic
@@ -227,7 +227,7 @@ private fun OverrideItem(
             }
             Spacer(Modifier.width(8.dp))
             ItemAction(
-                icon = MiuixIcons.MoreCircle,
+                icon = MiuixIcons.Glass.MoreCircle,
                 contentDescription = stringResource(R.string.common_edit),
                 enabled = !isLoading,
                 onClick = onEdit,
@@ -235,7 +235,7 @@ private fun OverrideItem(
             if (profile.isRemote) {
                 Spacer(Modifier.width(8.dp))
                 ItemAction(
-                    icon = MiuixIcons.Refresh,
+                    icon = MiuixIcons.Glass.Refresh,
                     contentDescription = stringResource(R.string.common_update),
                     enabled = !isLoading,
                     onClick = onUpdate,
@@ -243,7 +243,7 @@ private fun OverrideItem(
             }
             Spacer(Modifier.width(8.dp))
             ItemAction(
-                icon = MiuixIcons.Delete,
+                icon = MiuixIcons.Glass.Delete,
                 contentDescription = stringResource(R.string.common_delete),
                 enabled = !isLoading,
                 onClick = { showDeleteDialog = true },

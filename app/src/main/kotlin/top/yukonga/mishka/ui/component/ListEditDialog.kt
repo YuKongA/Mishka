@@ -13,9 +13,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import top.yukonga.mishka.R
 import top.yukonga.mishka.ui.component.blur.LocalPageBackdrop
-import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.glass.GlassDialog
 import top.yukonga.miuix.kmp.glass.GlassDialogButtonRole
+import top.yukonga.miuix.kmp.glass.GlassTextField
 
 /**
  * 列表编辑对话框，用于编辑 DNS 服务器、域名列表等。
@@ -36,7 +36,7 @@ fun ListEditDialog(
         title = title,
         onDismissRequest = onDismiss,
     ) {
-        TextField(
+        GlassTextField(
             state = textState,
             modifier = Modifier.fillMaxWidth(),
             label = stringResource(R.string.network_one_per_line),

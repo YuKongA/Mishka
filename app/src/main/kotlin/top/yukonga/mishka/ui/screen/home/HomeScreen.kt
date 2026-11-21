@@ -41,9 +41,7 @@ fun HomeScreen(
     bottomPadding: Dp = 0.dp,
     uiState: HomeUiState = HomeUiState(),
     viewModel: HomeViewModel? = null,
-    onRestart: () -> Unit = {},
     onStop: () -> Unit = {},
-    onReload: () -> Unit = {},
     onTestLatency: () -> Unit = {},
     onNavigateLog: () -> Unit = {},
     onNavigateProvider: () -> Unit = {},
@@ -113,15 +111,8 @@ fun HomeScreen(
                 uptime = uptime,
                 onSwitchMode = onSwitchMode,
                 onSwitchTunStack = onSwitchTunStack,
-            )
-            actionButtonsSection(
-                onRestart = onRestart,
                 onStop = onStop,
-                onReload = onReload,
                 onStart = onStartProxy,
-                isRunning = uiState.isRunning,
-                isStarting = uiState.isStarting,
-                isStopping = uiState.isStopping,
             )
             overviewCardsSection(
                 speed = speed,

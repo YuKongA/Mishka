@@ -19,12 +19,14 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.computedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -66,11 +68,10 @@ import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
 import top.yukonga.miuix.kmp.glass.GlassSegmentedTabRow
 import top.yukonga.miuix.kmp.icon.MiuixIcons
-import top.yukonga.miuix.kmp.icon.extended.Refresh
+import top.yukonga.miuix.kmp.icon.glass.Refresh
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.scrollEndHaptic
 import top.yukonga.miuix.kmp.utils.springAnimateToPage
-import top.yukonga.miuix.kmp.icon.glass.Refresh as GlassRefresh
 
 @Composable
 fun ProviderScreen(
@@ -86,7 +87,11 @@ fun ProviderScreen(
     val pagerState = rememberPagerState(initialPage = RULE_PROVIDERS_TAB, pageCount = { providerTabs.size })
     val coroutineScope = rememberCoroutineScope()
     val listStates = remember { List(providerTabs.size) { LazyListState() } }
-    val activeListState = listStates[pagerState.currentPage]
+    val contentUnderTopBar by remember(listStates, pagerState, scrollBehavior) {
+        computedStateOf {
+            listStates[pagerState.currentPage].canScrollBackward || scrollBehavior.state.overscrollOffset < -1f
+        }
+    }
     val otherTabErrorsContent: @Composable (List<Map.Entry<ProviderErrorKey, String>>) -> Unit = { errors ->
         Card(
             modifier = Modifier
@@ -113,6 +118,7 @@ fun ProviderScreen(
 
     val backdrop = rememberBlurBackdrop()
     val blurActive = backdrop != null
+    val fallbackBackdrop = rememberLayerBackdrop()
 
     PageBackdropBox {
         Scaffold(
@@ -121,12 +127,12 @@ fun ProviderScreen(
                     AdaptiveTopAppBar(
                         title = stringResource(R.string.provider_title),
                         scrollBehavior = scrollBehavior,
-                        isContentScrolled = activeListState.canScrollBackward,
+                        isContentScrolled = contentUnderTopBar,
                         navigationIcon = { BackNavigationIcon(onBack) },
                         actions = {
                             TopBarIconButton(
                                 onClick = { viewModel.updateAll() },
-                                glassIcon = MiuixIcons.Glass.GlassRefresh,
+                                glassIcon = MiuixIcons.Glass.Refresh,
                                 contentDescription = stringResource(R.string.subscription_update_all),
                             )
                         },
@@ -137,8 +143,8 @@ fun ProviderScreen(
                                 onSelect = { index ->
                                     coroutineScope.launch { pagerState.springAnimateToPage(index) }
                                 },
-                                backdrop = backdrop ?: rememberLayerBackdrop(),
-                                surfaceAlpha = if (blurActive) 1f else 0f,
+                                backdrop = backdrop ?: fallbackBackdrop,
+                                surfaceAlpha = if (blurActive && contentUnderTopBar) 1f else 0f,
                                 modifier = Modifier
                                     .padding(horizontal = 12.dp)
                                     .padding(top = 6.dp, bottom = 12.dp),
@@ -281,13 +287,14 @@ private fun ProviderItem(
                         )
                         Image(
                             modifier = Modifier
+                                .size(20.dp)
                                 .clickable(
                                     interactionSource = remember { MutableInteractionSource() },
                                     indication = null,
                                     role = Role.Button,
                                     onClick = onUpdate,
                                 ),
-                            imageVector = MiuixIcons.Refresh,
+                            imageVector = MiuixIcons.Glass.Refresh,
                             contentDescription = stringResource(R.string.provider_update),
                             colorFilter = ColorFilter.tint(MiuixTheme.colorScheme.onSurfaceVariantSummary),
                         )

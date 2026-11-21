@@ -27,7 +27,6 @@ dependencies {
     implementation(libs.androidx.activity)
     implementation(libs.androidx.core.splashscreen)
     implementation(libs.androidx.profileinstaller)
-    implementation(libs.material.icons.extended)
     implementation(libs.hiddenapibypass)
     implementation(libs.quickie.bundled)
     implementation(libs.scripta.editor)
@@ -87,6 +86,7 @@ android {
         targetCompatibility = JavaVersion.VERSION_21
     }
     defaultConfig {
+        buildConfigField("String", "MIHOMO_VERSION", "\"${providers.gradleProperty("mihomo.version").orElse("dev").get()}\"")
         applicationId = ProjectConfig.PACKAGE_NAME
         minSdk = ProjectConfig.Android.MIN_SDK
         targetSdk = ProjectConfig.Android.TARGET_SDK

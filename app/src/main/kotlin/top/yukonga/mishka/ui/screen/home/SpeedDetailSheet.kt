@@ -37,7 +37,7 @@ import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.glass.GlassBottomSheet
 import top.yukonga.miuix.kmp.icon.MiuixIcons
-import top.yukonga.miuix.kmp.icon.extended.Close
+import top.yukonga.miuix.kmp.icon.glass.Close
 import top.yukonga.miuix.kmp.theme.LocalDismissState
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
@@ -61,7 +61,7 @@ internal fun SpeedDetailSheet(
             val dismiss = LocalDismissState.current
             IconButton(onClick = { dismiss?.invoke() }) {
                 Icon(
-                    imageVector = MiuixIcons.Close,
+                    imageVector = MiuixIcons.Glass.Close,
                     contentDescription = stringResource(R.string.common_close),
                     tint = MiuixTheme.colorScheme.onBackground,
                 )

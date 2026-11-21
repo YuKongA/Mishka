@@ -41,10 +41,10 @@ import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.Text
-import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.glass.GlassDialog
 import top.yukonga.miuix.kmp.glass.GlassDialogButtonRole
+import top.yukonga.miuix.kmp.glass.GlassTextField
 import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.scrollEndHaptic
@@ -167,7 +167,7 @@ fun ExternalControlScreen(
             title = stringResource(R.string.network_external_controller),
             onDismissRequest = { showEditDialog = false },
         ) {
-            TextField(
+            GlassTextField(
                 state = controllerTextState,
                 modifier = Modifier.fillMaxWidth(),
                 label = stringResource(R.string.network_input_value),
@@ -210,7 +210,7 @@ fun ExternalControlScreen(
             title = stringResource(R.string.external_control_secret),
             onDismissRequest = { showSecretDialog = false },
         ) {
-            TextField(
+            GlassTextField(
                 state = secretTextState,
                 modifier = Modifier.fillMaxWidth(),
                 label = stringResource(R.string.network_input_value),

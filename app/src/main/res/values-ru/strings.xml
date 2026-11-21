@@ -55,7 +55,6 @@
     <string name="external_proxy_not_running">Прокси не запущен</string>
 
     <!-- Service Errors -->
-    <string name="error_vpn_failed">Сбой создания VPN: %1$s</string>
     <string name="error_vpn_denied">В доступе к VPN отказано</string>
     <string name="error_start_failed">Ошибка запуска</string>
     <string name="error_root_failed">Не удалось получить Root-права</string>
@@ -67,7 +66,6 @@
     <string name="error_mihomo_start_failed">Сбой запуска mihomo:\n%1$s</string>
     <string name="error_generic_start_failed">Ошибка запуска: %1$s</string>
     <string name="error_foreground_failed">Не удалось запустить службу переднего плана: %1$s</string>
-    <string name="error_fd_setup_failed">Не удалось подготовить файловый дескриптор TUN: %1$s</string>
     <string name="error_tun_init_failed">Ошибка инициализации TUN: %1$s</string>
     <string name="error_tproxy_unsupported">Режим ROOT TPROXY требует модули ядра xt_TPROXY/xt_socket, которые отсутствуют на этом устройстве</string>
     <string name="error_no_active_profile">Нет активной подписки. Пожалуйста, импортируйте подписку перед запуском прокси.</string>
@@ -123,9 +121,7 @@
     <string name="home_uptime_days_hours">%1$d д %2$d ч</string>
 
     <!-- Home - Action Buttons -->
-    <string name="home_restart">Перезапуск</string>
     <string name="home_stop">Остановить</string>
-    <string name="home_reload">Горячая перезагрузка</string>
     <string name="home_start">Запустить</string>
     <string name="home_starting_btn">Запуск...</string>
     <string name="home_stopping_btn">Остановка...</string>
@@ -331,7 +327,6 @@
     <string name="settings_theme_group_interface">Интерфейс и эффекты</string>
     <string name="settings_theme_group_navigation">Навигация</string>
     <string name="settings_theme_summary">Цвет, размытие и масштаб интерфейса; настройки навигации и жестов</string>
-    <string name="settings_theme_mode">Тема оформления</string>
     <string name="settings_theme_system">Системная</string>
     <string name="settings_theme_light">Светлая</string>
     <string name="settings_theme_dark">Темная</string>
@@ -440,7 +435,6 @@
     <string name="network_dns_default_nameserver">Сервер DNS по умолчанию</string>
     <string name="network_dns_fakeip_filter">Фильтр FakeIP</string>
     <string name="network_port_label">Порт (0-65535)</string>
-    <string name="network_port_zero_hint">0 отключает данный порт</string>
     <string name="network_input_value">Введите значение</string>
     <string name="network_one_per_line">По одной записи на строку</string>
     <string name="settings_override_restart_hint">Изменения этих настроек вступят в силу после перезапуска службы прокси.</string>

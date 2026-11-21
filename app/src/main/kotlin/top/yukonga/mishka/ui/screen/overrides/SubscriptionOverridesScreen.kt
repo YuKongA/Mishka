@@ -11,9 +11,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.KeyboardArrowDown
-import androidx.compose.material.icons.rounded.KeyboardArrowUp
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -51,6 +48,8 @@ import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.icon.MiuixIcons
+import top.yukonga.miuix.kmp.icon.glass.CollapseList
+import top.yukonga.miuix.kmp.icon.glass.ExpandList
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.scrollEndHaptic
 import top.yukonga.miuix.kmp.icon.glass.Ok as GlassOk
@@ -206,14 +205,14 @@ private fun OverrideSelectionItem(
             },
             endActions = {
                 MoveButton(
-                    icon = Icons.Rounded.KeyboardArrowUp,
+                    icon = MiuixIcons.Glass.CollapseList,
                     contentDescription = stringResource(R.string.override_move_up),
                     enabled = canMoveUp,
                     onClick = onMoveUp,
                 )
                 Spacer(Modifier.width(8.dp))
                 MoveButton(
-                    icon = Icons.Rounded.KeyboardArrowDown,
+                    icon = MiuixIcons.Glass.ExpandList,
                     contentDescription = stringResource(R.string.override_move_down),
                     enabled = canMoveDown,
                     onClick = onMoveDown,

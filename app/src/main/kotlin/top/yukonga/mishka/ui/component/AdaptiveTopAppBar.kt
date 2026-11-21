@@ -22,8 +22,8 @@ import androidx.compose.ui.unit.offset
 import top.yukonga.mishka.R
 import top.yukonga.mishka.ui.component.blur.LocalBlurEnabled
 import top.yukonga.mishka.ui.component.blur.LocalTopAppBarBackdrop
-import top.yukonga.mishka.ui.component.blur.LocalTopAppBarTitleAlpha
 import top.yukonga.mishka.ui.component.blur.LocalTopAppBarCenterObstructionStart
+import top.yukonga.mishka.ui.component.blur.LocalTopAppBarTitleAlpha
 import top.yukonga.mishka.ui.component.blur.LocalTopBarStartInset
 import top.yukonga.mishka.ui.util.rememberIsWideScreen
 import top.yukonga.miuix.kmp.basic.CircularProgressIndicator
@@ -79,7 +79,8 @@ fun AdaptiveTopAppBar(
     val bandBrush = remember(surfaceColor) { GlassTopAppBarDefaults.bandBrush(surfaceColor) }
     val resolvedContentScrolled by remember(scrollBehavior, isContentScrolled) {
         computedStateOf {
-            isContentScrolled ?: (scrollBehavior?.state?.let { it.contentOffset < -1f } ?: false)
+            val overscrolled = scrollBehavior?.state?.let { it.overscrollOffset < -1f } ?: false
+            (isContentScrolled ?: (scrollBehavior?.state?.let { it.contentOffset < -1f } ?: false)) || overscrolled
         }
     }
     GlassTopAppBar(

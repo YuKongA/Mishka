@@ -28,6 +28,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.flow.drop
 import top.yukonga.mishka.R
 import top.yukonga.mishka.platform.FilePicker
 import top.yukonga.mishka.platform.PlatformStorage
@@ -53,14 +54,13 @@ import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.glass.GlassDialog
 import top.yukonga.miuix.kmp.glass.GlassDialogButtonRole
 import top.yukonga.miuix.kmp.icon.MiuixIcons
-import top.yukonga.miuix.kmp.icon.extended.Backup
-import top.yukonga.miuix.kmp.icon.extended.Import
+import top.yukonga.miuix.kmp.icon.glass.Backup
+import top.yukonga.miuix.kmp.icon.glass.Import
 import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.scrollEndHaptic
 import java.text.SimpleDateFormat
 import java.util.Date
-import kotlinx.coroutines.flow.drop
 import java.util.Locale
 
 @Composable
@@ -246,7 +246,7 @@ private fun LocalBackupDialog(
             title = stringResource(R.string.backup_export_local),
             startAction = {
                 Icon(
-                    imageVector = MiuixIcons.Backup,
+                    imageVector = MiuixIcons.Glass.Backup,
                     contentDescription = null,
                     modifier = Modifier.padding(end = 16.dp),
                     tint = MiuixTheme.colorScheme.onSurface,
@@ -260,7 +260,7 @@ private fun LocalBackupDialog(
             title = stringResource(R.string.backup_restore_local),
             startAction = {
                 Icon(
-                    imageVector = MiuixIcons.Import,
+                    imageVector = MiuixIcons.Glass.Import,
                     contentDescription = null,
                     modifier = Modifier.padding(end = 16.dp),
                     tint = MiuixTheme.colorScheme.onSurface,
@@ -351,7 +351,7 @@ private fun WebDavDialog(
                     title = stringResource(R.string.backup_now),
                     startAction = {
                         Icon(
-                            imageVector = MiuixIcons.Backup,
+                            imageVector = MiuixIcons.Glass.Backup,
                             contentDescription = null,
                             modifier = Modifier.padding(end = 16.dp),
                             tint = MiuixTheme.colorScheme.onSurface,
@@ -365,7 +365,7 @@ private fun WebDavDialog(
                     title = stringResource(R.string.backup_restore_now),
                     startAction = {
                         Icon(
-                            imageVector = MiuixIcons.Import,
+                            imageVector = MiuixIcons.Glass.Import,
                             contentDescription = null,
                             modifier = Modifier.padding(end = 16.dp),
                             tint = MiuixTheme.colorScheme.onSurface,

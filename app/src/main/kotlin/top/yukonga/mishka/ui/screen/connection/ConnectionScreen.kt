@@ -63,7 +63,7 @@ import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.glass.GlassDialog
 import top.yukonga.miuix.kmp.glass.GlassDialogButtonRole
 import top.yukonga.miuix.kmp.icon.MiuixIcons
-import top.yukonga.miuix.kmp.icon.extended.Close
+import top.yukonga.miuix.kmp.icon.glass.Close
 import top.yukonga.miuix.kmp.squircle.squircleBackground
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.overScrollVertical
@@ -350,7 +350,7 @@ private fun ConnectionItem(
                         role = Role.Button,
                         onClick = onClose,
                     ),
-                imageVector = MiuixIcons.Close,
+                imageVector = MiuixIcons.Glass.Close,
                 contentDescription = stringResource(R.string.common_close),
                 colorFilter = ColorFilter.tint(MiuixTheme.colorScheme.onSurfaceVariantSummary),
             )

@@ -29,7 +29,7 @@ import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.icon.MiuixIcons
-import top.yukonga.miuix.kmp.icon.extended.Refresh
+import top.yukonga.miuix.kmp.icon.glass.Refresh
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 fun LazyListScope.latencySection(
@@ -115,7 +115,7 @@ private fun LatencyHeader(
                     modifier = Modifier.size(24.dp),
                 ) {
                     Icon(
-                        imageVector = MiuixIcons.Refresh,
+                        imageVector = MiuixIcons.Glass.Refresh,
                         contentDescription = stringResource(R.string.common_refresh),
                         modifier = Modifier.size(16.dp),
                         tint = MiuixTheme.colorScheme.onSurfaceVariantSummary,

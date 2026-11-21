@@ -109,11 +109,11 @@ import top.yukonga.miuix.kmp.glass.glassPopupAnchor
 import top.yukonga.miuix.kmp.glass.glassPopupAnchorContent
 import top.yukonga.miuix.kmp.glass.rememberGlassPopupAnchor
 import top.yukonga.miuix.kmp.icon.MiuixIcons
-import top.yukonga.miuix.kmp.icon.basic.ArrowRight
-import top.yukonga.miuix.kmp.icon.extended.Pin
-import top.yukonga.miuix.kmp.icon.extended.Refresh
-import top.yukonga.miuix.kmp.icon.extended.Unpin
+import top.yukonga.miuix.kmp.icon.glass.ChevronForward
 import top.yukonga.miuix.kmp.icon.glass.More
+import top.yukonga.miuix.kmp.icon.glass.Pin
+import top.yukonga.miuix.kmp.icon.glass.Refresh
+import top.yukonga.miuix.kmp.icon.glass.Unpin
 import top.yukonga.miuix.kmp.interfaces.HoldDownInteraction
 import top.yukonga.miuix.kmp.squircle.squircleBackground
 import top.yukonga.miuix.kmp.squircle.squircleClip
@@ -668,7 +668,7 @@ private fun ProxyGroupHeader(
                 modifier = Modifier.size(24.dp),
             ) {
                 Icon(
-                    imageVector = MiuixIcons.Unpin,
+                    imageVector = MiuixIcons.Glass.Unpin,
                     contentDescription = stringResource(R.string.proxy_unfix),
                     modifier = Modifier.size(16.dp),
                     tint = StatusColors.warning,
@@ -688,7 +688,7 @@ private fun ProxyGroupHeader(
                 )
             } else {
                 Icon(
-                    imageVector = MiuixIcons.Refresh,
+                    imageVector = MiuixIcons.Glass.Refresh,
                     contentDescription = stringResource(R.string.proxy_test_group_delay),
                     modifier = Modifier.size(16.dp),
                     tint = MiuixTheme.colorScheme.onSurfaceVariantSummary,
@@ -698,7 +698,7 @@ private fun ProxyGroupHeader(
         Spacer(Modifier.width(8.dp))
         val layoutDirection = LocalLayoutDirection.current
         Image(
-            imageVector = MiuixIcons.Basic.ArrowRight,
+            imageVector = MiuixIcons.Glass.ChevronForward,
             contentDescription = null,
             modifier = Modifier
                 .size(15.dp)
@@ -903,7 +903,7 @@ private fun ProxyNodeCard(
                 ) {
                     if (isFixed) {
                         Icon(
-                            imageVector = MiuixIcons.Pin,
+                            imageVector = MiuixIcons.Glass.Pin,
                             contentDescription = stringResource(R.string.proxy_fixed),
                             modifier = Modifier.size(11.dp),
                             tint = StatusColors.warning,
@@ -960,7 +960,7 @@ private fun ProxyNodeCard(
                         )
 
                         else -> Icon(
-                            imageVector = MiuixIcons.Refresh,
+                            imageVector = MiuixIcons.Glass.Refresh,
                             contentDescription = testNodeDelayLabel,
                             modifier = Modifier.size(14.dp),
                             tint = StatusColors.neutral,

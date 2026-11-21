@@ -54,9 +54,9 @@ import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.glass.GlassDialog
 import top.yukonga.miuix.kmp.glass.GlassDialogButtonRole
 import top.yukonga.miuix.kmp.icon.MiuixIcons
-import top.yukonga.miuix.kmp.icon.extended.Delete
-import top.yukonga.miuix.kmp.icon.extended.MoreCircle
-import top.yukonga.miuix.kmp.icon.extended.Refresh
+import top.yukonga.miuix.kmp.icon.glass.Delete
+import top.yukonga.miuix.kmp.icon.glass.MoreCircle
+import top.yukonga.miuix.kmp.icon.glass.Refresh
 import top.yukonga.miuix.kmp.squircle.squircleBackground
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.PressFeedbackType
@@ -310,7 +310,7 @@ private fun SubscriptionItem(
             ) {
                 Icon(
                     modifier = Modifier.size(20.dp),
-                    imageVector = MiuixIcons.MoreCircle,
+                    imageVector = MiuixIcons.Glass.MoreCircle,
                     contentDescription = stringResource(R.string.common_edit),
                     tint = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                 )
@@ -325,7 +325,7 @@ private fun SubscriptionItem(
             ) {
                 Icon(
                     modifier = Modifier.size(20.dp),
-                    imageVector = MiuixIcons.Refresh,
+                    imageVector = MiuixIcons.Glass.Refresh,
                     contentDescription = stringResource(R.string.common_update),
                     tint = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                 )
@@ -339,7 +339,7 @@ private fun SubscriptionItem(
             ) {
                 Icon(
                     modifier = Modifier.size(20.dp),
-                    imageVector = MiuixIcons.Delete,
+                    imageVector = MiuixIcons.Glass.Delete,
                     contentDescription = stringResource(R.string.common_delete),
                     tint = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                 )

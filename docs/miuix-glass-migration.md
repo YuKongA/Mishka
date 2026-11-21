@@ -1,4 +1,4 @@
-# Miuix 0.9.5-beta01 ~ beta02 Glass 迁移指南
+# Miuix 0.9.5-beta01 ~ beta03 Glass 迁移指南
 
 面向 Compose + miuix 应用的通用迁移参考，涵盖组件替换、采样架构与关键踩坑约束。
 
@@ -47,9 +47,10 @@
 | `NavigationRail` | `GlassNavigationRail` | 见第 4 节 |
 | `IconButton` / `MiuixIcons.Back` | `GlassIconButton` + `MiuixIcons.Glass.*` | 图标尺寸 `28.dp` |
 | `WindowListPopup` | `GlassIconDropdownMenu` / `GlassTransformPopup` | 锚点按钮加 `.glassPopupAnchor(anchor)`，内部 `Icon` **必须**加 `.glassPopupAnchorContent(anchor)`，否则变形动画时原图标不隐藏且错位 |
-| `TabRow` | `GlassSegmentedTabRow` | 传入 `backdrop` 与 `surfaceAlpha` |
+| `TabRow` | `GlassSegmentedTabRow` | 传入 `backdrop` 与 `surfaceAlpha`；置于顶栏 `bottomContent` 时静止态设为 `0f`（`if (blurActive && contentUnderTopBar) 1f else 0f`） |
 | `WindowDialog` | `GlassDialog` | 传入 `backdrop = LocalPageBackdrop.current`；内部按钮同步换为 `GlassDialogButton`（`Normal` / `Primary`） |
 | `WindowBottomSheet` | `GlassBottomSheet` | 传入 `backdrop = LocalPageBackdrop.current` |
+| `TextField`（`GlassDialog` 内） | `GlassTextField` | 与 `GlassDialogButton` 共用 `onBackground` 半透明底色体系 |
 
 > **圆角与材质**：所有 `miuix-glass` 组件默认已内置 `GlassShape`，无需额外传 `RoundedCornerShape` 或覆盖 `shape`。
 
@@ -73,7 +74,7 @@
 - `NavDisplay` 保持 `Modifier.fillMaxSize()` 全屏铺满，通过 `CompositionLocal` 下发动态值：
   - `LocalTopBarStartInset`：`{ (GlassNavigationRailDefaults.Margin + GlassNavigationRailDefaults.ExpandedWidth) * railState.progress }`
   - `LocalTopAppBarTitleAlpha`：`{ railState.progress }`（折叠态胶囊居中于顶栏上方时淡出标题；刚过宽屏阈值时顶栏右侧按钮不宜过多，以免与胶囊重叠）
-  - `LocalTopAppBarCenterObstructionStart`：折叠态侧边栏（`!railState.expanded && collapsedWidth > 0.dp`）提供 `railState.collapsedStart` 给 `GlassTopAppBar` / `TopAppBar` 的 `centerObstructionStart`，主 Tab（`Route.Main`）内覆盖为 `Dp.Unspecified`
+  - `LocalTopAppBarCenterObstructionStart`：使用 `compositionLocalOf`（而非 `staticCompositionLocalOf`）以免折叠态胶囊变化触发全树重组；折叠态侧边栏（`!railState.expanded && collapsedWidth > 0.dp`）提供 `railState.collapsedStart` 给 `GlassTopAppBar` / `TopAppBar` 的 `centerObstructionStart`，主 Tab（`Route.Main`）内覆盖为 `Dp.Unspecified`
 - 顶栏通过 `contentModifier`、正文与全屏覆盖层（如 `GlassSearchOverlay`）各自应用起始缩进，实现「背景全屏、内容避让」。
 
 ---
@@ -87,7 +88,7 @@
 3. **避免起始缩进重复叠加**：
    顶栏内部已消费 `LocalTopBarStartInset` 时，外部传入的 `contentModifier`（如同时处理刘海安全区）需关闭侧栏缩进，防止双倍偏移。
 4. **滚动阈值防抖**：
-   判断 `isContentScrolled` 时使用 `scrollBehavior.state.contentOffset < -1f`（而非 `< 0f`），避免亚像素或回弹边缘抖动误触发。
+   判断 `isContentScrolled` 时使用 `scrollBehavior.state.contentOffset < -1f || scrollBehavior.state.overscrollOffset < -1f`（而非 `< 0f`），避免亚像素或回弹边缘抖动误触发，同时保证页面不足一页向上越界时顶栏模糊与按钮材质能正常浮起；即使显式传入 `listState.canScrollBackward` 也应叠加 `overscrollOffset < -1f`。
 
 ---
 
@@ -97,3 +98,12 @@
 - **输入框状态化**：`TextField` / `BasicTextField` 统一使用 `TextFieldState`（`rememberTextFieldState`、`TextFieldLineLimits.SingleLine`、`onKeyboardAction`、`decorator`）；字符长度限制用 `maxLengthReject` / `maxLengthTrim` 替代已废弃的 `maxLength`。
 - **容器尺寸基准**：根部用 `BoxWithConstraints(Modifier.fillMaxSize())` 注入 `LocalContainerSize`，宽屏与视口计算优先读取它再回退 `LocalWindowInfo.current.containerSize`。
 - **分段卡片防漏缝**：自绘分段卡片（`CardSegment`）在 `!isLast && bottomCornerRadius == 0.dp && color.alpha == 1f` 时向下 `drawBehind` 延伸 2px，避免 0.5x 降采样 RenderNode 光栅化产生抗锯齿黑缝。
+
+---
+
+## 7. 0.9.5-beta03 同步要点
+
+- **顶栏透明带与越界驱动**：`GlassTopAppBar` 移除 100ms mask 渐隐延迟的旧 `visualContentOffset` 路径（保留非折叠态 100ms 线性过渡，折叠态随 `collapsedFraction`），`overscrollOffset < -1f` 直接参与驱动渐进模糊与按钮悬浮材质。
+- **`GlassSegmentedTabRow` 静止不透明度**：列表内或未滚动的顶栏 `bottomContent` 中应保持 `surfaceAlpha = 0f`，滚动/越界后再切至 `1f`，避免静止态误显遮罩。
+- **侧栏与路由重组优化**：`LocalTopAppBarCenterObstructionStart` 使用 `compositionLocalOf`，传入 `LocalTopAppBarTitleAlpha` 与 `LocalTopBarStartInset` 的 lambda 需以 `remember(railState)` / 顶层常量稳定引用；`LazyColumn` 中的多行静态偏好卡统一拆分为 `groupedCardItems`（按行 item）。
+- **图标与弹窗规范**：全量使用 `MiuixIcons.Glass.*`（原生 `28.dp`，超大水印图标建议自建矢量路径）；`GlassDialog` 内输入框使用 `GlassTextField`，嵌套 `Card` 可采用 `onBackground.copy(alpha = if (isDark) 36f / 255f else 15f / 255f)` 保持浅/深色与动态取色下的通透对比度。

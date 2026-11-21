@@ -46,11 +46,11 @@ import top.yukonga.mishka.viewmodel.NetworkSettingsViewModel
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.SmallTitle
-import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.glass.GlassDialog
 import top.yukonga.miuix.kmp.glass.GlassDialogButtonRole
 import top.yukonga.miuix.kmp.glass.GlassDropdownPreference
+import top.yukonga.miuix.kmp.glass.GlassTextField
 import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.utils.scrollEndHaptic
 
@@ -455,7 +455,7 @@ private fun PortEditDialog(
         title = title,
         onDismissRequest = onDismiss,
     ) {
-        TextField(
+        GlassTextField(
             state = textState,
             modifier = Modifier.fillMaxWidth(),
             label = stringResource(R.string.network_port_label),
@@ -512,7 +512,7 @@ private fun StringEditDialog(
         title = title,
         onDismissRequest = onDismiss,
     ) {
-        TextField(
+        GlassTextField(
             state = textState,
             modifier = Modifier.fillMaxWidth(),
             label = stringResource(R.string.network_input_value),

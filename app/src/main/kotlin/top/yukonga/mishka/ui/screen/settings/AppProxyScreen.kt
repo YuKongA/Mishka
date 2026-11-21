@@ -35,6 +35,7 @@ import top.yukonga.mishka.R
 import top.yukonga.mishka.platform.showToast
 import top.yukonga.mishka.ui.component.AdaptiveTopAppBar
 import top.yukonga.mishka.ui.component.BackNavigationIcon
+import top.yukonga.mishka.ui.component.CardItem
 import top.yukonga.mishka.ui.component.GlassSearchOverlay
 import top.yukonga.mishka.ui.component.TopBarIconButton
 import top.yukonga.mishka.ui.component.TopLayer
@@ -43,6 +44,7 @@ import top.yukonga.mishka.ui.component.blur.LocalPageBackdrop
 import top.yukonga.mishka.ui.component.blur.PageBackdropBox
 import top.yukonga.mishka.ui.component.blur.rememberBlurBackdrop
 import top.yukonga.mishka.ui.component.glassSearchBarTransition
+import top.yukonga.mishka.ui.component.groupedCardItems
 import top.yukonga.mishka.ui.component.overScrollVertical
 import top.yukonga.mishka.ui.component.rememberGlassSearchBarAlpha
 import top.yukonga.mishka.ui.platform.AppIcon
@@ -163,35 +165,40 @@ fun AppProxyScreen(
                         top = innerPadding.calculateTopPadding(),
                     ),
                 ) {
-                    item(key = "mode_card") {
-                        Card(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 12.dp, vertical = 6.dp),
-                        ) {
-                            RadioButtonPreference(
-                                title = stringResource(R.string.app_proxy_allow_all),
-                                summary = stringResource(R.string.app_proxy_allow_all_summary),
-                                selected = uiState.mode == AppProxyMode.AllowAll,
-                                onClick = { viewModel.setMode(AppProxyMode.AllowAll) },
-                                radioButtonLocation = RadioButtonLocation.End,
-                            )
-                            RadioButtonPreference(
-                                title = stringResource(R.string.app_proxy_allow_selected),
-                                summary = stringResource(R.string.app_proxy_allow_selected_summary),
-                                selected = uiState.mode == AppProxyMode.AllowSelected,
-                                onClick = { viewModel.setMode(AppProxyMode.AllowSelected) },
-                                radioButtonLocation = RadioButtonLocation.End,
-                            )
-                            RadioButtonPreference(
-                                title = stringResource(R.string.app_proxy_deny_selected),
-                                summary = stringResource(R.string.app_proxy_deny_selected_summary),
-                                selected = uiState.mode == AppProxyMode.DenySelected,
-                                onClick = { viewModel.setMode(AppProxyMode.DenySelected) },
-                                radioButtonLocation = RadioButtonLocation.End,
-                            )
-                        }
-                    }
+                    groupedCardItems(
+                        keyPrefix = "app_proxy_mode",
+                        outerTopPadding = 6.dp,
+                        outerBottomPadding = 6.dp,
+                        items = listOf(
+                            CardItem("allow_all") {
+                                RadioButtonPreference(
+                                    title = stringResource(R.string.app_proxy_allow_all),
+                                    summary = stringResource(R.string.app_proxy_allow_all_summary),
+                                    selected = uiState.mode == AppProxyMode.AllowAll,
+                                    onClick = { viewModel.setMode(AppProxyMode.AllowAll) },
+                                    radioButtonLocation = RadioButtonLocation.End,
+                                )
+                            },
+                            CardItem("allow_selected") {
+                                RadioButtonPreference(
+                                    title = stringResource(R.string.app_proxy_allow_selected),
+                                    summary = stringResource(R.string.app_proxy_allow_selected_summary),
+                                    selected = uiState.mode == AppProxyMode.AllowSelected,
+                                    onClick = { viewModel.setMode(AppProxyMode.AllowSelected) },
+                                    radioButtonLocation = RadioButtonLocation.End,
+                                )
+                            },
+                            CardItem("deny_selected") {
+                                RadioButtonPreference(
+                                    title = stringResource(R.string.app_proxy_deny_selected),
+                                    summary = stringResource(R.string.app_proxy_deny_selected_summary),
+                                    selected = uiState.mode == AppProxyMode.DenySelected,
+                                    onClick = { viewModel.setMode(AppProxyMode.DenySelected) },
+                                    radioButtonLocation = RadioButtonLocation.End,
+                                )
+                            },
+                        ),
+                    )
 
                     // 应用列表（AllowAll 模式下不显示）
                     if (uiState.mode != AppProxyMode.AllowAll) {

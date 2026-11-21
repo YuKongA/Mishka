@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.State
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
@@ -27,7 +28,7 @@ val LocalTopBarBlurStyle = staticCompositionLocalOf { TopBarBlurStyle.Gaussian }
 val LocalTopAppBarBackdrop = staticCompositionLocalOf<LayerBackdrop?> { null }
 val LocalPageBackdrop = staticCompositionLocalOf<LayerBackdrop?> { null }
 val LocalTopAppBarTitleAlpha = staticCompositionLocalOf<() -> Float> { { 1f } }
-val LocalTopAppBarCenterObstructionStart = staticCompositionLocalOf { Dp.Unspecified }
+val LocalTopAppBarCenterObstructionStart = compositionLocalOf { Dp.Unspecified }
 val LocalTopBarStartInset = staticCompositionLocalOf<() -> Dp> { { 0.dp } }
 
 @Composable

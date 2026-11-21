@@ -44,11 +44,11 @@ import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.Text
-import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.glass.GlassDialog
 import top.yukonga.miuix.kmp.glass.GlassDialogButtonRole
 import top.yukonga.miuix.kmp.glass.GlassDropdownPreference
+import top.yukonga.miuix.kmp.glass.GlassTextField
 import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.preference.SwitchPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
@@ -260,7 +260,7 @@ fun RootSettingsScreen(
             title = stringResource(R.string.settings_tun_device),
             onDismissRequest = { showTunDeviceDialog = false },
         ) {
-            TextField(
+            GlassTextField(
                 state = tunDeviceTextState,
                 modifier = Modifier.fillMaxWidth(),
                 label = stringResource(R.string.network_input_value),
