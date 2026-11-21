@@ -106,6 +106,7 @@
 
     <!-- Home - Status -->
     <string name="home_starting">Запуск</string>
+    <string name="home_restarting">Перезапуск</string>
     <string name="home_running">Работает</string>
     <string name="home_stopping">Остановка</string>
     <string name="home_stopped">Остановлено</string>
@@ -121,6 +122,7 @@
     <string name="home_uptime_days_hours">%1$d д %2$d ч</string>
 
     <!-- Home - Action Buttons -->
+    <string name="home_restart">Перезапуск</string>
     <string name="home_stop">Остановить</string>
     <string name="home_start">Запустить</string>
     <string name="home_starting_btn">Запуск...</string>

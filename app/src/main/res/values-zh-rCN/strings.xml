@@ -106,6 +106,7 @@
 
     <!-- Home - Status -->
     <string name="home_starting">启动中</string>
+    <string name="home_restarting">重启中</string>
     <string name="home_running">运行中</string>
     <string name="home_stopping">停止中</string>
     <string name="home_stopped">已停止</string>
@@ -121,6 +122,7 @@
     <string name="home_uptime_days_hours">%1$d 天 %2$d 时</string>
 
     <!-- Home - Action Buttons -->
+    <string name="home_restart">重启</string>
     <string name="home_stop">停止</string>
     <string name="home_start">启动</string>
     <string name="home_starting_btn">启动中...</string>

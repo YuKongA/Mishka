@@ -1,13 +1,15 @@
 package top.yukonga.mishka.ui.screen.home
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -16,6 +18,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -25,10 +28,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.path
+import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import top.yukonga.mishka.BuildConfig
@@ -47,20 +53,26 @@ import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.CardDefaults
 import top.yukonga.miuix.kmp.basic.DropdownDefaults
 import top.yukonga.miuix.kmp.basic.Icon
+import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.basic.TextButtonColors
 import top.yukonga.miuix.kmp.glass.GlassDialog
+import top.yukonga.miuix.kmp.icon.MiuixIcons
+import top.yukonga.miuix.kmp.icon.glass.Refresh
 import top.yukonga.miuix.kmp.preference.RadioButtonLocation
 import top.yukonga.miuix.kmp.preference.RadioButtonPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.PressFeedbackType
+import kotlin.math.ceil
+import kotlin.math.roundToInt
 
 fun LazyListScope.statusSection(
     state: HomeUiState = HomeUiState(),
     uptime: String = "",
     onSwitchMode: (String) -> Unit = {},
     onSwitchTunStack: (String) -> Unit = {},
+    onRestart: () -> Unit = {},
     onStop: () -> Unit = {},
     onStart: () -> Unit = {},
 ) {
@@ -70,6 +82,7 @@ fun LazyListScope.statusSection(
             uptime = uptime,
             onSwitchMode = onSwitchMode,
             onSwitchTunStack = onSwitchTunStack,
+            onRestart = onRestart,
             onStop = onStop,
             onStart = onStart,
         )
@@ -82,6 +95,7 @@ private fun StatusContent(
     uptime: String,
     onSwitchMode: (String) -> Unit,
     onSwitchTunStack: (String) -> Unit,
+    onRestart: () -> Unit,
     onStop: () -> Unit,
     onStart: () -> Unit,
 ) {
@@ -90,7 +104,7 @@ private fun StatusContent(
     val isStopping = state.isStopping
 
     val runState = when {
-        isStarting || isStopping -> RunState.Pending
+        isStarting || isStopping || state.isRestarting -> RunState.Pending
         isRunning -> RunState.Running
         else -> RunState.Stopped
     }
@@ -110,128 +124,182 @@ private fun StatusContent(
         // 顶部左右结构：左状态卡（右下角 Badge）+ 右双配置卡
         val isTproxy = state.tunMode == TunMode.RootTproxy
         val inboundTproxyLabel = stringResource(R.string.home_inbound_tproxy, TPROXY_INBOUND_PORT)
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(IntrinsicSize.Min),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Card(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxHeight(),
-                colors = CardDefaults.defaultColors(color = statusContainer),
-            ) {
-                val statusIcon = if (isRunning) CheckCircleOutlineIcon else RemoveCircleOutlineIcon
-                Box(modifier = Modifier.fillMaxSize()) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .offset(38.dp, 45.dp),
-                        contentAlignment = Alignment.BottomEnd,
-                    ) {
-                        Icon(
-                            modifier = Modifier.size(170.dp),
-                            imageVector = statusIcon,
-                            tint = statusTint,
-                            contentDescription = null,
-                        )
-                    }
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(all = 16.dp),
-                    ) {
-                        Text(
-                            text = when {
-                                isStopping -> stringResource(R.string.home_stopping)
-                                isStarting -> stringResource(R.string.home_starting)
-                                isRunning -> stringResource(R.string.home_running)
-                                else -> stringResource(R.string.home_stopped)
-                            },
-                            fontSize = 20.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = statusTint,
-                        )
-                        Spacer(Modifier.height(2.dp))
-                        val versionText = state.version.ifBlank { BuildConfig.MIHOMO_VERSION }
-                        Text(
-                            text = versionText,
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                        )
-                        if (uptime.isNotBlank()) {
+        Layout(
+            modifier = Modifier.fillMaxWidth(),
+            content = {
+                Card(
+                    modifier = Modifier.fillMaxSize(),
+                    colors = CardDefaults.defaultColors(color = statusContainer),
+                ) {
+                    val statusIcon = if (isRunning) CheckCircleOutlineIcon else RemoveCircleOutlineIcon
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        Box(
+                            modifier = Modifier
+                                .matchParentSize()
+                                .offset(30.dp, 36.dp),
+                            contentAlignment = Alignment.BottomEnd,
+                        ) {
+                            Icon(
+                                modifier = Modifier.size(136.dp),
+                                imageVector = statusIcon,
+                                tint = statusTint,
+                                contentDescription = null,
+                            )
+                        }
+                        Column(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(all = 16.dp),
+                        ) {
                             Text(
-                                text = uptime,
+                                text = when {
+                                    state.isRestarting -> stringResource(R.string.home_restarting)
+                                    isStopping -> stringResource(R.string.home_stopping)
+                                    isStarting -> stringResource(R.string.home_starting)
+                                    isRunning -> stringResource(R.string.home_running)
+                                    else -> stringResource(R.string.home_stopped)
+                                },
+                                fontSize = 20.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = statusTint,
+                            )
+                            Spacer(Modifier.height(2.dp))
+                            val versionText = state.version.ifBlank { BuildConfig.MIHOMO_VERSION }
+                            Text(
+                                text = versionText,
                                 fontSize = 14.sp,
                                 fontWeight = FontWeight.Medium,
                                 color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                             )
+                            if (uptime.isNotBlank()) {
+                                Text(
+                                    text = uptime,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                                )
+                            }
                         }
                     }
                 }
-            }
 
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxHeight(),
-            ) {
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f),
-                    insideMargin = PaddingValues(16.dp),
-                    onClick = { showModeDialog = true },
-                    showIndication = true,
-                    pressFeedbackType = PressFeedbackType.Sink,
-                ) {
-                    Text(
-                        text = stringResource(R.string.home_mode),
-                        fontSize = 13.sp,
-                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                    )
-                    Text(
-                        text = modeLabel(state.mode),
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = MiuixTheme.colorScheme.onSurface,
-                    )
+                Column(modifier = Modifier.fillMaxSize()) {
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f),
+                        insideMargin = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+                        onClick = { showModeDialog = true },
+                        showIndication = true,
+                        pressFeedbackType = PressFeedbackType.Sink,
+                    ) {
+                        Column(
+                            modifier = Modifier.fillMaxSize(),
+                            verticalArrangement = Arrangement.Center,
+                        ) {
+                            Text(
+                                text = stringResource(R.string.home_mode),
+                                fontSize = 13.sp,
+                                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                            )
+                            Text(
+                                text = modeLabel(state.mode),
+                                fontSize = 20.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MiuixTheme.colorScheme.onSurface,
+                            )
+                        }
+                    }
+                    Spacer(Modifier.height(12.dp))
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f),
+                        insideMargin = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+                        onClick = { if (isRunning && !isTproxy) showTunStackDialog = true },
+                        showIndication = isRunning && !isTproxy,
+                        pressFeedbackType = if (isRunning && !isTproxy) PressFeedbackType.Sink else PressFeedbackType.None,
+                    ) {
+                        Column(
+                            modifier = Modifier.fillMaxSize(),
+                            verticalArrangement = Arrangement.Center,
+                        ) {
+                            Text(
+                                text = if (isTproxy) stringResource(R.string.home_inbound) else stringResource(R.string.home_tun),
+                                fontSize = 13.sp,
+                                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                            )
+                            Text(
+                                text = if (isTproxy) inboundTproxyLabel else tunStackLabel(state.tunStack),
+                                fontSize = 20.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MiuixTheme.colorScheme.onSurface,
+                            )
+                        }
+                    }
                 }
-                Spacer(Modifier.height(12.dp))
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f),
-                    insideMargin = PaddingValues(16.dp),
-                    onClick = { if (isRunning && !isTproxy) showTunStackDialog = true },
-                    showIndication = isRunning && !isTproxy,
-                    pressFeedbackType = if (isRunning && !isTproxy) PressFeedbackType.Sink else PressFeedbackType.None,
-                ) {
-                    Text(
-                        text = if (isTproxy) stringResource(R.string.home_inbound) else stringResource(R.string.home_tun),
-                        fontSize = 13.sp,
-                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                    )
-                    Text(
-                        text = if (isTproxy) inboundTproxyLabel else tunStackLabel(state.tunStack),
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = MiuixTheme.colorScheme.onSurface,
-                    )
-                }
+            },
+        ) { measurables, constraints ->
+            val gap = 12.dp.roundToPx()
+            val availableWidth = (constraints.maxWidth - gap).coerceAtLeast(0)
+            val leftWidth = (availableWidth * 0.44f).roundToInt().coerceAtMost(180.dp.roundToPx())
+            val rightWidth = (availableWidth - leftWidth).coerceAtLeast(0)
+            val leftMinHeight = measurables[0].minIntrinsicHeight(leftWidth)
+            val rightMinHeight = measurables[1].minIntrinsicHeight(rightWidth)
+            val height = maxOf(leftWidth, leftMinHeight, rightMinHeight)
+            val leftPlaceable = measurables[0].measure(Constraints.fixed(leftWidth, height))
+            val rightPlaceable = measurables[1].measure(Constraints.fixed(rightWidth, height))
+            layout(constraints.maxWidth, height) {
+                leftPlaceable.placeRelative(0, 0)
+                rightPlaceable.placeRelative(leftWidth + gap, 0)
             }
         }
 
-        if (isRunning) {
-            TextButton(
-                text = stringResource(R.string.home_stop),
-                onClick = onStop,
+        if (isRunning || state.isRestarting) {
+            Row(
                 modifier = Modifier.fillMaxWidth(),
-                colors = StatusColors.actionButton(ActionKind.Stop).asTextButtonColors(),
-            )
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                TextButton(
+                    text = stringResource(R.string.home_stop),
+                    onClick = onStop,
+                    modifier = Modifier.weight(1f),
+                    enabled = !state.isRestarting,
+                    colors = StatusColors.actionButton(ActionKind.Stop).asTextButtonColors(),
+                )
+                val restartColors = StatusColors.actionButton(ActionKind.Restart)
+                val rotation = remember { Animatable(0f) }
+                LaunchedEffect(state.isRestarting) {
+                    if (state.isRestarting) {
+                        while (true) {
+                            rotation.animateTo(
+                                targetValue = rotation.value + 360f,
+                                animationSpec = tween(durationMillis = 800, easing = LinearEasing),
+                            )
+                        }
+                    } else if (rotation.value % 360f != 0f) {
+                        val target = ceil(rotation.value / 360f) * 360f
+                        rotation.animateTo(
+                            targetValue = target,
+                            animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing),
+                        )
+                        rotation.snapTo(0f)
+                    }
+                }
+                IconButton(
+                    onClick = { if (!state.isRestarting) onRestart() },
+                    modifier = Modifier.size(48.dp),
+                    backgroundColor = restartColors.container,
+                ) {
+                    Icon(
+                        imageVector = MiuixIcons.Glass.Refresh,
+                        contentDescription = stringResource(R.string.home_restart),
+                        modifier = Modifier.graphicsLayer { rotationZ = rotation.value },
+                        tint = restartColors.content,
+                    )
+                }
+            }
         } else if (isStopping) {
             TextButton(
                 text = stringResource(R.string.home_stopping_btn),

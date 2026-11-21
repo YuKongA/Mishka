@@ -686,6 +686,7 @@ private fun MainPage(
                     bottomPadding = bottomPadding,
                     uiState = homeUiState,
                     viewModel = homeViewModel,
+                    onRestart = { homeViewModel?.restartProxy() },
                     onStop = { homeViewModel?.stopProxy() },
                     onTestLatency = { homeViewModel?.testLatency() },
                     onNavigateLog = { navigator.push(Route.Log) },

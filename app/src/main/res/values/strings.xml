@@ -108,6 +108,7 @@
 
     <!-- Home - Status -->
     <string name="home_starting">Starting</string>
+    <string name="home_restarting">Restarting</string>
     <string name="home_running">Running</string>
     <string name="home_stopping">Stopping</string>
     <string name="home_stopped">Stopped</string>
@@ -123,6 +124,7 @@
     <string name="home_uptime_days_hours">%1$dd %2$dh</string>
 
     <!-- Home - Action Buttons -->
+    <string name="home_restart">Restart</string>
     <string name="home_stop">Stop</string>
     <string name="home_start">Start</string>
     <string name="home_starting_btn">Starting...</string>

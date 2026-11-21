@@ -45,6 +45,7 @@ data class HomeUiState(
     val isRunning: Boolean = false,
     val isStarting: Boolean = false,
     val isStopping: Boolean = false,
+    val isRestarting: Boolean = false,
     val mode: String = "--",
     val tunStack: String = "",
     val tunMode: TunMode = TunMode.Vpn,
@@ -54,7 +55,7 @@ data class HomeUiState(
     val providerTraffic: ImmutableList<ProviderTrafficInfo> = persistentListOf(),
     val isProviderTrafficLoading: Boolean = false,
     val providerTrafficLoadFailed: Boolean = false,
-    val latencyBaidu: Int = -1,
+    val latencyXiaomi: Int = -1,
     val latencyCloudflare: Int = -1,
     val latencyGoogle: Int = -1,
     val isTestingLatency: Boolean = false,
@@ -103,7 +104,7 @@ data class SpeedSnapshot(
 
 /** 主页连通性体检的三个探针；URL 一律用 http 明文，避免 TLS 握手把测量口径拉长 */
 enum class LatencyProbe(val url: String) {
-    Baidu("http://www.baidu.com"),
+    Xiaomi("http://connect.rom.miui.com/generate_204"),
     Cloudflare("http://www.cloudflare.com/cdn-cgi/trace"),
     Google("http://www.google.com/generate_204"),
 }
@@ -216,6 +217,7 @@ class HomeViewModel(
                     ProxyState.Running -> {
                         _uiState.value = _uiState.value.copy(
                             isStarting = false,
+                            isRestarting = false,
                             isRunning = true,
                             tunMode = status.tunMode,
                             subscription = activeSubscriptionInfo(),
@@ -671,6 +673,7 @@ class HomeViewModel(
     }
 
     fun restartProxy() {
+        _uiState.update { it.copy(isRestarting = true) }
         serviceController.restart(getActiveSubscriptionId())
     }
 
@@ -762,7 +765,7 @@ class HomeViewModel(
     private fun applyLatency(probe: LatencyProbe, delay: Int) {
         _uiState.update {
             when (probe) {
-                LatencyProbe.Baidu -> it.copy(latencyBaidu = delay)
+                LatencyProbe.Xiaomi -> it.copy(latencyXiaomi = delay)
                 LatencyProbe.Cloudflare -> it.copy(latencyCloudflare = delay)
                 LatencyProbe.Google -> it.copy(latencyGoogle = delay)
             }
