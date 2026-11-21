@@ -73,6 +73,7 @@ android {
         }
         debug {
             if (keystoreFile != null) signingConfig = signingConfigs.getByName("release")
+            applicationIdSuffix = ".debug"
         }
     }
     buildFeatures {

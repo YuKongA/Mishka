@@ -108,9 +108,11 @@ fun LogScreen(
     val backdrop = rememberBlurBackdrop()
     val blurActive = backdrop != null
 
-    Box(modifier = Modifier
-        .fillMaxSize()
-        .background(MiuixTheme.colorScheme.surface)) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MiuixTheme.colorScheme.surface)
+    ) {
         Scaffold(
             modifier = Modifier.glassSearchBarTransition(searchExpanded) { barAlpha.value },
             topBar = {

@@ -76,75 +76,75 @@ internal fun SystemCardsContent(
     memory: MemorySnapshot = MemorySnapshot(),
     systemInfo: SystemInfoSnapshot = SystemInfoSnapshot(),
 ) {
-        Row(
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(LocalHomeCardHorizontalPadding.current)
+            .padding(vertical = 6.dp)
+            .height(IntrinsicSize.Min),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Card(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp)
-                .padding(vertical = 6.dp)
-                .height(IntrinsicSize.Min),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                .weight(1f)
+                .fillMaxHeight(),
+            insideMargin = PaddingValues(16.dp),
         ) {
-            Card(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxHeight(),
-                insideMargin = PaddingValues(16.dp),
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        text = "IP",
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = MiuixTheme.colorScheme.onSurface,
-                    )
-                    BadgeLabel(
-                        when (systemInfo.addressType) {
-                            NetworkAddressType.Unknown -> "--"
-                            NetworkAddressType.Tun -> "TUN"
-                            NetworkAddressType.Lan -> "LAN"
-                            NetworkAddressType.Wan -> "WAN"
-                        },
-                    )
-                }
-                InfoRow(stringResource(R.string.home_address), systemInfo.localIp, Modifier.padding(top = 8.dp))
-                InfoRow(stringResource(R.string.home_interface), systemInfo.interfaceName, Modifier.padding(top = 4.dp))
-            }
-
-            Card(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxHeight(),
-                insideMargin = PaddingValues(16.dp),
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        text = stringResource(R.string.home_system),
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = MiuixTheme.colorScheme.onSurface,
-                    )
-                    BadgeLabel("SYS")
-                }
-                InfoRow(
-                    "CPU",
-                    systemInfo.cpuUsage,
-                    Modifier.padding(top = 8.dp),
+                Text(
+                    text = "IP",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = MiuixTheme.colorScheme.onSurface,
                 )
-                InfoRow(
-                    "RAM",
-                    memory.ramUsage,
-                    Modifier.padding(top = 4.dp),
+                BadgeLabel(
+                    when (systemInfo.addressType) {
+                        NetworkAddressType.Unknown -> "--"
+                        NetworkAddressType.Tun -> "TUN"
+                        NetworkAddressType.Lan -> "LAN"
+                        NetworkAddressType.Wan -> "WAN"
+                    },
                 )
             }
+            InfoRow(stringResource(R.string.home_address), systemInfo.localIp, Modifier.padding(top = 8.dp))
+            InfoRow(stringResource(R.string.home_interface), systemInfo.interfaceName, Modifier.padding(top = 4.dp))
         }
+
+        Card(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxHeight(),
+            insideMargin = PaddingValues(16.dp),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = stringResource(R.string.home_system),
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = MiuixTheme.colorScheme.onSurface,
+                )
+                BadgeLabel("SYS")
+            }
+            InfoRow(
+                "CPU",
+                systemInfo.cpuUsage,
+                Modifier.padding(top = 8.dp),
+            )
+            InfoRow(
+                "RAM",
+                memory.ramUsage,
+                Modifier.padding(top = 4.dp),
+            )
+        }
+    }
 }
 
 @Composable

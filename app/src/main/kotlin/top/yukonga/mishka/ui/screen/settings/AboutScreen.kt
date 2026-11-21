@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.add
 import androidx.compose.foundation.layout.calculateEndPadding
 import androidx.compose.foundation.layout.calculateStartPadding
@@ -58,6 +57,7 @@ import top.yukonga.mishka.ui.component.blur.rememberBlurEnabled
 import top.yukonga.mishka.ui.component.effect.BgEffectBackground
 import top.yukonga.mishka.ui.component.overScrollVertical
 import top.yukonga.mishka.ui.theme.LocalAppDarkMode
+import top.yukonga.mishka.ui.util.LocalHorizontalCutoutSides
 import top.yukonga.mishka.ui.util.horizontalCutoutPadding
 import top.yukonga.mishka.ui.util.sidebarStartInset
 import top.yukonga.miuix.kmp.basic.Card
@@ -131,7 +131,7 @@ fun AboutScreen(
         },
         contentWindowInsets = WindowInsets.systemBars
             .add(WindowInsets.displayCutout)
-            .only(WindowInsetsSides.Horizontal),
+            .only(LocalHorizontalCutoutSides.current),
     ) { innerPadding ->
         Box(modifier = if (backdrop != null) Modifier.layerBackdrop(backdrop) else Modifier) {
             AboutContent(

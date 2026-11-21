@@ -1,10 +1,12 @@
 package top.yukonga.mishka.ui.screen.home
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -12,6 +14,8 @@ import androidx.compose.ui.unit.sp
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.squircle.squircleBackground
 import top.yukonga.miuix.kmp.theme.MiuixTheme
+
+internal val LocalHomeCardHorizontalPadding = staticCompositionLocalOf { PaddingValues(horizontal = 12.dp) }
 
 /** 卡片背景水印的共享度量，供 [TrafficSparkline] 等背景绘制组件复用 */
 internal const val WatermarkHeightFraction = 0.52f

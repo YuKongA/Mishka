@@ -19,8 +19,8 @@ import top.yukonga.mishka.ui.component.blur.LocalBlurEnabled
 import top.yukonga.mishka.ui.component.blur.LocalTopBarBlurStyle
 import top.yukonga.mishka.ui.navigation.AppNavigation
 import top.yukonga.mishka.ui.theme.LocalAppDarkMode
-import top.yukonga.mishka.ui.theme.LocalContainerSize
 import top.yukonga.mishka.ui.theme.LocalAppMonetEnabled
+import top.yukonga.mishka.ui.theme.LocalContainerSize
 import top.yukonga.mishka.ui.theme.LocalPlatformDensity
 import top.yukonga.mishka.ui.theme.ThemeAccentColor
 import top.yukonga.mishka.ui.theme.ThemeConfig
@@ -137,37 +137,37 @@ fun App(
                 LocalTopBarBlurStyle provides themeConfig.topBarBlurStyle,
                 LocalContentColor provides MiuixTheme.colorScheme.onBackground,
             ) {
-            AppNavigation(
-                themeConfig = themeConfig,
-                onThemeConfigChange = onThemeConfigChange,
-                homeViewModel = homeViewModel,
-                subscriptionViewModel = subscriptionViewModel,
-                overrideProfileViewModel = overrideProfileViewModel,
-                proxyViewModel = proxyViewModel,
-                logViewModel = logViewModel,
-                providerViewModel = providerViewModel,
-                connectionViewModel = connectionViewModel,
-                dnsQueryViewModel = dnsQueryViewModel,
-                networkSettingsViewModel = networkSettingsViewModel,
-                metaSettingsViewModel = metaSettingsViewModel,
-                externalControlViewModel = externalControlViewModel,
-                automationViewModel = automationViewModel,
-                appProxyViewModel = appProxyViewModel,
-                filePicker = filePicker,
-                storage = storage,
-                bootStartManager = bootStartManager,
-                mihomoVersion = mihomoVersion,
-                onScanQR = onScanQR,
-                wifiPolicyController = wifiPolicyController,
-                onRequestWifiPermission = onRequestWifiPermission,
-                onPredictiveBackChange = onPredictiveBackChange,
-                onHideTaskCardChange = onHideTaskCardChange,
-                hasRootPermission = hasRootPermission,
-                deepLinkImport = deepLinkImport,
-                onDeepLinkImportConsumed = onDeepLinkImportConsumed,
-                backupViewModel = backupViewModel,
-                onRestartApp = onRestartApp,
-            )
+                AppNavigation(
+                    themeConfig = themeConfig,
+                    onThemeConfigChange = onThemeConfigChange,
+                    homeViewModel = homeViewModel,
+                    subscriptionViewModel = subscriptionViewModel,
+                    overrideProfileViewModel = overrideProfileViewModel,
+                    proxyViewModel = proxyViewModel,
+                    logViewModel = logViewModel,
+                    providerViewModel = providerViewModel,
+                    connectionViewModel = connectionViewModel,
+                    dnsQueryViewModel = dnsQueryViewModel,
+                    networkSettingsViewModel = networkSettingsViewModel,
+                    metaSettingsViewModel = metaSettingsViewModel,
+                    externalControlViewModel = externalControlViewModel,
+                    automationViewModel = automationViewModel,
+                    appProxyViewModel = appProxyViewModel,
+                    filePicker = filePicker,
+                    storage = storage,
+                    bootStartManager = bootStartManager,
+                    mihomoVersion = mihomoVersion,
+                    onScanQR = onScanQR,
+                    wifiPolicyController = wifiPolicyController,
+                    onRequestWifiPermission = onRequestWifiPermission,
+                    onPredictiveBackChange = onPredictiveBackChange,
+                    onHideTaskCardChange = onHideTaskCardChange,
+                    hasRootPermission = hasRootPermission,
+                    deepLinkImport = deepLinkImport,
+                    onDeepLinkImportConsumed = onDeepLinkImportConsumed,
+                    backupViewModel = backupViewModel,
+                    onRestartApp = onRestartApp,
+                )
             }
         }
     }

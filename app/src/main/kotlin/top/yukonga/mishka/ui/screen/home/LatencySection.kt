@@ -69,7 +69,7 @@ private fun LatencyCard(state: HomeUiState) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 12.dp)
+            .padding(LocalHomeCardHorizontalPadding.current)
             .padding(bottom = 6.dp),
         insideMargin = PaddingValues(16.dp),
     ) {

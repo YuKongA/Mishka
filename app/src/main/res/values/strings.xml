@@ -176,6 +176,7 @@
     <!-- Proxy -->
     <string name="proxy_title">Proxy Groups</string>
     <string name="proxy_no_groups">No proxy groups</string>
+    <string name="proxy_select_group_hint">Select a proxy group</string>
     <string name="proxy_start_first">Please start the proxy service first</string>
     <string name="proxy_mode_direct_hint">Direct mode is active: all traffic bypasses the proxy. Group selections are saved but only take effect after switching back to rule mode.</string>
     <string name="proxy_mode_global_hint">Global mode is active: only the GLOBAL group routes traffic. Selections in other groups take effect after switching back to rule mode.</string>
@@ -380,6 +381,7 @@
     <string name="settings_hide_task_card">Hide from recents</string>
     <string name="settings_hide_task_card_summary">Hide task card in recent tasks</string>
     <string name="settings_about">About</string>
+    <string name="settings_select_item_hint">Select a setting</string>
 
     <!-- VPN Settings -->
     <string name="vpn_settings_title">VPN Settings</string>

@@ -33,7 +33,7 @@ fun LazyListScope.quickEntriesSection(
     item(key = "quick_entries") {
         Column(
             modifier = Modifier
-                .padding(horizontal = 12.dp)
+                .padding(LocalHomeCardHorizontalPadding.current)
                 .padding(bottom = 12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
@@ -90,7 +90,7 @@ internal fun QuickEntriesContent(
     SmallTitle(text = stringResource(R.string.home_tools))
     Column(
         modifier = Modifier
-            .padding(horizontal = 12.dp)
+            .padding(LocalHomeCardHorizontalPadding.current)
             .padding(bottom = 12.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {

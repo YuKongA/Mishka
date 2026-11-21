@@ -174,6 +174,7 @@
     <!-- Proxy -->
     <string name="proxy_title">代理组</string>
     <string name="proxy_no_groups">暂无代理组</string>
+    <string name="proxy_select_group_hint">选择一个代理组</string>
     <string name="proxy_start_first">请先启动代理服务</string>
     <string name="proxy_mode_direct_hint">当前为直连模式，所有流量不经代理。此处的选择会被保存，切回规则模式后生效。</string>
     <string name="proxy_mode_global_hint">当前为全局模式，仅 GLOBAL 组决定出口。其他代理组的选择切回规则模式后生效。</string>
@@ -378,6 +379,7 @@
     <string name="settings_hide_task_card">后台卡片隐藏</string>
     <string name="settings_hide_task_card_summary">在最近任务中隐藏任务卡片</string>
     <string name="settings_about">关于</string>
+    <string name="settings_select_item_hint">选择一个设置项</string>
 
     <!-- VPN Settings -->
     <string name="vpn_settings_title">VPN 设置</string>

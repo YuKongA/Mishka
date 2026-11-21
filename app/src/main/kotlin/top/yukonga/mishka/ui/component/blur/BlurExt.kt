@@ -30,6 +30,8 @@ val LocalPageBackdrop = staticCompositionLocalOf<LayerBackdrop?> { null }
 val LocalTopAppBarTitleAlpha = staticCompositionLocalOf<() -> Float> { { 1f } }
 val LocalTopAppBarCenterObstructionStart = compositionLocalOf { Dp.Unspecified }
 val LocalTopBarStartInset = staticCompositionLocalOf<() -> Dp> { { 0.dp } }
+val LocalTopBarExtraTopInset = staticCompositionLocalOf<() -> Dp> { { 0.dp } }
+val LocalCollapsedRailTopObstruction = staticCompositionLocalOf<() -> Dp> { { 0.dp } }
 
 @Composable
 fun Modifier.defaultBlurEffect(

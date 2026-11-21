@@ -172,7 +172,11 @@ fun OverrideEditScreen(
                                         onPickFile { result ->
                                             if (result != null) {
                                                 picked = result
-                                                if (nameState.text.isBlank()) nameState.setTextAndPlaceCursorAtEnd(result.fileName.substringBeforeLast('.'))
+                                                if (nameState.text.isBlank()) nameState.setTextAndPlaceCursorAtEnd(
+                                                    result.fileName.substringBeforeLast(
+                                                        '.'
+                                                    )
+                                                )
                                                 format = if (result.fileName.endsWith(".js", ignoreCase = true)) {
                                                     OverrideFormat.JavaScript
                                                 } else {

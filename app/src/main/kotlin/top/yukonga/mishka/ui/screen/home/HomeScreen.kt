@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -157,7 +158,7 @@ private fun HomeScreenContent(
         },
     ) { innerPadding ->
         BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-            val isTablet = (maxWidth - LocalTopBarStartInset.current()) >= 840.dp
+            val isTablet = (maxWidth - LocalTopBarStartInset.current()) >= 960.dp
             LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
@@ -175,50 +176,58 @@ private fun HomeScreenContent(
                 if (isTablet) {
                     item(key = "tablet_dashboard") {
                         Row(modifier = Modifier.fillMaxWidth()) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                StatusContent(
-                                    state = uiState,
-                                    uptime = uptime,
-                                    onSwitchMode = onSwitchMode,
-                                    onSwitchTunStack = onSwitchTunStack,
-                                    onRestart = onRestart,
-                                    onStop = onStop,
-                                    onStart = onStartProxy,
-                                    useWideLayout = false,
-                                )
-                                LatencySectionContent(uiState, onTestLatency)
-                                if (hasSubscriptionQuota) {
-                                    QuickEntriesContent(
-                                        isRunning = uiState.isRunning,
-                                        onNavigateLog = onNavigateLog,
-                                        onNavigateProvider = onNavigateProvider,
-                                        onNavigateConnection = onNavigateConnection,
-                                        onNavigateDnsQuery = onNavigateDnsQuery,
+                            CompositionLocalProvider(
+                                LocalHomeCardHorizontalPadding provides PaddingValues(start = 12.dp, end = 6.dp),
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    StatusContent(
+                                        state = uiState,
+                                        uptime = uptime,
+                                        onSwitchMode = onSwitchMode,
+                                        onSwitchTunStack = onSwitchTunStack,
+                                        onRestart = onRestart,
+                                        onStop = onStop,
+                                        onStart = onStartProxy,
+                                        useWideLayout = false,
                                     )
+                                    LatencySectionContent(uiState, onTestLatency)
+                                    if (hasSubscriptionQuota) {
+                                        QuickEntriesContent(
+                                            isRunning = uiState.isRunning,
+                                            onNavigateLog = onNavigateLog,
+                                            onNavigateProvider = onNavigateProvider,
+                                            onNavigateConnection = onNavigateConnection,
+                                            onNavigateDnsQuery = onNavigateDnsQuery,
+                                        )
+                                    }
                                 }
                             }
-                            Column(modifier = Modifier.weight(1f)) {
-                                OverviewCardsContent(
-                                    speed = speed,
-                                    state = uiState,
-                                    onSpeedClick = { showSpeedDetail = true },
-                                    onSubscriptionClick = {
-                                        showSubscriptionTraffic = true
-                                        onRefreshProviderTraffic()
-                                    },
-                                )
-                                SystemCardsContent(
-                                    memory = memory,
-                                    systemInfo = systemInfo,
-                                )
-                                if (!hasSubscriptionQuota) {
-                                    QuickEntriesContent(
-                                        isRunning = uiState.isRunning,
-                                        onNavigateLog = onNavigateLog,
-                                        onNavigateProvider = onNavigateProvider,
-                                        onNavigateConnection = onNavigateConnection,
-                                        onNavigateDnsQuery = onNavigateDnsQuery,
+                            CompositionLocalProvider(
+                                LocalHomeCardHorizontalPadding provides PaddingValues(start = 6.dp, end = 12.dp),
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    OverviewCardsContent(
+                                        speed = speed,
+                                        state = uiState,
+                                        onSpeedClick = { showSpeedDetail = true },
+                                        onSubscriptionClick = {
+                                            showSubscriptionTraffic = true
+                                            onRefreshProviderTraffic()
+                                        },
                                     )
+                                    SystemCardsContent(
+                                        memory = memory,
+                                        systemInfo = systemInfo,
+                                    )
+                                    if (!hasSubscriptionQuota) {
+                                        QuickEntriesContent(
+                                            isRunning = uiState.isRunning,
+                                            onNavigateLog = onNavigateLog,
+                                            onNavigateProvider = onNavigateProvider,
+                                            onNavigateConnection = onNavigateConnection,
+                                            onNavigateDnsQuery = onNavigateDnsQuery,
+                                        )
+                                    }
                                 }
                             }
                         }

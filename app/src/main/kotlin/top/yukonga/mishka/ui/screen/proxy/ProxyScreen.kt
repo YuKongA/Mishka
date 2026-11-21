@@ -11,15 +11,19 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.LocalIndication
+import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -28,8 +32,14 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.FloatState
 import androidx.compose.runtime.LaunchedEffect
@@ -49,6 +59,7 @@ import androidx.compose.runtime.toMutableStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
@@ -63,6 +74,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
@@ -73,6 +85,7 @@ import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.ImmutableMap
 import kotlinx.collections.immutable.ImmutableSet
 import kotlinx.collections.immutable.persistentListOf
+import kotlinx.collections.immutable.persistentMapOf
 import kotlinx.collections.immutable.persistentSetOf
 import kotlinx.collections.immutable.toPersistentList
 import kotlinx.coroutines.Job
@@ -82,17 +95,29 @@ import top.yukonga.mishka.ui.component.AdaptiveTopAppBar
 import top.yukonga.mishka.ui.component.CardSegment
 import top.yukonga.mishka.ui.component.TopLayer
 import top.yukonga.mishka.ui.component.blur.BlurredBar
+import top.yukonga.mishka.ui.component.blur.LocalCollapsedRailTopObstruction
 import top.yukonga.mishka.ui.component.blur.LocalPageBackdrop
+import top.yukonga.mishka.ui.component.blur.LocalTopAppBarCenterObstructionStart
+import top.yukonga.mishka.ui.component.blur.LocalTopAppBarTitleAlpha
+import top.yukonga.mishka.ui.component.blur.LocalTopBarExtraTopInset
+import top.yukonga.mishka.ui.component.blur.LocalTopBarStartInset
 import top.yukonga.mishka.ui.component.blur.rememberBlurBackdrop
 import top.yukonga.mishka.ui.component.overScrollVertical
 import top.yukonga.mishka.ui.platform.IconLoader
 import top.yukonga.mishka.ui.theme.LocalContainerSize
 import top.yukonga.mishka.ui.theme.LocalPlatformDensity
 import top.yukonga.mishka.ui.theme.StatusColors
+import top.yukonga.mishka.ui.util.DualPaneDividerWidth
+import top.yukonga.mishka.ui.util.DualPaneMinWidth
+import top.yukonga.mishka.ui.util.LocalHorizontalCutoutSides
+import top.yukonga.mishka.ui.util.calculateDualPaneMasterWidth
 import top.yukonga.mishka.ui.util.horizontalCutoutPadding
+import top.yukonga.mishka.ui.util.rememberHorizontalSafeInsets
 import top.yukonga.mishka.viewmodel.ProxyGroupUi
 import top.yukonga.mishka.viewmodel.ProxyUiState
 import top.yukonga.mishka.viewmodel.ProxyViewModel
+import top.yukonga.miuix.kmp.basic.Card
+import top.yukonga.miuix.kmp.basic.CardDefaults
 import top.yukonga.miuix.kmp.basic.CircularProgressIndicator
 import top.yukonga.miuix.kmp.basic.DropdownEntry
 import top.yukonga.miuix.kmp.basic.DropdownItem
@@ -119,8 +144,10 @@ import top.yukonga.miuix.kmp.squircle.squircleBackground
 import top.yukonga.miuix.kmp.squircle.squircleClip
 import top.yukonga.miuix.kmp.squircle.squircleSurface
 import top.yukonga.miuix.kmp.theme.MiuixTheme
+import top.yukonga.miuix.kmp.utils.PressFeedbackType
 import top.yukonga.miuix.kmp.utils.scrollEndHaptic
 import kotlin.math.roundToInt
+import androidx.compose.foundation.lazy.grid.items as gridItems
 import top.yukonga.miuix.kmp.icon.glass.Sort as GlassSort
 
 private class GroupRowsCacheEntry(
@@ -146,7 +173,39 @@ fun ProxyScreen(
     val sortOption = viewModel?.sortOption?.collectAsStateWithLifecycle()?.value ?: 0
     val singleColumn = viewModel?.singleColumn?.collectAsStateWithLifecycle()?.value == true
     val showGroupIcons = viewModel?.showGroupIcons?.collectAsStateWithLifecycle()?.value ?: true
-    // 0 = 行内两列并排，1 = 行内竖排
+    ProxyScreenContent(
+        modifier = modifier,
+        bottomPadding = bottomPadding,
+        uiState = uiState,
+        sortOption = sortOption,
+        singleColumn = singleColumn,
+        showGroupIcons = showGroupIcons,
+        onTestNodeDelay = { nodeName -> viewModel?.testNodeDelay(nodeName) },
+        onSelectProxy = { groupName, proxyName -> viewModel?.selectProxy(groupName, proxyName) },
+        onTestGroupDelay = { groupName -> viewModel?.testGroupDelay(groupName) },
+        onUnfixProxy = { groupName -> viewModel?.unfixProxy(groupName) },
+        onUpdateSortOption = { viewModel?.updateSortOption(it) },
+        onUpdateSingleColumn = { viewModel?.updateSingleColumn(it) },
+        onUpdateShowGroupIcons = { viewModel?.updateShowGroupIcons(it) },
+    )
+}
+
+@Composable
+private fun ProxyScreenContent(
+    modifier: Modifier = Modifier,
+    bottomPadding: Dp = 0.dp,
+    uiState: ProxyUiState = ProxyUiState(),
+    sortOption: Int = 0,
+    singleColumn: Boolean = false,
+    showGroupIcons: Boolean = true,
+    onTestNodeDelay: (String) -> Unit = {},
+    onSelectProxy: (String, String) -> Unit = { _, _ -> },
+    onTestGroupDelay: (String) -> Unit = {},
+    onUnfixProxy: (String) -> Unit = {},
+    onUpdateSortOption: (Int) -> Unit = {},
+    onUpdateSingleColumn: (Boolean) -> Unit = {},
+    onUpdateShowGroupIcons: (Boolean) -> Unit = {},
+) {
     val singleColumnProgress = animateFloatAsState(
         targetValue = if (singleColumn) 1f else 0f,
         animationSpec = tween(300),
@@ -182,12 +241,23 @@ fun ProxyScreen(
             restore = { it.toMutableStateList() },
         ),
     ) { mutableStateListOf<String>() }
+    var selectedGroupName by rememberSaveable { mutableStateOf<String?>(null) }
 
     // retainedGroups 在收缩动画期间保住 item 防脱落穿插；普通 Map 靠随后状态写入驱动重测
     val expandProgress = remember { mutableMapOf<String, MutableFloatState>() }
     val animatingGroups = remember { mutableStateListOf<String>() }
     val retainedGroups = remember { mutableStateListOf<String>() }
     val expandJobs = remember { mutableMapOf<String, Job>() }
+
+    fun ensureGroupExpanded(name: String) {
+        expandJobs[name]?.cancel()
+        animatingGroups.remove(name)
+        retainedGroups.remove(name)
+        expandProgress.getOrPut(name) { mutableFloatStateOf(1f) }.floatValue = 1f
+        if (name !in expandedGroups) {
+            expandedGroups.add(name)
+        }
+    }
 
     fun toggleGroup(name: String) {
         val progress = expandProgress.getOrPut(name) {
@@ -198,8 +268,12 @@ fun ProxyScreen(
         if (expanding) {
             retainedGroups.remove(name)
             expandedGroups.add(name)
+            selectedGroupName = name
         } else {
             if (name !in retainedGroups) retainedGroups.add(name)
+            if (selectedGroupName == name) {
+                selectedGroupName = expandedGroups.lastOrNull { it != name }
+            }
         }
         if (name !in animatingGroups) animatingGroups.add(name)
         expandJobs[name] = coroutineScope.launch {
@@ -256,213 +330,551 @@ fun ProxyScreen(
     }
 
 
-    val backdrop = rememberBlurBackdrop()
-    val blurActive = backdrop != null
-
-    Scaffold(
-        modifier = modifier,
-        topBar = {
-            BlurredBar(backdrop = backdrop, blurActive = blurActive) {
-                AdaptiveTopAppBar(
-                    title = stringResource(R.string.proxy_title),
-                    scrollBehavior = scrollBehavior,
-                    actions = {
-                        if (groups.isNotEmpty()) {
-                            GlassIconButton(
-                                onClick = { showSortPopup.value = true },
-                                modifier = Modifier.glassPopupAnchor(
-                                    anchor = sortAnchor,
-                                    cornerRadius = GlassTopAppBarDefaults.ButtonSize / 2,
-                                ),
-                            ) {
-                                Icon(
-                                    imageVector = MiuixIcons.Glass.GlassSort,
-                                    contentDescription = stringResource(R.string.proxy_sort_title),
-                                    tint = MiuixTheme.colorScheme.onSurface,
-                                    modifier = Modifier
-                                        .size(28.dp)
-                                        .glassPopupAnchorContent(sortAnchor),
-                                )
-                            }
-                            GlassIconButton(
-                                onClick = { showPopup.value = true },
-                                modifier = Modifier.glassPopupAnchor(
-                                    anchor = moreAnchor,
-                                    cornerRadius = GlassTopAppBarDefaults.ButtonSize / 2,
-                                ),
-                            ) {
-                                Icon(
-                                    imageVector = MiuixIcons.Glass.More,
-                                    contentDescription = stringResource(R.string.common_more),
-                                    tint = MiuixTheme.colorScheme.onSurface,
-                                    modifier = Modifier
-                                        .size(28.dp)
-                                        .glassPopupAnchorContent(moreAnchor),
-                                )
-                            }
-                        }
-                    },
-                )
-            }
-        },
-    ) { innerPadding ->
-        val onTestNodeDelay: (String) -> Unit = remember(viewModel) {
-            { nodeName -> viewModel?.testNodeDelay(nodeName) }
-        }
-        val onSelectProxy: (String, String) -> Unit = remember(viewModel) {
-            { groupName, proxyName -> viewModel?.selectProxy(groupName, proxyName) }
-        }
-
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .then(if (backdrop != null) Modifier.layerBackdrop(backdrop) else Modifier)
-                .horizontalCutoutPadding()
-                .scrollEndHaptic()
-                .overScrollVertical(scrollBehavior)
-                .nestedScroll(scrollBehavior.nestedScrollConnection),
-            state = listState,
-            contentPadding = PaddingValues(
-                top = innerPadding.calculateTopPadding(),
-                bottom = bottomPadding,
-            ),
-        ) {
-            if (groups.isEmpty()) {
-                item(key = "empty", contentType = "empty") {
-                    Column(
-                        modifier = Modifier.fillParentMaxSize(),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center,
-                    ) {
-                        Text(
-                            text = stringResource(R.string.proxy_no_groups),
-                            fontSize = 16.sp,
-                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                        )
-                        Text(
-                            text = stringResource(R.string.proxy_start_first),
-                            modifier = Modifier.padding(top = 6.dp),
-                            fontSize = 14.sp,
-                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                        )
-                    }
+    BoxWithConstraints(modifier = modifier.fillMaxSize()) {
+        val safeInsets = rememberHorizontalSafeInsets()
+        val startInset = LocalTopBarStartInset.current()
+        val contentWidth = (maxWidth - startInset - safeInsets.start - safeInsets.end).coerceAtLeast(0.dp)
+        val isTablet = contentWidth >= DualPaneMinWidth && groups.isNotEmpty()
+        val masterPaneWidth = calculateDualPaneMasterWidth(contentWidth) + startInset + safeInsets.start
+        val selectedGroup = selectedGroupName?.let { name -> groups.firstOrNull { it.name == name } }
+        LaunchedEffect(isTablet, groups) {
+            if (isTablet) {
+                if (selectedGroupName == null || groups.none { it.name == selectedGroupName }) {
+                    selectedGroupName = expandedGroups.lastOrNull { name -> groups.any { it.name == name } }
                 }
             } else {
-                if (modeHintRes != null) {
-                    item(key = "mode_hint", contentType = "proxy_mode_hint") {
-                        CardSegment(
-                            isFirst = true,
-                            isLast = true,
-                            modifier = Modifier.animateItem(placementSpec = null),
-                            outerTopPadding = 12.dp,
-                            insidePadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
-                        ) {
-                            Text(
-                                text = stringResource(modeHintRes),
-                                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                                fontSize = 13.sp,
-                            )
-                        }
-                    }
+                val target = selectedGroupName
+                if (target != null && groups.any { it.name == target }) {
+                    ensureGroupExpanded(target)
                 }
-
-
-                // 展平为独立 item，仅组合可见行
-                groups.forEach { group ->
-                    val isExpanded = group.name in expandedGroups
-                    val rowsPresent = isExpanded || group.name in retainedGroups
-                    val isAnimating = group.name in animatingGroups
-                    val allRows = if (rowsPresent) {
-                        getGroupRows(group, sortOption)
-                    } else {
-                        persistentListOf()
-                    }
-                    // 动画期间限制最大渲染行数防卡死，收尾后恢复全量虚拟化
-                    val rows = if (isAnimating && allRows.size > maxAnimRows) {
-                        allRows.take(maxAnimRows)
-                    } else {
-                        allRows
-                    }
-                    val groupProgress = expandProgress[group.name]
-                    val currentFraction = groupProgress?.floatValue ?: if (isExpanded) 1f else 0f
-
-                    item(key = "group:${group.name}", contentType = "proxy_group_header") {
-                        // 有子行时平接（0dp），完全收起后封底（16dp）
-                        val headerBottomCorner = if (currentFraction <= 0.01f) 16.dp else 0.dp
-
-                        CardSegment(
-                            isFirst = true,
-                            isLast = currentFraction <= 0.01f,
-                            modifier = Modifier.animateItem(placementSpec = null),
-                            bottomCornerRadius = headerBottomCorner,
-                            outerTopPadding = 12.dp,
-                        ) {
-                            ProxyGroupHeader(
-                                group = group,
-                                showIcon = showGroupIcons,
-                                isExpanded = isExpanded,
-                                expandProgress = groupProgress,
-                                isTesting = group.name in uiState.testingGroups,
-                                onTestDelay = { viewModel?.testGroupDelay(group.name) },
-                                onUnfix = { viewModel?.unfixProxy(group.name) },
-                                onToggle = { toggleGroup(group.name) },
-                            )
-                        }
-                    }
-
-                    if (rows.isNotEmpty()) {
-                        val lastRowIndex = rows.lastIndex
-                        val rowCount = rows.size
-                        val groupExpandProgress = expandProgress[group.name]
-                        val onSelectThisGroup: (String) -> Unit = { proxyName ->
-                            onSelectProxy(group.name, proxyName)
-                        }
-
-                        // 动态计算当前露出的最底行，赋予 16dp 底圆角
-                        val activeBottomIndex = when {
-                            currentFraction >= 0.99f -> lastRowIndex
-                            currentFraction <= 0.01f -> -1
-                            else -> (rowCount * currentFraction).toInt().coerceIn(0, lastRowIndex)
-                        }
-
-                        rows.forEachIndexed { rowIndex, row ->
-                            val isCurrentBottom = rowIndex == activeBottomIndex
-                            val rowBottomCorner = if (isCurrentBottom) 16.dp else 0.dp
-
-                            item(
-                                key = "nodes:${group.name}:$rowIndex",
-                                contentType = "proxy_node_row",
-                            ) {
-                                CardSegment(
-                                    isFirst = false,
-                                    isLast = isCurrentBottom,
-                                    modifier = Modifier
-                                        .animateItem(placementSpec = null)
-                                        .clipToBounds(),
-                                    bottomCornerRadius = rowBottomCorner,
-                                    insidePadding = PaddingValues(
-                                        start = 12.dp,
-                                        end = 12.dp,
-                                    ),
-                                ) {
-                                    ProxyNodeRow(
-                                        row = row,
-                                        group = group,
-                                        singleColumnProgress = singleColumnProgress,
-                                        expandProgress = groupExpandProgress,
-                                        rowIndex = rowIndex,
-                                        rowCount = rowCount,
-                                        testingNodes = uiState.testingNodes,
-                                        onTestNodeDelay = onTestNodeDelay,
-                                        onSelect = onSelectThisGroup,
+            }
+        }
+        val masterListState = rememberLazyListState()
+        val detailGridState = rememberLazyGridState()
+        val masterScrollBehavior = MiuixScrollBehavior()
+        val detailScrollBehavior = MiuixScrollBehavior()
+        LaunchedEffect(selectedGroup?.name) {
+            detailGridState.scrollToItem(0)
+        }
+        val proxyTopBarActions: @Composable () -> Unit = {
+            if (groups.isNotEmpty()) {
+                GlassIconButton(
+                    onClick = { showSortPopup.value = true },
+                    modifier = Modifier.glassPopupAnchor(
+                        anchor = sortAnchor,
+                        cornerRadius = GlassTopAppBarDefaults.ButtonSize / 2,
+                    ),
+                ) {
+                    Icon(
+                        imageVector = MiuixIcons.Glass.GlassSort,
+                        contentDescription = stringResource(R.string.proxy_sort_title),
+                        tint = MiuixTheme.colorScheme.onSurface,
+                        modifier = Modifier
+                            .size(28.dp)
+                            .glassPopupAnchorContent(sortAnchor),
+                    )
+                }
+                GlassIconButton(
+                    onClick = { showPopup.value = true },
+                    modifier = Modifier.glassPopupAnchor(
+                        anchor = moreAnchor,
+                        cornerRadius = GlassTopAppBarDefaults.ButtonSize / 2,
+                    ),
+                ) {
+                    Icon(
+                        imageVector = MiuixIcons.Glass.More,
+                        contentDescription = stringResource(R.string.common_more),
+                        tint = MiuixTheme.colorScheme.onSurface,
+                        modifier = Modifier
+                            .size(28.dp)
+                            .glassPopupAnchorContent(moreAnchor),
+                    )
+                }
+            }
+        }
+        val onTestNodeDelayStable = remember(onTestNodeDelay) { onTestNodeDelay }
+        val onSelectProxyStable = remember(onSelectProxy) { onSelectProxy }
+        if (isTablet) {
+            val masterBackdrop = rememberBlurBackdrop()
+            val detailBackdrop = rememberBlurBackdrop()
+            Row(modifier = Modifier.fillMaxSize()) {
+                Box(
+                    modifier = Modifier
+                        .width(masterPaneWidth)
+                        .fillMaxHeight(),
+                ) {
+                    CompositionLocalProvider(
+                        LocalHorizontalCutoutSides provides WindowInsetsSides.Start,
+                    ) {
+                        Scaffold(
+                            modifier = Modifier.fillMaxSize(),
+                            topBar = {
+                                BlurredBar(backdrop = masterBackdrop, blurActive = masterBackdrop != null) {
+                                    AdaptiveTopAppBar(
+                                        title = stringResource(R.string.proxy_title),
+                                        scrollBehavior = masterScrollBehavior,
                                     )
+                                }
+                            },
+                        ) { innerPadding ->
+                            LazyColumn(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .then(if (masterBackdrop != null) Modifier.layerBackdrop(masterBackdrop) else Modifier)
+                                    .horizontalCutoutPadding()
+                                    .scrollEndHaptic()
+                                    .overScrollVertical(masterScrollBehavior)
+                                    .nestedScroll(masterScrollBehavior.nestedScrollConnection),
+                                state = masterListState,
+                                contentPadding = PaddingValues(
+                                    top = innerPadding.calculateTopPadding() + 12.dp,
+                                    end = 12.dp,
+                                    bottom = bottomPadding + 12.dp,
+                                ),
+                            ) {
+                                if (modeHintRes != null) {
+                                    item(key = "tablet_mode_hint") {
+                                        Card(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(start = 12.dp, bottom = 10.dp),
+                                            insideMargin = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+                                        ) {
+                                            Text(
+                                                text = stringResource(modeHintRes),
+                                                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                                                fontSize = 13.sp,
+                                            )
+                                        }
+                                    }
+                                }
+                                items(groups, key = { "master:${it.name}" }) { group ->
+                                    val isSelectedGroup = group.name == selectedGroup?.name
+                                    Card(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(start = 12.dp, bottom = 10.dp),
+                                        insideMargin = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+                                        colors = if (isSelectedGroup) {
+                                            CardDefaults.defaultColors(color = MiuixTheme.colorScheme.secondaryContainer)
+                                        } else {
+                                            CardDefaults.defaultColors()
+                                        },
+                                        onClick = { selectedGroupName = group.name },
+                                        pressFeedbackType = PressFeedbackType.Sink,
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                        ) {
+                                            if (showGroupIcons) {
+                                                GroupIcon(icon = group.icon, name = group.name)
+                                                Spacer(Modifier.width(12.dp))
+                                            }
+                                            Column(modifier = Modifier.weight(1f)) {
+                                                Text(
+                                                    text = group.name,
+                                                    fontSize = 15.sp,
+                                                    fontWeight = FontWeight.Medium,
+                                                    color = MiuixTheme.colorScheme.onSurface,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis,
+                                                )
+                                                if (group.now.isNotEmpty()) {
+                                                    Text(
+                                                        text = group.now,
+                                                        fontSize = 12.sp,
+                                                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                                                        maxLines = 1,
+                                                        overflow = TextOverflow.Ellipsis,
+                                                    )
+                                                }
+                                            }
+                                            val nowDelay = group.delays[group.now]
+                                            if (nowDelay != null) {
+                                                val delayText =
+                                                    if (nowDelay < 0) stringResource(R.string.proxy_timeout) else "${nowDelay}ms"
+                                                Text(
+                                                    text = delayText,
+                                                    fontSize = 12.sp,
+                                                    color = StatusColors.delay(nowDelay),
+                                                )
+                                                Spacer(Modifier.width(8.dp))
+                                            }
+                                            Text(
+                                                text = "${group.all.size}",
+                                                fontSize = 13.sp,
+                                                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                                            )
+                                            Spacer(Modifier.width(8.dp))
+                                            Image(
+                                                imageVector = MiuixIcons.Glass.ChevronForward,
+                                                contentDescription = null,
+                                                modifier = Modifier.size(15.dp),
+                                                colorFilter = ColorFilter.tint(MiuixTheme.colorScheme.onSurfaceVariantSummary),
+                                            )
+                                        }
+                                    }
                                 }
                             }
                         }
                     }
                 }
-                item(key = "bottom_spacer") {
-                    Spacer(Modifier.padding(bottom = 12.dp))
+                Box(
+                    modifier = Modifier
+                        .width(DualPaneDividerWidth)
+                        .fillMaxHeight()
+                        .background(MiuixTheme.colorScheme.onSurface.copy(alpha = 0.08f)),
+                )
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight(),
+                ) {
+                    CompositionLocalProvider(
+                        LocalTopBarStartInset provides { 0.dp },
+                        LocalTopAppBarCenterObstructionStart provides Dp.Unspecified,
+                        LocalTopAppBarTitleAlpha provides { 1f },
+                        LocalHorizontalCutoutSides provides WindowInsetsSides.End,
+                        LocalTopBarExtraTopInset provides LocalCollapsedRailTopObstruction.current,
+                    ) {
+                        Scaffold(
+                            modifier = Modifier.fillMaxSize(),
+                            topBar = {
+                                BlurredBar(backdrop = detailBackdrop, blurActive = detailBackdrop != null) {
+                                    AdaptiveTopAppBar(
+                                        title = selectedGroup?.name.orEmpty(),
+                                        scrollBehavior = detailScrollBehavior,
+                                        actions = { proxyTopBarActions() },
+                                    )
+                                }
+                            },
+                        ) { innerPadding ->
+                            if (selectedGroup == null) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .padding(top = innerPadding.calculateTopPadding(), bottom = bottomPadding),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    Text(
+                                        text = stringResource(R.string.proxy_select_group_hint),
+                                        fontSize = 15.sp,
+                                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                                    )
+                                }
+                            } else {
+                                val sortedNodes = remember(selectedGroup.all, selectedGroup.delays, sortOption) {
+                                    sortNodes(selectedGroup.all, selectedGroup.delays, sortOption)
+                                }
+                                val onSelectThisGroup = remember(onSelectProxyStable, selectedGroup.name) {
+                                    { proxyName: String -> onSelectProxyStable(selectedGroup.name, proxyName) }
+                                }
+                                LazyVerticalGrid(
+                                    columns = if (singleColumn) GridCells.Fixed(1) else GridCells.Adaptive(minSize = 180.dp),
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .then(if (detailBackdrop != null) Modifier.layerBackdrop(detailBackdrop) else Modifier)
+                                        .horizontalCutoutPadding(applySidebarInset = false)
+                                        .scrollEndHaptic()
+                                        .overScrollVertical(detailScrollBehavior)
+                                        .nestedScroll(detailScrollBehavior.nestedScrollConnection),
+                                    state = detailGridState,
+                                    contentPadding = PaddingValues(
+                                        start = 12.dp,
+                                        end = 12.dp,
+                                        top = innerPadding.calculateTopPadding() + 12.dp,
+                                        bottom = bottomPadding + 12.dp,
+                                    ),
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                                ) {
+                                    item(
+                                        key = "detail_header:${selectedGroup.name}",
+                                        span = { GridItemSpan(maxLineSpan) },
+                                    ) {
+                                        val isTestingGroup = selectedGroup.name in uiState.testingGroups
+                                        val nowDelay = selectedGroup.delays[selectedGroup.now]
+                                        Card(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(bottom = 2.dp),
+                                            insideMargin = PaddingValues(horizontal = 16.dp, vertical = 14.dp),
+                                        ) {
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                verticalAlignment = Alignment.CenterVertically,
+                                            ) {
+                                                if (showGroupIcons) {
+                                                    GroupIcon(icon = selectedGroup.icon, name = selectedGroup.name)
+                                                    Spacer(Modifier.width(12.dp))
+                                                }
+                                                Column(modifier = Modifier.weight(1f)) {
+                                                    Text(
+                                                        text = selectedGroup.name,
+                                                        fontSize = 17.sp,
+                                                        fontWeight = FontWeight.SemiBold,
+                                                        color = MiuixTheme.colorScheme.onSurface,
+                                                        maxLines = 1,
+                                                        overflow = TextOverflow.Ellipsis,
+                                                    )
+                                                    val subtitle = buildString {
+                                                        if (selectedGroup.type.isNotEmpty()) append(selectedGroup.type)
+                                                        if (selectedGroup.now.isNotEmpty()) {
+                                                            if (isNotEmpty()) append(" · ")
+                                                            append(selectedGroup.now)
+                                                        }
+                                                    }
+                                                    if (subtitle.isNotEmpty()) {
+                                                        Text(
+                                                            text = subtitle,
+                                                            fontSize = 13.sp,
+                                                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                                                            maxLines = 1,
+                                                            overflow = TextOverflow.Ellipsis,
+                                                        )
+                                                    }
+                                                }
+                                                if (nowDelay != null) {
+                                                    val delayText =
+                                                        if (nowDelay < 0) stringResource(R.string.proxy_timeout) else "${nowDelay}ms"
+                                                    val delayColor = StatusColors.delay(nowDelay)
+                                                    Text(
+                                                        text = delayText,
+                                                        modifier = Modifier
+                                                            .squircleBackground(delayColor.copy(alpha = 0.14f), 6.dp)
+                                                            .padding(horizontal = 8.dp, vertical = 2.dp),
+                                                        fontSize = 12.sp,
+                                                        fontWeight = FontWeight.Medium,
+                                                        color = delayColor,
+                                                    )
+                                                    Spacer(Modifier.width(8.dp))
+                                                }
+                                                if (selectedGroup.isFixed) {
+                                                    IconButton(
+                                                        onClick = { onUnfixProxy(selectedGroup.name) },
+                                                        modifier = Modifier.size(32.dp),
+                                                    ) {
+                                                        Icon(
+                                                            imageVector = MiuixIcons.Glass.Unpin,
+                                                            contentDescription = stringResource(R.string.proxy_unfix),
+                                                            modifier = Modifier.size(18.dp),
+                                                            tint = StatusColors.warning,
+                                                        )
+                                                    }
+                                                    Spacer(Modifier.width(4.dp))
+                                                }
+                                                IconButton(
+                                                    onClick = { onTestGroupDelay(selectedGroup.name) },
+                                                    enabled = !isTestingGroup,
+                                                    modifier = Modifier.size(32.dp),
+                                                ) {
+                                                    if (isTestingGroup) {
+                                                        CircularProgressIndicator(size = 16.dp, strokeWidth = 2.dp)
+                                                    } else {
+                                                        Icon(
+                                                            imageVector = MiuixIcons.Glass.Refresh,
+                                                            contentDescription = stringResource(R.string.proxy_test_group_delay),
+                                                            modifier = Modifier.size(18.dp),
+                                                            tint = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                    gridItems(
+                                        items = sortedNodes,
+                                        key = { "detail_node:${selectedGroup.name}:$it" },
+                                        contentType = { "proxy_node_card" },
+                                    ) { proxyName ->
+                                        ProxyNodeCard(
+                                            name = proxyName,
+                                            type = selectedGroup.nodeTypes[proxyName] ?: "",
+                                            delay = selectedGroup.delays[proxyName],
+                                            isSelected = proxyName == selectedGroup.now,
+                                            isFixed = proxyName == selectedGroup.fixed,
+                                            isSelectable = selectedGroup.isSelectable,
+                                            isTesting = proxyName in uiState.testingNodes,
+                                            modifier = Modifier.fillMaxWidth(),
+                                            defaultContainerColor = MiuixTheme.colorScheme.surfaceContainer,
+                                            onTestDelay = onTestNodeDelayStable,
+                                            onClick = onSelectThisGroup,
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        } else {
+            val backdrop = rememberBlurBackdrop()
+            val blurActive = backdrop != null
+            Scaffold(
+                modifier = Modifier.fillMaxSize(),
+                topBar = {
+                    BlurredBar(backdrop = backdrop, blurActive = blurActive) {
+                        AdaptiveTopAppBar(
+                            title = stringResource(R.string.proxy_title),
+                            scrollBehavior = scrollBehavior,
+                            actions = { proxyTopBarActions() },
+                        )
+                    }
+                },
+            ) { innerPadding ->
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .then(if (backdrop != null) Modifier.layerBackdrop(backdrop) else Modifier)
+                        .horizontalCutoutPadding()
+                        .scrollEndHaptic()
+                        .overScrollVertical(scrollBehavior)
+                        .nestedScroll(scrollBehavior.nestedScrollConnection),
+                    state = listState,
+                    contentPadding = PaddingValues(
+                        top = innerPadding.calculateTopPadding(),
+                        bottom = bottomPadding,
+                    ),
+                ) {
+                    if (groups.isEmpty()) {
+                        item(key = "empty", contentType = "empty") {
+                            Column(
+                                modifier = Modifier.fillParentMaxSize(),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.Center,
+                            ) {
+                                Text(
+                                    text = stringResource(R.string.proxy_no_groups),
+                                    fontSize = 16.sp,
+                                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                                )
+                                Text(
+                                    text = stringResource(R.string.proxy_start_first),
+                                    modifier = Modifier.padding(top = 6.dp),
+                                    fontSize = 14.sp,
+                                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                                )
+                            }
+                        }
+                    } else {
+                        if (modeHintRes != null) {
+                            item(key = "mode_hint", contentType = "proxy_mode_hint") {
+                                CardSegment(
+                                    isFirst = true,
+                                    isLast = true,
+                                    modifier = Modifier.animateItem(placementSpec = null),
+                                    outerTopPadding = 12.dp,
+                                    insidePadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+                                ) {
+                                    Text(
+                                        text = stringResource(modeHintRes),
+                                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                                        fontSize = 13.sp,
+                                    )
+                                }
+                            }
+                        }
+
+
+                        // 展平为独立 item，仅组合可见行
+                        groups.forEach { group ->
+                            val isExpanded = group.name in expandedGroups
+                            val rowsPresent = isExpanded || group.name in retainedGroups
+                            val isAnimating = group.name in animatingGroups
+                            val allRows = if (rowsPresent) {
+                                getGroupRows(group, sortOption)
+                            } else {
+                                persistentListOf()
+                            }
+                            // 动画期间限制最大渲染行数防卡死，收尾后恢复全量虚拟化
+                            val rows = if (isAnimating && allRows.size > maxAnimRows) {
+                                allRows.take(maxAnimRows)
+                            } else {
+                                allRows
+                            }
+                            val groupProgress = expandProgress[group.name]
+                            val currentFraction = groupProgress?.floatValue ?: if (isExpanded) 1f else 0f
+
+                            item(key = "group:${group.name}", contentType = "proxy_group_header") {
+                                // 有子行时平接（0dp），完全收起后封底（16dp）
+                                val headerBottomCorner = if (currentFraction <= 0.01f) 16.dp else 0.dp
+
+                                CardSegment(
+                                    isFirst = true,
+                                    isLast = currentFraction <= 0.01f,
+                                    modifier = Modifier.animateItem(placementSpec = null),
+                                    bottomCornerRadius = headerBottomCorner,
+                                    outerTopPadding = 12.dp,
+                                ) {
+                                    ProxyGroupHeader(
+                                        group = group,
+                                        showIcon = showGroupIcons,
+                                        isExpanded = isExpanded,
+                                        expandProgress = groupProgress,
+                                        isTesting = group.name in uiState.testingGroups,
+                                        onTestDelay = { onTestGroupDelay(group.name) },
+                                        onUnfix = { onUnfixProxy(group.name) },
+                                        onToggle = { toggleGroup(group.name) },
+                                    )
+                                }
+                            }
+
+                            if (rows.isNotEmpty()) {
+                                val lastRowIndex = rows.lastIndex
+                                val rowCount = rows.size
+                                val groupExpandProgress = expandProgress[group.name]
+                                val onSelectThisGroup: (String) -> Unit = { proxyName ->
+                                    onSelectProxyStable(group.name, proxyName)
+                                }
+
+                                // 动态计算当前露出的最底行，赋予 16dp 底圆角
+                                val activeBottomIndex = when {
+                                    currentFraction >= 0.99f -> lastRowIndex
+                                    currentFraction <= 0.01f -> -1
+                                    else -> (rowCount * currentFraction).toInt().coerceIn(0, lastRowIndex)
+                                }
+
+                                rows.forEachIndexed { rowIndex, row ->
+                                    val isCurrentBottom = rowIndex == activeBottomIndex
+                                    val rowBottomCorner = if (isCurrentBottom) 16.dp else 0.dp
+
+                                    item(
+                                        key = "nodes:${group.name}:$rowIndex",
+                                        contentType = "proxy_node_row",
+                                    ) {
+                                        CardSegment(
+                                            isFirst = false,
+                                            isLast = isCurrentBottom,
+                                            modifier = Modifier
+                                                .animateItem(placementSpec = null)
+                                                .clipToBounds(),
+                                            bottomCornerRadius = rowBottomCorner,
+                                            insidePadding = PaddingValues(
+                                                start = 12.dp,
+                                                end = 12.dp,
+                                            ),
+                                        ) {
+                                            ProxyNodeRow(
+                                                row = row,
+                                                group = group,
+                                                singleColumnProgress = singleColumnProgress,
+                                                expandProgress = groupExpandProgress,
+                                                rowIndex = rowIndex,
+                                                rowCount = rowCount,
+                                                testingNodes = uiState.testingNodes,
+                                                onTestNodeDelay = onTestNodeDelayStable,
+                                                onSelect = onSelectThisGroup,
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        item(key = "bottom_spacer") {
+                            Spacer(Modifier.padding(bottom = 12.dp))
+                        }
+                    }
                 }
             }
         }
@@ -483,7 +895,7 @@ fun ProxyScreen(
                         DropdownItem(
                             text = label,
                             selected = currentKey == index,
-                            onClick = { viewModel?.updateSortOption(index * 2 + if (isReverse) 1 else 0) },
+                            onClick = { onUpdateSortOption(index * 2 + if (isReverse) 1 else 0) },
                         )
                     },
                 ),
@@ -492,7 +904,7 @@ fun ProxyScreen(
                         DropdownItem(
                             text = reverseLabel,
                             selected = isReverse,
-                            onClick = { viewModel?.updateSortOption(currentKey * 2 + if (!isReverse) 1 else 0) },
+                            onClick = { onUpdateSortOption(currentKey * 2 + if (!isReverse) 1 else 0) },
                         ),
                     ),
                 ),
@@ -505,12 +917,12 @@ fun ProxyScreen(
                         DropdownItem(
                             text = singleColumnLabel,
                             selected = singleColumn,
-                            onClick = { viewModel?.updateSingleColumn(!singleColumn) },
+                            onClick = { onUpdateSingleColumn(!singleColumn) },
                         ),
                         DropdownItem(
                             text = showGroupIconsLabel,
                             selected = showGroupIcons,
-                            onClick = { viewModel?.updateShowGroupIcons(!showGroupIcons) },
+                            onClick = { onUpdateShowGroupIcons(!showGroupIcons) },
                         ),
                     ),
                 ),
@@ -859,6 +1271,8 @@ private fun ProxyNodeCard(
     isFixed: Boolean,
     isSelectable: Boolean,
     isTesting: Boolean = false,
+    modifier: Modifier = Modifier,
+    defaultContainerColor: Color = MiuixTheme.colorScheme.surface,
     onTestDelay: (String) -> Unit = {},
     onClick: (String) -> Unit,
 ) {
@@ -875,11 +1289,11 @@ private fun ProxyNodeCard(
     val backgroundColor = when {
         isFixed -> StatusColors.fixedNodeContainer
         isSelected -> StatusColors.selectedNodeContainer
-        else -> MiuixTheme.colorScheme.surface
+        else -> defaultContainerColor
     }
 
     Box(
-        modifier = Modifier
+        modifier = modifier
             .then(
                 if (isSelectable) {
                     Modifier
@@ -1022,5 +1436,69 @@ private fun sortNodes(
         }
 
         else -> if (reverse) names.reversed() else names
+    }
+}
+
+private fun sampleProxyUiState(): ProxyUiState = ProxyUiState(
+    mode = "rule",
+    groups = persistentListOf(
+        ProxyGroupUi(
+            name = "Auto",
+            type = "URLTest",
+            now = "HK-01",
+            all = persistentListOf("HK-01", "HK-02", "JP-01", "SG-01", "US-01"),
+            delays = persistentMapOf("HK-01" to 55, "HK-02" to 68, "JP-01" to 102, "SG-01" to 88, "US-01" to 195),
+            nodeTypes = persistentMapOf(
+                "HK-01" to "Shadowsocks",
+                "HK-02" to "Shadowsocks",
+                "JP-01" to "VMess",
+                "SG-01" to "Trojan",
+                "US-01" to "Vless"
+            ),
+        ),
+        ProxyGroupUi(
+            name = "AI",
+            type = "Selector",
+            now = "JP-01",
+            all = persistentListOf("JP-01", "SG-01", "US-01"),
+            delays = persistentMapOf("JP-01" to 102, "SG-01" to 88, "US-01" to 195),
+        ),
+        ProxyGroupUi(
+            name = "YouTube",
+            type = "Selector",
+            now = "Auto",
+            all = persistentListOf("Auto", "HK-01", "JP-01", "SG-01"),
+            delays = persistentMapOf("Auto" to 55, "HK-01" to 55, "JP-01" to 102, "SG-01" to 88),
+        ),
+        ProxyGroupUi(
+            name = "Google",
+            type = "Selector",
+            now = "Auto",
+            all = persistentListOf("Auto", "HK-01", "SG-01"),
+            delays = persistentMapOf("Auto" to 55, "HK-01" to 55, "SG-01" to 88),
+        ),
+        ProxyGroupUi(
+            name = "GitHub",
+            type = "Selector",
+            now = "Auto",
+            all = persistentListOf("Auto", "JP-01", "US-01"),
+            delays = persistentMapOf("Auto" to 55, "JP-01" to 102, "US-01" to 195),
+        ),
+    ),
+)
+
+@Preview(showBackground = true)
+@Composable
+private fun ProxyScreenPreview() {
+    MiuixTheme {
+        ProxyScreenContent(uiState = sampleProxyUiState())
+    }
+}
+
+@Preview(showBackground = true, widthDp = 1280, heightDp = 800)
+@Composable
+private fun ProxyScreenTabletPreview() {
+    MiuixTheme {
+        ProxyScreenContent(uiState = sampleProxyUiState())
     }
 }

@@ -121,7 +121,7 @@ internal fun StatusContent(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 12.dp)
+            .padding(LocalHomeCardHorizontalPadding.current)
             .padding(top = 12.dp, bottom = 6.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {

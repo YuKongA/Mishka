@@ -124,7 +124,7 @@ private fun SpeedHeroCard(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 12.dp)
+            .padding(LocalHomeCardHorizontalPadding.current)
             .padding(bottom = 6.dp),
         insideMargin = PaddingValues(0.dp),
         onClick = if (isRunning) onSpeedClick else null,
@@ -221,7 +221,7 @@ private fun SubscriptionQuotaCard(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 12.dp)
+            .padding(LocalHomeCardHorizontalPadding.current)
             .padding(top = 6.dp, bottom = 6.dp),
         insideMargin = PaddingValues(16.dp),
         onClick = if (isRunning) onClick else null,

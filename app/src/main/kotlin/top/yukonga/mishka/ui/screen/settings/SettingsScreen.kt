@@ -1,7 +1,12 @@
 package top.yukonga.mishka.ui.screen.settings
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -12,6 +17,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import top.yukonga.mishka.BuildConfig
@@ -24,9 +30,11 @@ import top.yukonga.mishka.ui.component.AdaptiveTopAppBar
 import top.yukonga.mishka.ui.component.CardItem
 import top.yukonga.mishka.ui.component.blur.BlurredBar
 import top.yukonga.mishka.ui.component.blur.LocalPageBackdrop
+import top.yukonga.mishka.ui.component.blur.PageBackdropBox
 import top.yukonga.mishka.ui.component.blur.rememberBlurBackdrop
 import top.yukonga.mishka.ui.component.groupedCardItems
 import top.yukonga.mishka.ui.component.overScrollVertical
+import top.yukonga.mishka.ui.navigation.Route
 import top.yukonga.mishka.ui.util.horizontalCutoutPadding
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.Scaffold
@@ -35,12 +43,14 @@ import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.glass.GlassDropdownPreference
 import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.preference.SwitchPreference
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.scrollEndHaptic
 
 @Composable
 fun SettingsScreen(
     modifier: Modifier = Modifier,
     bottomPadding: Dp = 0.dp,
+    selectedRoute: Route? = null,
     onNavigateVpnSettings: () -> Unit = {},
     onNavigateRootSettings: () -> Unit = {},
     onNavigateNetworkSettings: () -> Unit = {},
@@ -159,6 +169,7 @@ fun SettingsScreen(
                                 title = stringResource(R.string.settings_vpn_settings),
                                 summary = stringResource(R.string.settings_vpn_summary),
                                 onClick = onNavigateVpnSettings,
+                                holdDownState = selectedRoute is Route.VpnSettings,
                             )
                         })
                     }
@@ -168,6 +179,7 @@ fun SettingsScreen(
                                 title = stringResource(R.string.root_settings_title),
                                 summary = stringResource(R.string.root_settings_summary),
                                 onClick = onNavigateRootSettings,
+                                holdDownState = selectedRoute is Route.RootSettings,
                             )
                         })
                     }
@@ -176,6 +188,7 @@ fun SettingsScreen(
                             title = stringResource(R.string.settings_override_settings),
                             summary = stringResource(R.string.settings_override_summary),
                             onClick = onNavigateNetworkSettings,
+                            holdDownState = selectedRoute is Route.NetworkSettings,
                         )
                     })
                     add(CardItem("meta") {
@@ -183,6 +196,7 @@ fun SettingsScreen(
                             title = stringResource(R.string.settings_meta_settings),
                             summary = stringResource(R.string.settings_meta_summary),
                             onClick = onNavigateMetaSettings,
+                            holdDownState = selectedRoute is Route.MetaSettings,
                         )
                     })
                     add(CardItem("externalControl") {
@@ -190,6 +204,7 @@ fun SettingsScreen(
                             title = stringResource(R.string.external_control_title),
                             summary = stringResource(R.string.settings_external_control_summary),
                             onClick = onNavigateExternalControl,
+                            holdDownState = selectedRoute is Route.ExternalControl,
                         )
                     })
                     add(CardItem("automation") {
@@ -197,6 +212,7 @@ fun SettingsScreen(
                             title = stringResource(R.string.automation_title),
                             summary = stringResource(R.string.settings_automation_summary),
                             onClick = onNavigateAutomation,
+                            holdDownState = selectedRoute is Route.Automation,
                         )
                     })
                     add(CardItem("appProxy") {
@@ -204,6 +220,7 @@ fun SettingsScreen(
                             title = stringResource(R.string.settings_app_proxy),
                             summary = stringResource(R.string.settings_app_proxy_summary),
                             onClick = onNavigateAppProxy,
+                            holdDownState = selectedRoute is Route.AppProxy,
                         )
                     })
                     add(CardItem("wifiPolicy") {
@@ -211,6 +228,7 @@ fun SettingsScreen(
                             title = stringResource(R.string.settings_wifi_policy),
                             summary = stringResource(R.string.settings_wifi_policy_summary),
                             onClick = onNavigateWifiPolicy,
+                            holdDownState = selectedRoute is Route.WifiPolicy,
                         )
                     })
                     add(CardItem("fileManager") {
@@ -218,6 +236,7 @@ fun SettingsScreen(
                             title = stringResource(R.string.settings_file_manager),
                             summary = stringResource(R.string.settings_file_manager_summary),
                             onClick = onNavigateFileManager,
+                            holdDownState = selectedRoute is Route.FileManager || selectedRoute is Route.FileManagerEditor,
                         )
                     })
                     add(CardItem("overrides") {
@@ -225,6 +244,9 @@ fun SettingsScreen(
                             title = stringResource(R.string.settings_overrides),
                             summary = stringResource(R.string.settings_overrides_summary),
                             onClick = onNavigateOverrides,
+                            holdDownState = selectedRoute is Route.OverrideList ||
+                                    selectedRoute is Route.OverrideEdit ||
+                                    selectedRoute is Route.OverrideFileEditor,
                         )
                     })
                     add(CardItem("backup") {
@@ -232,6 +254,7 @@ fun SettingsScreen(
                             title = stringResource(R.string.settings_backup),
                             summary = stringResource(R.string.settings_backup_summary),
                             onClick = onNavigateBackup,
+                            holdDownState = selectedRoute is Route.BackupRestore,
                         )
                     })
                 },
@@ -328,6 +351,7 @@ fun SettingsScreen(
                             title = stringResource(R.string.settings_theme_title),
                             summary = stringResource(R.string.settings_theme_summary),
                             onClick = onNavigateThemeSettings,
+                            holdDownState = selectedRoute is Route.ThemeSettings,
                         )
                     })
                     add(CardItem("about") {
@@ -335,10 +359,56 @@ fun SettingsScreen(
                             title = stringResource(R.string.settings_about),
                             summary = "Mishka v${BuildConfig.VERSION_NAME}",
                             onClick = onNavigateAbout,
+                            holdDownState = selectedRoute is Route.About,
                         )
                     })
                 },
             )
+        }
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun SettingsScreenPreview() {
+    MiuixTheme {
+        PageBackdropBox {
+            SettingsScreen()
+        }
+    }
+}
+
+@Preview(showBackground = true, widthDp = 1280, heightDp = 800)
+@Composable
+private fun SettingsScreenWidePreview() {
+    MiuixTheme {
+        PageBackdropBox(modifier = Modifier.fillMaxSize()) {
+            Row(modifier = Modifier.fillMaxSize()) {
+                Box(
+                    modifier = Modifier
+                        .width(360.dp)
+                        .fillMaxHeight(),
+                ) {
+                    SettingsScreen(selectedRoute = Route.About)
+                }
+                Box(
+                    modifier = Modifier
+                        .width(1.dp)
+                        .fillMaxHeight()
+                        .background(MiuixTheme.colorScheme.onSurface.copy(alpha = 0.08f)),
+                )
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight(),
+                ) {
+                    AboutScreen(
+                        onBack = {},
+                        mihomoVersion = "1.19.0",
+                        onOpenUrl = {},
+                    )
+                }
+            }
         }
     }
 }

@@ -4,12 +4,17 @@ import androidx.compose.animation.core.LinearEasing
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerDefaults
 import androidx.compose.foundation.pager.PagerState
@@ -34,12 +39,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigationevent.NavigationEventInfo
 import androidx.navigationevent.compose.NavigationBackHandler
@@ -60,8 +68,10 @@ import top.yukonga.mishka.platform.WifiPolicyController
 import top.yukonga.mishka.ui.component.LocalTopLayer
 import top.yukonga.mishka.ui.component.TopLayerHost
 import top.yukonga.mishka.ui.component.TopLayerState
+import top.yukonga.mishka.ui.component.blur.LocalCollapsedRailTopObstruction
 import top.yukonga.mishka.ui.component.blur.LocalTopAppBarCenterObstructionStart
 import top.yukonga.mishka.ui.component.blur.LocalTopAppBarTitleAlpha
+import top.yukonga.mishka.ui.component.blur.LocalTopBarExtraTopInset
 import top.yukonga.mishka.ui.component.blur.LocalTopBarStartInset
 import top.yukonga.mishka.ui.component.blur.PageBackdropBox
 import top.yukonga.mishka.ui.component.blur.rememberBlurBackdrop
@@ -96,7 +106,13 @@ import top.yukonga.mishka.ui.screen.subscription.SubscriptionEditScreen
 import top.yukonga.mishka.ui.screen.subscription.SubscriptionScreen
 import top.yukonga.mishka.ui.theme.FloatingBottomBarStyle
 import top.yukonga.mishka.ui.theme.LocalAppDarkMode
+import top.yukonga.mishka.ui.theme.LocalContainerSize
 import top.yukonga.mishka.ui.theme.ThemeConfig
+import top.yukonga.mishka.ui.util.DualPaneDividerWidth
+import top.yukonga.mishka.ui.util.DualPaneMinWidth
+import top.yukonga.mishka.ui.util.LocalHorizontalCutoutSides
+import top.yukonga.mishka.ui.util.calculateDualPaneMasterWidth
+import top.yukonga.mishka.ui.util.rememberHorizontalSafeInsets
 import top.yukonga.mishka.ui.util.rememberIsWideScreen
 import top.yukonga.mishka.viewmodel.AppProxyViewModel
 import top.yukonga.mishka.viewmodel.AutomationViewModel
@@ -115,6 +131,7 @@ import top.yukonga.mishka.viewmodel.ProxyViewModel
 import top.yukonga.mishka.viewmodel.SubscriptionViewModel
 import top.yukonga.miuix.kmp.basic.NavigationItem
 import top.yukonga.miuix.kmp.basic.Scaffold
+import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.glass.GlassNavigationBar
 import top.yukonga.miuix.kmp.glass.GlassNavigationItem
@@ -128,6 +145,7 @@ import top.yukonga.miuix.kmp.icon.glass.HomeFill
 import top.yukonga.miuix.kmp.icon.glass.SettingsFill
 import top.yukonga.miuix.kmp.nav.core.NavDisplay
 import top.yukonga.miuix.kmp.nav.core.NavDisplayEffects
+import top.yukonga.miuix.kmp.nav.core.NavEntryBuilder
 import top.yukonga.miuix.kmp.nav.core.NavKey
 import top.yukonga.miuix.kmp.nav.core.rememberNavSystemCornerRadius
 import top.yukonga.miuix.kmp.nav.transition.NavMotion
@@ -164,6 +182,21 @@ private val NavBackStackSaver = Saver<SnapshotStateList<NavKey>, List<String>>(
                 if (restoredRoutes.first() !is Route.Main) add(Route.Main)
                 addAll(restoredRoutes)
             }
+        }
+    },
+)
+
+private val SettingsDetailStackSaver = Saver<SnapshotStateList<NavKey>, List<String>>(
+    save = { stack ->
+        stack.mapNotNull { key ->
+            (key as? Route)?.let { Json.encodeToString<Route>(it) }
+        }
+    },
+    restore = { savedRoutes ->
+        mutableStateListOf<NavKey>().apply {
+            savedRoutes.mapNotNull { value ->
+                runCatching { Json.decodeFromString<Route>(value) }.getOrNull()
+            }.let(::addAll)
         }
     },
 )
@@ -209,6 +242,7 @@ fun AppNavigation(
 ) {
     val backStack = rememberSaveable(saver = NavBackStackSaver) { mutableStateListOf(Route.Main) }
     val navigator = remember { Navigator(backStack) }
+    val settingsDetailStack = rememberSaveable(saver = SettingsDetailStackSaver) { mutableStateListOf() }
     val pagerState = rememberPagerState(pageCount = { 4 })
     val useNavigationRail = rememberIsWideScreen()
     val mainPagerState = rememberMainPagerState(
@@ -238,7 +272,6 @@ fun AppNavigation(
         if (mainPagerState.pagerState.currentPage == 1) proxyViewModel?.loadProxies()
     }
 
-    MainScreenBackHandler(mainPagerState, navigator)
 
     // 横移返回默认启用；设置页开关实时生效（storage 只持久化，本状态驱动 entry 的 swipeDismiss）
     var swipeDismissEnabled by remember {
@@ -269,6 +302,45 @@ fun AppNavigation(
     }
     val sidebarBackdrop = if (useNavigationRail) rememberBlurBackdrop(themeConfig.blurEnabled) else null
     var suppressNavTransition by remember { mutableStateOf(false) }
+    val containerWidthPx = LocalContainerSize.current?.width ?: LocalWindowInfo.current.containerSize.width
+    val containerWidthDp = with(LocalDensity.current) { containerWidthPx.toDp() }
+    val targetRailStartInset = if (railState != null && railState.expanded) {
+        GlassNavigationRailDefaults.Margin + GlassNavigationRailDefaults.ExpandedWidth
+    } else {
+        0.dp
+    }
+    val safeInsets = rememberHorizontalSafeInsets()
+    val isSettingsDualPane = (containerWidthDp - targetRailStartInset - safeInsets.start - safeInsets.end) >= DualPaneMinWidth
+    LaunchedEffect(isSettingsDualPane) {
+        if (isSettingsDualPane) {
+            val settingsSuffix = backStack.drop(1).filterIsInstance<Route>().takeIf {
+                it.isNotEmpty() && it.all(Route::isSettingsPaneRoute)
+            }
+            if (settingsSuffix != null) {
+                suppressNavTransition = true
+                settingsDetailStack.clear()
+                settingsDetailStack.addAll(settingsSuffix)
+                navigator.popUntil { it is Route.Main }
+                mainPagerState.pagerState.scrollToPage(3)
+                mainPagerState.syncPage()
+            }
+        } else if (
+            navigator.current() is Route.Main &&
+            mainPagerState.selectedPage == 3 &&
+            settingsDetailStack.isNotEmpty()
+        ) {
+            suppressNavTransition = true
+            settingsDetailStack.forEach { navigator.push(it) }
+            settingsDetailStack.clear()
+        }
+    }
+    SettingsDetailBackHandler(
+        mainState = mainPagerState,
+        navigator = navigator,
+        settingsDetailStack = settingsDetailStack,
+        isSettingsDualPane = isSettingsDualPane,
+    )
+    MainScreenBackHandler(mainPagerState, navigator, settingsDetailStack, isSettingsDualPane)
     LaunchedEffect(backStack.size, backStack.lastOrNull()) {
         if (suppressNavTransition) {
             delay(50.milliseconds)
@@ -276,6 +348,146 @@ fun AppNavigation(
         }
     }
     val navTransition = if (suppressNavTransition) InstantNavTransition else NavTransitions.MiuixDefault
+    val settingsDetailRenderer: @Composable (Route, (Route) -> Unit, () -> Unit) -> Unit = { route, onPush, onPop ->
+        when (route) {
+            is Route.OverrideList -> overrideProfileViewModel?.let { vm ->
+                OverrideListScreen(
+                    viewModel = vm,
+                    onBack = onPop,
+                    onAdd = { onPush(Route.OverrideEdit()) },
+                    onEdit = { id -> onPush(Route.OverrideEdit(id)) },
+                    onEditFile = { id -> onPush(Route.OverrideFileEditor(id)) },
+                )
+            }
+
+            is Route.OverrideEdit -> overrideProfileViewModel?.let { vm ->
+                OverrideEditScreen(
+                    overrideId = route.id,
+                    viewModel = vm,
+                    onBack = onPop,
+                    onSaved = onPop,
+                    onPickFile = { callback -> filePicker?.pickYamlFile(callback) },
+                )
+            }
+
+            is Route.OverrideFileEditor -> overrideProfileViewModel?.let { vm ->
+                OverrideFileEditorScreen(route.id, vm, onBack = onPop)
+            }
+
+            is Route.VpnSettings -> storage?.let {
+                VpnSettingsScreen(
+                    storage = it,
+                    isSystemProxySupported = true,
+                    onBack = onPop,
+                )
+            }
+
+            is Route.RootSettings -> storage?.let {
+                val homeState = homeViewModel?.uiState?.collectAsStateWithLifecycle()?.value
+                RootSettingsScreen(
+                    storage = it,
+                    isProxyRunning = homeState?.isRunning == true || homeState?.isStarting == true,
+                    onBack = onPop,
+                )
+            }
+
+            is Route.NetworkSettings -> networkSettingsViewModel?.let {
+                NetworkSettingsScreen(
+                    viewModel = it,
+                    onBack = onPop,
+                )
+            }
+
+            is Route.MetaSettings -> metaSettingsViewModel?.let {
+                MetaSettingsScreen(
+                    viewModel = it,
+                    onBack = onPop,
+                )
+            }
+
+            is Route.AppProxy -> appProxyViewModel?.let {
+                AppProxyScreen(
+                    viewModel = it,
+                    onBack = onPop,
+                )
+            }
+
+            is Route.WifiPolicy -> storage?.let {
+                WifiPolicyScreen(
+                    storage = it,
+                    controller = wifiPolicyController,
+                    onRequestPermission = onRequestWifiPermission,
+                    onBack = onPop,
+                )
+            }
+
+            is Route.ThemeSettings -> storage?.let {
+                ThemeSettingsScreen(
+                    storage = it,
+                    themeConfig = themeConfig,
+                    onThemeConfigChange = onThemeConfigChange,
+                    onPredictiveBackChange = onPredictiveBackChange,
+                    swipeDismissEnabled = swipeDismissEnabled,
+                    onSwipeDismissChange = { enabled ->
+                        swipeDismissEnabled = enabled
+                        it.putString(StorageKeys.SWIPE_DISMISS, enabled.toString())
+                    },
+                    onBack = onPop,
+                )
+            }
+
+            is Route.ExternalControl -> externalControlViewModel?.let {
+                ExternalControlScreen(
+                    viewModel = it,
+                    onBack = onPop,
+                )
+            }
+
+            is Route.Automation -> automationViewModel?.let {
+                AutomationScreen(
+                    viewModel = it,
+                    onBack = onPop,
+                )
+            }
+
+            is Route.BackupRestore -> if (backupViewModel != null && storage != null) {
+                BackupRestoreScreen(
+                    viewModel = backupViewModel,
+                    storage = storage,
+                    filePicker = filePicker,
+                    onRestartApp = onRestartApp,
+                    onBack = onPop,
+                )
+            }
+
+            is Route.FileManager -> FileManagerScreen(
+                subscriptionViewModel = subscriptionViewModel,
+                onBack = onPop,
+                onOpenFile = { uuid, relPath ->
+                    onPush(Route.FileManagerEditor(uuid, relPath))
+                },
+            )
+
+            is Route.FileManagerEditor -> FileManagerEditorScreen(
+                uuid = route.uuid,
+                relativePath = route.relativePath,
+                subscriptionViewModel = subscriptionViewModel,
+                onBack = onPop,
+            )
+
+            is Route.About -> {
+                val uriHandler = LocalUriHandler.current
+                AboutScreen(
+                    onBack = onPop,
+                    mihomoVersion = mihomoVersion,
+                    onOpenUrl = { url -> uriHandler.openUri(url) },
+                )
+            }
+
+            else -> Unit
+        }
+    }
+
     Scaffold(
         containerColor = Color.Transparent,
         contentWindowInsets = WindowInsets(0),
@@ -310,6 +522,13 @@ fun AppNavigation(
                             DefaultTopBarStartInset
                         }
                     }
+                    val collapsedRailTopObstruction = remember(railState) {
+                        if (railState != null) {
+                            { 56.dp * (1f - railState.progress) }
+                        } else {
+                            DefaultTopBarStartInset
+                        }
+                    }
                     CompositionLocalProvider(
                         LocalTopAppBarTitleAlpha provides topAppBarTitleAlpha,
                         LocalTopAppBarCenterObstructionStart provides (if (
@@ -320,6 +539,7 @@ fun AppNavigation(
                             Dp.Unspecified
                         }),
                         LocalTopBarStartInset provides topBarStartInset,
+                        LocalCollapsedRailTopObstruction provides collapsedRailTopObstruction,
                     ) {
                         NavDisplay(
                             backStack = backStack,
@@ -345,6 +565,10 @@ fun AppNavigation(
                                         onHideTaskCardChange,
                                         hasRootPermission,
                                         useNavigationRail,
+                                        settingsDetailStack = settingsDetailStack,
+                                        settingsDetailRenderer = settingsDetailRenderer,
+                                        isSettingsDualPane = isSettingsDualPane,
+                                        swipeDismiss = swipeDismiss,
                                     )
                                 }
                             }
@@ -410,33 +634,12 @@ fun AppNavigation(
                                     )
                                 }
                             }
-                            entry<Route.OverrideList>(swipeDismiss = swipeDismiss) {
-                                overrideProfileViewModel?.let { vm ->
-                                    OverrideListScreen(
-                                        viewModel = vm,
-                                        onBack = { navigator.pop() },
-                                        onAdd = { navigator.push(Route.OverrideEdit()) },
-                                        onEdit = { id -> navigator.push(Route.OverrideEdit(id)) },
-                                        onEditFile = { id -> navigator.push(Route.OverrideFileEditor(id)) },
-                                    )
-                                }
-                            }
-                            entry<Route.OverrideEdit>(swipeDismiss = swipeDismiss) { route ->
-                                overrideProfileViewModel?.let { vm ->
-                                    OverrideEditScreen(
-                                        overrideId = route.id,
-                                        viewModel = vm,
-                                        onBack = { navigator.pop() },
-                                        onSaved = { navigator.pop() },
-                                        onPickFile = { callback -> filePicker?.pickYamlFile(callback) },
-                                    )
-                                }
-                            }
-                            entry<Route.OverrideFileEditor>(swipeDismiss = swipeDismiss) { route ->
-                                overrideProfileViewModel?.let { vm ->
-                                    OverrideFileEditorScreen(route.id, vm, onBack = { navigator.pop() })
-                                }
-                            }
+                            registerSettingsEntries(
+                                swipeDismiss = swipeDismiss,
+                                onPush = { navigator.push(it) },
+                                onPop = { navigator.pop() },
+                                settingsDetailRenderer = settingsDetailRenderer,
+                            )
                             entry<Route.Log>(swipeDismiss = swipeDismiss) {
                                 logViewModel?.let {
                                     LogScreen(
@@ -468,127 +671,6 @@ fun AppNavigation(
                                         onBack = { navigator.pop() },
                                     )
                                 }
-                            }
-                            entry<Route.VpnSettings>(swipeDismiss = swipeDismiss) {
-                                storage?.let {
-                                    VpnSettingsScreen(
-                                        storage = it,
-                                        isSystemProxySupported = true,
-                                        onBack = { navigator.pop() },
-                                    )
-                                }
-                            }
-                            entry<Route.RootSettings>(swipeDismiss = swipeDismiss) {
-                                storage?.let {
-                                    val homeState = homeViewModel?.uiState?.collectAsStateWithLifecycle()?.value
-                                    RootSettingsScreen(
-                                        storage = it,
-                                        isProxyRunning = homeState?.isRunning == true || homeState?.isStarting == true,
-                                        onBack = { navigator.pop() },
-                                    )
-                                }
-                            }
-                            entry<Route.NetworkSettings>(swipeDismiss = swipeDismiss) {
-                                networkSettingsViewModel?.let {
-                                    NetworkSettingsScreen(
-                                        viewModel = it,
-                                        onBack = { navigator.pop() },
-                                    )
-                                }
-                            }
-                            entry<Route.MetaSettings>(swipeDismiss = swipeDismiss) {
-                                metaSettingsViewModel?.let {
-                                    MetaSettingsScreen(
-                                        viewModel = it,
-                                        onBack = { navigator.pop() },
-                                    )
-                                }
-                            }
-                            entry<Route.AppProxy>(swipeDismiss = swipeDismiss) {
-                                appProxyViewModel?.let {
-                                    AppProxyScreen(
-                                        viewModel = it,
-                                        onBack = { navigator.pop() },
-                                    )
-                                }
-                            }
-                            entry<Route.WifiPolicy>(swipeDismiss = swipeDismiss) {
-                                storage?.let {
-                                    WifiPolicyScreen(
-                                        storage = it,
-                                        controller = wifiPolicyController,
-                                        onRequestPermission = onRequestWifiPermission,
-                                        onBack = { navigator.pop() },
-                                    )
-                                }
-                            }
-                            entry<Route.ThemeSettings>(swipeDismiss = swipeDismiss) {
-                                storage?.let {
-                                    ThemeSettingsScreen(
-                                        storage = it,
-                                        themeConfig = themeConfig,
-                                        onThemeConfigChange = onThemeConfigChange,
-                                        onPredictiveBackChange = onPredictiveBackChange,
-                                        swipeDismissEnabled = swipeDismissEnabled,
-                                        onSwipeDismissChange = { enabled ->
-                                            swipeDismissEnabled = enabled
-                                            it.putString(StorageKeys.SWIPE_DISMISS, enabled.toString())
-                                        },
-                                        onBack = { navigator.pop() },
-                                    )
-                                }
-                            }
-                            entry<Route.ExternalControl>(swipeDismiss = swipeDismiss) {
-                                externalControlViewModel?.let {
-                                    ExternalControlScreen(
-                                        viewModel = it,
-                                        onBack = { navigator.pop() },
-                                    )
-                                }
-                            }
-                            entry<Route.Automation>(swipeDismiss = swipeDismiss) {
-                                automationViewModel?.let {
-                                    AutomationScreen(
-                                        viewModel = it,
-                                        onBack = { navigator.pop() },
-                                    )
-                                }
-                            }
-                            entry<Route.BackupRestore>(swipeDismiss = swipeDismiss) {
-                                if (backupViewModel != null && storage != null) {
-                                    BackupRestoreScreen(
-                                        viewModel = backupViewModel,
-                                        storage = storage,
-                                        filePicker = filePicker,
-                                        onRestartApp = onRestartApp,
-                                        onBack = { navigator.pop() },
-                                    )
-                                }
-                            }
-                            entry<Route.FileManager>(swipeDismiss = swipeDismiss) {
-                                FileManagerScreen(
-                                    subscriptionViewModel = subscriptionViewModel,
-                                    onBack = { navigator.pop() },
-                                    onOpenFile = { uuid, relPath ->
-                                        navigator.push(Route.FileManagerEditor(uuid, relPath))
-                                    },
-                                )
-                            }
-                            entry<Route.FileManagerEditor>(swipeDismiss = swipeDismiss) { route ->
-                                FileManagerEditorScreen(
-                                    uuid = route.uuid,
-                                    relativePath = route.relativePath,
-                                    subscriptionViewModel = subscriptionViewModel,
-                                    onBack = { navigator.pop() },
-                                )
-                            }
-                            entry<Route.About>(swipeDismiss = swipeDismiss) {
-                                val uriHandler = LocalUriHandler.current
-                                AboutScreen(
-                                    onBack = { navigator.pop() },
-                                    mihomoVersion = mihomoVersion,
-                                    onOpenUrl = { url -> uriHandler.openUri(url) },
-                                )
                             }
                         }
                     }
@@ -648,6 +730,10 @@ private fun MainPage(
     onHideTaskCardChange: ((Boolean) -> Unit)? = null,
     hasRootPermission: Boolean = false,
     useNavigationRail: Boolean = false,
+    settingsDetailStack: SnapshotStateList<NavKey> = remember { mutableStateListOf() },
+    settingsDetailRenderer: @Composable (Route, (Route) -> Unit, () -> Unit) -> Unit = { _, _, _ -> },
+    isSettingsDualPane: Boolean = false,
+    swipeDismiss: NavSwipeDirection? = null,
 ) {
     val homeUiState = homeViewModel?.uiState?.collectAsStateWithLifecycle()?.value ?: HomeUiState()
     val selectedPage = mainPagerState.selectedPage
@@ -709,27 +795,156 @@ private fun MainPage(
                     )
                 }
 
-                3 -> SettingsScreen(
-                    bottomPadding = bottomPadding,
-                    onNavigateVpnSettings = { navigator.push(Route.VpnSettings) },
-                    onNavigateRootSettings = { navigator.push(Route.RootSettings) },
-                    onNavigateNetworkSettings = { navigator.push(Route.NetworkSettings) },
-                    onNavigateMetaSettings = { navigator.push(Route.MetaSettings) },
-                    onNavigateExternalControl = { navigator.push(Route.ExternalControl) },
-                    onNavigateAutomation = { navigator.push(Route.Automation) },
-                    onNavigateAppProxy = { navigator.push(Route.AppProxy) },
-                    onNavigateWifiPolicy = { navigator.push(Route.WifiPolicy) },
-                    onNavigateThemeSettings = { navigator.push(Route.ThemeSettings) },
-                    onNavigateFileManager = { navigator.push(Route.FileManager) },
-                    onNavigateOverrides = { navigator.push(Route.OverrideList) },
-                    onNavigateBackup = { navigator.push(Route.BackupRestore) },
-                    onNavigateAbout = { navigator.push(Route.About) },
-                    bootStartManager = bootStartManager,
-                    storage = storage,
-                    onHideTaskCardChange = onHideTaskCardChange,
-                    hasRootPermission = hasRootPermission,
-                    isProxyRunning = homeUiState.isRunning || homeUiState.isStarting,
-                )
+                3 -> BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+                    val safeInsets = rememberHorizontalSafeInsets()
+                    val startInset = LocalTopBarStartInset.current()
+                    val availableWidth = (maxWidth - startInset - safeInsets.start - safeInsets.end).coerceAtLeast(0.dp)
+                    val masterPaneWidth = calculateDualPaneMasterWidth(availableWidth) + startInset + safeInsets.start
+                    var suppressDetailTransition by remember { mutableStateOf(false) }
+                    LaunchedEffect(suppressDetailTransition) {
+                        if (suppressDetailTransition) {
+                            delay(50.milliseconds)
+                            suppressDetailTransition = false
+                        }
+                    }
+                    val navigateSettings: (Route) -> Unit = { route ->
+                        if (isSettingsDualPane) {
+                            if (settingsDetailStack.size != 1 || settingsDetailStack.firstOrNull() != route) {
+                                suppressDetailTransition = true
+                                settingsDetailStack.clear()
+                                settingsDetailStack.add(route)
+                            }
+                        } else {
+                            navigator.push(route)
+                        }
+                    }
+                    if (isSettingsDualPane) {
+                        Row(modifier = Modifier.fillMaxSize()) {
+                            Box(
+                                modifier = Modifier
+                                    .width(masterPaneWidth)
+                                    .clipToBounds()
+                                    .fillMaxHeight(),
+                            ) {
+                                CompositionLocalProvider(
+                                    LocalHorizontalCutoutSides provides WindowInsetsSides.Start,
+                                ) {
+                                    SettingsScreen(
+                                        bottomPadding = bottomPadding,
+                                        selectedRoute = settingsDetailStack.firstOrNull() as? Route,
+                                        onNavigateVpnSettings = { navigateSettings(Route.VpnSettings) },
+                                        onNavigateRootSettings = { navigateSettings(Route.RootSettings) },
+                                        onNavigateNetworkSettings = { navigateSettings(Route.NetworkSettings) },
+                                        onNavigateMetaSettings = { navigateSettings(Route.MetaSettings) },
+                                        onNavigateExternalControl = { navigateSettings(Route.ExternalControl) },
+                                        onNavigateAutomation = { navigateSettings(Route.Automation) },
+                                        onNavigateAppProxy = { navigateSettings(Route.AppProxy) },
+                                        onNavigateWifiPolicy = { navigateSettings(Route.WifiPolicy) },
+                                        onNavigateThemeSettings = { navigateSettings(Route.ThemeSettings) },
+                                        onNavigateFileManager = { navigateSettings(Route.FileManager) },
+                                        onNavigateOverrides = { navigateSettings(Route.OverrideList) },
+                                        onNavigateBackup = { navigateSettings(Route.BackupRestore) },
+                                        onNavigateAbout = { navigateSettings(Route.About) },
+                                        bootStartManager = bootStartManager,
+                                        storage = storage,
+                                        onHideTaskCardChange = onHideTaskCardChange,
+                                        hasRootPermission = hasRootPermission,
+                                        isProxyRunning = homeUiState.isRunning || homeUiState.isStarting,
+                                    )
+                                }
+                            }
+                            Box(
+                                modifier = Modifier
+                                    .width(DualPaneDividerWidth)
+                                    .fillMaxHeight()
+                                    .background(MiuixTheme.colorScheme.onSurface.copy(alpha = 0.08f)),
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clipToBounds()
+                                    .fillMaxHeight(),
+                            ) {
+                                CompositionLocalProvider(
+                                    LocalTopBarStartInset provides DefaultTopBarStartInset,
+                                    LocalTopAppBarCenterObstructionStart provides Dp.Unspecified,
+                                    LocalTopAppBarTitleAlpha provides DefaultTopAppBarTitleAlpha,
+                                    LocalHorizontalCutoutSides provides WindowInsetsSides.End,
+                                    LocalTopBarExtraTopInset provides LocalCollapsedRailTopObstruction.current,
+                                ) {
+                                    if (settingsDetailStack.isEmpty()) {
+                                        Box(
+                                            modifier = Modifier.fillMaxSize(),
+                                            contentAlignment = Alignment.Center,
+                                        ) {
+                                            Text(
+                                                text = stringResource(R.string.settings_select_item_hint),
+                                                fontSize = 15.sp,
+                                                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                                            )
+                                        }
+                                    } else {
+                                        val detailTransition = if (suppressDetailTransition) {
+                                            InstantNavTransition
+                                        } else {
+                                            NavTransitions.MiuixDefault
+                                        }
+                                        val detailSwipeDismiss = if (settingsDetailStack.size > 1) swipeDismiss else null
+                                        NavDisplay(
+                                            backStack = settingsDetailStack,
+                                            onBack = {
+                                                if (settingsDetailStack.isNotEmpty()) {
+                                                    settingsDetailStack.removeAt(settingsDetailStack.lastIndex)
+                                                }
+                                            },
+                                            transition = detailTransition,
+                                            effects = NavDisplayEffects(cornerClipRadius = 0.dp),
+                                        ) {
+                                            registerSettingsEntries(
+                                                swipeDismiss = detailSwipeDismiss,
+                                                onPush = { sub ->
+                                                    if (sub !in settingsDetailStack) {
+                                                        suppressDetailTransition = false
+                                                        settingsDetailStack.add(sub)
+                                                    }
+                                                },
+                                                onPop = {
+                                                    if (settingsDetailStack.isNotEmpty()) {
+                                                        suppressDetailTransition = false
+                                                        settingsDetailStack.removeAt(settingsDetailStack.lastIndex)
+                                                    }
+                                                },
+                                                settingsDetailRenderer = settingsDetailRenderer,
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    } else {
+                        SettingsScreen(
+                            bottomPadding = bottomPadding,
+                            onNavigateVpnSettings = { navigateSettings(Route.VpnSettings) },
+                            onNavigateRootSettings = { navigateSettings(Route.RootSettings) },
+                            onNavigateNetworkSettings = { navigateSettings(Route.NetworkSettings) },
+                            onNavigateMetaSettings = { navigateSettings(Route.MetaSettings) },
+                            onNavigateExternalControl = { navigateSettings(Route.ExternalControl) },
+                            onNavigateAutomation = { navigateSettings(Route.Automation) },
+                            onNavigateAppProxy = { navigateSettings(Route.AppProxy) },
+                            onNavigateWifiPolicy = { navigateSettings(Route.WifiPolicy) },
+                            onNavigateThemeSettings = { navigateSettings(Route.ThemeSettings) },
+                            onNavigateFileManager = { navigateSettings(Route.FileManager) },
+                            onNavigateOverrides = { navigateSettings(Route.OverrideList) },
+                            onNavigateBackup = { navigateSettings(Route.BackupRestore) },
+                            onNavigateAbout = { navigateSettings(Route.About) },
+                            bootStartManager = bootStartManager,
+                            storage = storage,
+                            onHideTaskCardChange = onHideTaskCardChange,
+                            hasRootPermission = hasRootPermission,
+                            isProxyRunning = homeUiState.isRunning || homeUiState.isStarting,
+                        )
+                    }
+                }
             }
         }
     }
@@ -885,15 +1100,46 @@ fun rememberMainPagerState(
 // === 返回键处理 ===
 
 @Composable
-private fun MainScreenBackHandler(
+private fun SettingsDetailBackHandler(
     mainState: MainPagerState,
     navigator: Navigator,
+    settingsDetailStack: SnapshotStateList<NavKey>,
+    isSettingsDualPane: Boolean,
 ) {
-    val isPagerBackHandlerEnabled by remember {
+    val isEnabled by remember(settingsDetailStack, isSettingsDualPane) {
         computedStateOf {
             navigator.current() is Route.Main &&
                     navigator.backStackSize() == 1 &&
-                    mainState.selectedPage != 0
+                    mainState.selectedPage == 3 &&
+                    isSettingsDualPane &&
+                    settingsDetailStack.isNotEmpty()
+        }
+    }
+    val navEventState = rememberNavigationEventState(NavigationEventInfo.None)
+    NavigationBackHandler(
+        state = navEventState,
+        isBackEnabled = isEnabled,
+        onBackCompleted = {
+            if (settingsDetailStack.isNotEmpty()) {
+                settingsDetailStack.removeAt(settingsDetailStack.lastIndex)
+            }
+        },
+    )
+}
+
+@Composable
+private fun MainScreenBackHandler(
+    mainState: MainPagerState,
+    navigator: Navigator,
+    settingsDetailStack: SnapshotStateList<NavKey>,
+    isSettingsDualPane: Boolean,
+) {
+    val isPagerBackHandlerEnabled by remember(settingsDetailStack, isSettingsDualPane) {
+        computedStateOf {
+            navigator.current() is Route.Main &&
+                    navigator.backStackSize() == 1 &&
+                    mainState.selectedPage != 0 &&
+                    !(mainState.selectedPage == 3 && isSettingsDualPane && settingsDetailStack.isNotEmpty())
         }
     }
 
@@ -915,3 +1161,49 @@ private val InstantNavTransition: NavTransition = navGraphicsTransition(
         programmatic = NavSettleSpec.Tween(durationMillis = 0, easing = LinearEasing),
     ),
 ) {}
+
+private fun Route.isSettingsPaneRoute(): Boolean = when (this) {
+    is Route.VpnSettings,
+    is Route.RootSettings,
+    is Route.NetworkSettings,
+    is Route.MetaSettings,
+    is Route.ExternalControl,
+    is Route.Automation,
+    is Route.AppProxy,
+    is Route.WifiPolicy,
+    is Route.ThemeSettings,
+    is Route.FileManager,
+    is Route.FileManagerEditor,
+    is Route.OverrideList,
+    is Route.OverrideEdit,
+    is Route.OverrideFileEditor,
+    is Route.BackupRestore,
+    is Route.About,
+        -> true
+
+    else -> false
+}
+
+private fun NavEntryBuilder.registerSettingsEntries(
+    swipeDismiss: NavSwipeDirection?,
+    onPush: (Route) -> Unit,
+    onPop: () -> Unit,
+    settingsDetailRenderer: @Composable (Route, (Route) -> Unit, () -> Unit) -> Unit,
+) {
+    entry<Route.OverrideList>(swipeDismiss = swipeDismiss) { route -> settingsDetailRenderer(route, onPush, onPop) }
+    entry<Route.OverrideEdit>(swipeDismiss = swipeDismiss) { route -> settingsDetailRenderer(route, onPush, onPop) }
+    entry<Route.OverrideFileEditor>(swipeDismiss = swipeDismiss) { route -> settingsDetailRenderer(route, onPush, onPop) }
+    entry<Route.VpnSettings>(swipeDismiss = swipeDismiss) { route -> settingsDetailRenderer(route, onPush, onPop) }
+    entry<Route.RootSettings>(swipeDismiss = swipeDismiss) { route -> settingsDetailRenderer(route, onPush, onPop) }
+    entry<Route.NetworkSettings>(swipeDismiss = swipeDismiss) { route -> settingsDetailRenderer(route, onPush, onPop) }
+    entry<Route.MetaSettings>(swipeDismiss = swipeDismiss) { route -> settingsDetailRenderer(route, onPush, onPop) }
+    entry<Route.AppProxy>(swipeDismiss = swipeDismiss) { route -> settingsDetailRenderer(route, onPush, onPop) }
+    entry<Route.WifiPolicy>(swipeDismiss = swipeDismiss) { route -> settingsDetailRenderer(route, onPush, onPop) }
+    entry<Route.ThemeSettings>(swipeDismiss = swipeDismiss) { route -> settingsDetailRenderer(route, onPush, onPop) }
+    entry<Route.ExternalControl>(swipeDismiss = swipeDismiss) { route -> settingsDetailRenderer(route, onPush, onPop) }
+    entry<Route.Automation>(swipeDismiss = swipeDismiss) { route -> settingsDetailRenderer(route, onPush, onPop) }
+    entry<Route.BackupRestore>(swipeDismiss = swipeDismiss) { route -> settingsDetailRenderer(route, onPush, onPop) }
+    entry<Route.FileManager>(swipeDismiss = swipeDismiss) { route -> settingsDetailRenderer(route, onPush, onPop) }
+    entry<Route.FileManagerEditor>(swipeDismiss = swipeDismiss) { route -> settingsDetailRenderer(route, onPush, onPop) }
+    entry<Route.About>(swipeDismiss = swipeDismiss) { route -> settingsDetailRenderer(route, onPush, onPop) }
+}

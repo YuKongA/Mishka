@@ -3,6 +3,9 @@ package top.yukonga.mishka.ui.util
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.calculateEndPadding
+import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.only
@@ -10,10 +13,14 @@ import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.offset
@@ -21,6 +28,34 @@ import top.yukonga.mishka.ui.component.blur.LocalTopBarStartInset
 import top.yukonga.mishka.ui.theme.LocalContainerSize
 import top.yukonga.mishka.ui.theme.LocalPlatformDensity
 import top.yukonga.miuix.kmp.anim.folmeSpring
+
+val LocalHorizontalCutoutSides = staticCompositionLocalOf { WindowInsetsSides.Horizontal }
+
+@Immutable
+data class HorizontalSafeInsets(
+    val start: Dp,
+    val end: Dp,
+)
+
+@Composable
+fun rememberHorizontalSafeInsets(): HorizontalSafeInsets {
+    val layoutDirection = LocalLayoutDirection.current
+    val padding = WindowInsets.displayCutout.union(WindowInsets.navigationBars).asPaddingValues()
+    return HorizontalSafeInsets(
+        start = padding.calculateStartPadding(layoutDirection),
+        end = padding.calculateEndPadding(layoutDirection),
+    )
+}
+
+
+val DualPaneMasterMinWidth = 360.dp
+val DualPaneMasterMaxWidth = 400.dp
+val DualPaneDetailMinWidth = 400.dp
+val DualPaneDividerWidth = 1.dp
+val DualPaneMinWidth = DualPaneMasterMinWidth + DualPaneDividerWidth + DualPaneDetailMinWidth
+
+fun calculateDualPaneMasterWidth(availableWidth: Dp): Dp =
+    (availableWidth * 0.36f).coerceIn(DualPaneMasterMinWidth, DualPaneMasterMaxWidth)
 
 /** 宽屏阈值：窗口宽度达到此值时启用侧边导航栏与内容居中（平板、横屏、展开态折叠屏、桌面）。 */
 private val WideScreenMinWidth = 600.dp
@@ -59,7 +94,7 @@ fun Modifier.sidebarStartInset(): Modifier {
 @Composable
 fun Modifier.horizontalCutoutPadding(applySidebarInset: Boolean = true): Modifier = this
     .windowInsetsPadding(
-        WindowInsets.displayCutout.union(WindowInsets.navigationBars).only(WindowInsetsSides.Horizontal),
+        WindowInsets.displayCutout.union(WindowInsets.navigationBars).only(LocalHorizontalCutoutSides.current),
     )
     .then(if (applySidebarInset) Modifier.sidebarStartInset() else Modifier)
 
