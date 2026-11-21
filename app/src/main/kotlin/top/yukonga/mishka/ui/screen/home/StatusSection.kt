@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -47,6 +48,7 @@ import top.yukonga.mishka.ui.theme.ActionPalette
 import top.yukonga.mishka.ui.theme.LocalAppDarkMode
 import top.yukonga.mishka.ui.theme.RunState
 import top.yukonga.mishka.ui.theme.StatusColors
+import top.yukonga.mishka.ui.util.rememberIsWideScreen
 import top.yukonga.mishka.viewmodel.HomeUiState
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Card
@@ -59,6 +61,7 @@ import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.basic.TextButtonColors
 import top.yukonga.miuix.kmp.glass.GlassDialog
 import top.yukonga.miuix.kmp.icon.MiuixIcons
+import top.yukonga.miuix.kmp.icon.glass.ChevronForward
 import top.yukonga.miuix.kmp.icon.glass.Refresh
 import top.yukonga.miuix.kmp.preference.RadioButtonLocation
 import top.yukonga.miuix.kmp.preference.RadioButtonPreference
@@ -90,7 +93,7 @@ fun LazyListScope.statusSection(
 }
 
 @Composable
-private fun StatusContent(
+internal fun StatusContent(
     state: HomeUiState,
     uptime: String,
     onSwitchMode: (String) -> Unit,
@@ -98,6 +101,7 @@ private fun StatusContent(
     onRestart: () -> Unit,
     onStop: () -> Unit,
     onStart: () -> Unit,
+    useWideLayout: Boolean = rememberIsWideScreen(),
 ) {
     val isRunning = state.isRunning
     val isStarting = state.isStarting
@@ -124,125 +128,249 @@ private fun StatusContent(
         // 顶部左右结构：左状态卡（右下角 Badge）+ 右双配置卡
         val isTproxy = state.tunMode == TunMode.RootTproxy
         val inboundTproxyLabel = stringResource(R.string.home_inbound_tproxy, TPROXY_INBOUND_PORT)
-        Layout(
-            modifier = Modifier.fillMaxWidth(),
-            content = {
-                Card(
-                    modifier = Modifier.fillMaxSize(),
-                    colors = CardDefaults.defaultColors(color = statusContainer),
-                ) {
-                    val statusIcon = if (isRunning) CheckCircleOutlineIcon else RemoveCircleOutlineIcon
-                    Box(modifier = Modifier.fillMaxSize()) {
-                        Box(
-                            modifier = Modifier
-                                .matchParentSize()
-                                .offset(30.dp, 36.dp),
-                            contentAlignment = Alignment.BottomEnd,
-                        ) {
-                            Icon(
-                                modifier = Modifier.size(136.dp),
-                                imageVector = statusIcon,
-                                tint = statusTint,
-                                contentDescription = null,
-                            )
-                        }
-                        Column(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(all = 16.dp),
-                        ) {
+        val isWideScreen = useWideLayout
+        val statusCard = @Composable {
+            Card(
+                modifier = Modifier.fillMaxSize(),
+                colors = CardDefaults.defaultColors(color = statusContainer),
+            ) {
+                val statusIcon = if (isRunning) CheckCircleOutlineIcon else RemoveCircleOutlineIcon
+                Box(modifier = Modifier.fillMaxSize()) {
+                    Box(
+                        modifier = Modifier
+                            .matchParentSize()
+                            .offset(30.dp, 36.dp),
+                        contentAlignment = Alignment.BottomEnd,
+                    ) {
+                        Icon(
+                            modifier = Modifier.size(136.dp),
+                            imageVector = statusIcon,
+                            tint = statusTint,
+                            contentDescription = null,
+                        )
+                    }
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(all = 16.dp),
+                    ) {
+                        Text(
+                            text = when {
+                                state.isRestarting -> stringResource(R.string.home_restarting)
+                                isStopping -> stringResource(R.string.home_stopping)
+                                isStarting -> stringResource(R.string.home_starting)
+                                isRunning -> stringResource(R.string.home_running)
+                                else -> stringResource(R.string.home_stopped)
+                            },
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = statusTint,
+                        )
+                        Spacer(Modifier.height(2.dp))
+                        val versionText = state.version.ifBlank { BuildConfig.MIHOMO_VERSION }
+                        Text(
+                            text = versionText,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                        )
+                        if (uptime.isNotBlank()) {
                             Text(
-                                text = when {
-                                    state.isRestarting -> stringResource(R.string.home_restarting)
-                                    isStopping -> stringResource(R.string.home_stopping)
-                                    isStarting -> stringResource(R.string.home_starting)
-                                    isRunning -> stringResource(R.string.home_running)
-                                    else -> stringResource(R.string.home_stopped)
-                                },
-                                fontSize = 20.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = statusTint,
-                            )
-                            Spacer(Modifier.height(2.dp))
-                            val versionText = state.version.ifBlank { BuildConfig.MIHOMO_VERSION }
-                            Text(
-                                text = versionText,
+                                text = uptime,
                                 fontSize = 14.sp,
                                 fontWeight = FontWeight.Medium,
                                 color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                             )
-                            if (uptime.isNotBlank()) {
-                                Text(
-                                    text = uptime,
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                                )
-                            }
                         }
                     }
                 }
-
-                Column(modifier = Modifier.fillMaxSize()) {
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .weight(1f),
-                        insideMargin = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
-                        onClick = { showModeDialog = true },
-                        showIndication = true,
-                        pressFeedbackType = PressFeedbackType.Sink,
-                    ) {
-                        Column(
-                            modifier = Modifier.fillMaxSize(),
-                            verticalArrangement = Arrangement.Center,
-                        ) {
-                            Text(
-                                text = stringResource(R.string.home_mode),
-                                fontSize = 13.sp,
-                                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+            }
+        }
+        val modeCard = @Composable { modifier: Modifier ->
+            Card(
+                modifier = modifier,
+                insideMargin = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+                onClick = { showModeDialog = true },
+                showIndication = true,
+                pressFeedbackType = PressFeedbackType.Sink,
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxSize(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column {
+                        Text(
+                            text = stringResource(R.string.home_mode),
+                            fontSize = 13.sp,
+                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                        )
+                        Text(
+                            text = modeLabel(state.mode),
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MiuixTheme.colorScheme.onSurface,
+                        )
+                    }
+                    Icon(
+                        imageVector = MiuixIcons.Glass.ChevronForward,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp),
+                        tint = MiuixTheme.colorScheme.onSurfaceVariantSummary.copy(alpha = 0.6f),
+                    )
+                }
+            }
+        }
+        val tunStackCard = @Composable { modifier: Modifier ->
+            Card(
+                modifier = modifier,
+                insideMargin = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+                onClick = { if (isRunning && !isTproxy) showTunStackDialog = true },
+                showIndication = isRunning && !isTproxy,
+                pressFeedbackType = if (isRunning && !isTproxy) PressFeedbackType.Sink else PressFeedbackType.None,
+            ) {
+                val clickable = isRunning && !isTproxy
+                Row(
+                    modifier = Modifier.fillMaxSize(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column {
+                        Text(
+                            text = if (isTproxy) stringResource(R.string.home_inbound) else stringResource(R.string.home_tun),
+                            fontSize = 13.sp,
+                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                        )
+                        Text(
+                            text = if (isTproxy) inboundTproxyLabel else tunStackLabel(state.tunStack),
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MiuixTheme.colorScheme.onSurface,
+                        )
+                    }
+                    if (clickable) {
+                        Icon(
+                            imageVector = MiuixIcons.Glass.ChevronForward,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                            tint = MiuixTheme.colorScheme.onSurfaceVariantSummary.copy(alpha = 0.6f),
+                        )
+                    }
+                }
+            }
+        }
+        val actionButtons = @Composable {
+            if (isRunning || state.isRestarting) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    TextButton(
+                        text = stringResource(R.string.home_stop),
+                        onClick = onStop,
+                        modifier = Modifier.weight(1f),
+                        enabled = !state.isRestarting,
+                        colors = StatusColors.actionButton(ActionKind.Stop).asTextButtonColors(),
+                    )
+                    val restartColors = StatusColors.actionButton(ActionKind.Restart)
+                    val rotation = remember { Animatable(0f) }
+                    LaunchedEffect(state.isRestarting) {
+                        if (state.isRestarting) {
+                            while (true) {
+                                rotation.animateTo(
+                                    targetValue = rotation.value + 360f,
+                                    animationSpec = tween(durationMillis = 800, easing = LinearEasing),
+                                )
+                            }
+                        } else if (rotation.value % 360f != 0f) {
+                            val target = ceil(rotation.value / 360f) * 360f
+                            rotation.animateTo(
+                                targetValue = target,
+                                animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing),
                             )
-                            Text(
-                                text = modeLabel(state.mode),
-                                fontSize = 20.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = MiuixTheme.colorScheme.onSurface,
-                            )
+                            rotation.snapTo(0f)
                         }
                     }
-                    Spacer(Modifier.height(12.dp))
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .weight(1f),
-                        insideMargin = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
-                        onClick = { if (isRunning && !isTproxy) showTunStackDialog = true },
-                        showIndication = isRunning && !isTproxy,
-                        pressFeedbackType = if (isRunning && !isTproxy) PressFeedbackType.Sink else PressFeedbackType.None,
+                    IconButton(
+                        onClick = { if (!state.isRestarting) onRestart() },
+                        modifier = Modifier.size(48.dp),
+                        backgroundColor = restartColors.container,
                     ) {
-                        Column(
-                            modifier = Modifier.fillMaxSize(),
-                            verticalArrangement = Arrangement.Center,
+                        Icon(
+                            imageVector = MiuixIcons.Glass.Refresh,
+                            contentDescription = stringResource(R.string.home_restart),
+                            modifier = Modifier.graphicsLayer { rotationZ = rotation.value },
+                            tint = restartColors.content,
+                        )
+                    }
+                }
+            } else if (isStopping) {
+                TextButton(
+                    text = stringResource(R.string.home_stopping_btn),
+                    onClick = {},
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = false,
+                    colors = ButtonDefaults.textButtonColorsPrimary(),
+                )
+            } else {
+                TextButton(
+                    text = if (isStarting) stringResource(R.string.home_starting_btn) else stringResource(R.string.home_start),
+                    onClick = onStart,
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !isStarting,
+                    colors = ButtonDefaults.textButtonColorsPrimary(),
+                )
+            }
+        }
+
+        Layout(
+            modifier = Modifier.fillMaxWidth(),
+            content = {
+                statusCard()
+                if (isWideScreen) {
+                    Column(modifier = Modifier.fillMaxSize()) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .weight(1f),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
                         ) {
-                            Text(
-                                text = if (isTproxy) stringResource(R.string.home_inbound) else stringResource(R.string.home_tun),
-                                fontSize = 13.sp,
-                                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                            modeCard(
+                                Modifier
+                                    .weight(1f)
+                                    .fillMaxHeight(),
                             )
-                            Text(
-                                text = if (isTproxy) inboundTproxyLabel else tunStackLabel(state.tunStack),
-                                fontSize = 20.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = MiuixTheme.colorScheme.onSurface,
+                            tunStackCard(
+                                Modifier
+                                    .weight(1f)
+                                    .fillMaxHeight(),
                             )
                         }
+                        Spacer(Modifier.height(12.dp))
+                        actionButtons()
+                    }
+                } else {
+                    Column(modifier = Modifier.fillMaxSize()) {
+                        modeCard(
+                            Modifier
+                                .fillMaxWidth()
+                                .weight(1f),
+                        )
+                        Spacer(Modifier.height(12.dp))
+                        tunStackCard(
+                            Modifier
+                                .fillMaxWidth()
+                                .weight(1f),
+                        )
                     }
                 }
             },
         ) { measurables, constraints ->
             val gap = 12.dp.roundToPx()
             val availableWidth = (constraints.maxWidth - gap).coerceAtLeast(0)
-            val leftWidth = (availableWidth * 0.44f).roundToInt().coerceAtMost(180.dp.roundToPx())
+            val maxLeftWidth = if (isWideScreen) 144.dp.roundToPx() else 180.dp.roundToPx()
+            val leftWidth = (availableWidth * 0.44f).roundToInt().coerceAtMost(maxLeftWidth)
             val rightWidth = (availableWidth - leftWidth).coerceAtLeast(0)
             val leftMinHeight = measurables[0].minIntrinsicHeight(leftWidth)
             val rightMinHeight = measurables[1].minIntrinsicHeight(rightWidth)
@@ -255,67 +383,8 @@ private fun StatusContent(
             }
         }
 
-        if (isRunning || state.isRestarting) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                TextButton(
-                    text = stringResource(R.string.home_stop),
-                    onClick = onStop,
-                    modifier = Modifier.weight(1f),
-                    enabled = !state.isRestarting,
-                    colors = StatusColors.actionButton(ActionKind.Stop).asTextButtonColors(),
-                )
-                val restartColors = StatusColors.actionButton(ActionKind.Restart)
-                val rotation = remember { Animatable(0f) }
-                LaunchedEffect(state.isRestarting) {
-                    if (state.isRestarting) {
-                        while (true) {
-                            rotation.animateTo(
-                                targetValue = rotation.value + 360f,
-                                animationSpec = tween(durationMillis = 800, easing = LinearEasing),
-                            )
-                        }
-                    } else if (rotation.value % 360f != 0f) {
-                        val target = ceil(rotation.value / 360f) * 360f
-                        rotation.animateTo(
-                            targetValue = target,
-                            animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing),
-                        )
-                        rotation.snapTo(0f)
-                    }
-                }
-                IconButton(
-                    onClick = { if (!state.isRestarting) onRestart() },
-                    modifier = Modifier.size(48.dp),
-                    backgroundColor = restartColors.container,
-                ) {
-                    Icon(
-                        imageVector = MiuixIcons.Glass.Refresh,
-                        contentDescription = stringResource(R.string.home_restart),
-                        modifier = Modifier.graphicsLayer { rotationZ = rotation.value },
-                        tint = restartColors.content,
-                    )
-                }
-            }
-        } else if (isStopping) {
-            TextButton(
-                text = stringResource(R.string.home_stopping_btn),
-                onClick = {},
-                modifier = Modifier.fillMaxWidth(),
-                enabled = false,
-                colors = ButtonDefaults.textButtonColorsPrimary(),
-            )
-        } else {
-            TextButton(
-                text = if (isStarting) stringResource(R.string.home_starting_btn) else stringResource(R.string.home_start),
-                onClick = onStart,
-                modifier = Modifier.fillMaxWidth(),
-                enabled = !isStarting,
-                colors = ButtonDefaults.textButtonColorsPrimary(),
-            )
+        if (!isWideScreen) {
+            actionButtons()
         }
     }
 

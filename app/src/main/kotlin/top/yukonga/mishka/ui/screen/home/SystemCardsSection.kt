@@ -67,6 +67,15 @@ fun LazyListScope.systemCardsSection(
     systemInfo: SystemInfoSnapshot = SystemInfoSnapshot(),
 ) {
     item(key = "system_cards") {
+        SystemCardsContent(memory = memory, systemInfo = systemInfo)
+    }
+}
+
+@Composable
+internal fun SystemCardsContent(
+    memory: MemorySnapshot = MemorySnapshot(),
+    systemInfo: SystemInfoSnapshot = SystemInfoSnapshot(),
+) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -136,7 +145,6 @@ fun LazyListScope.systemCardsSection(
                 )
             }
         }
-    }
 }
 
 @Composable

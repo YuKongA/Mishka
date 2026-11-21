@@ -1,7 +1,11 @@
 package top.yukonga.mishka.ui.screen.home
 
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -25,6 +29,7 @@ import top.yukonga.mishka.domain.model.SubscriptionInfo
 import top.yukonga.mishka.platform.NetworkAddressType
 import top.yukonga.mishka.ui.component.AdaptiveTopAppBar
 import top.yukonga.mishka.ui.component.blur.BlurredBar
+import top.yukonga.mishka.ui.component.blur.LocalTopBarStartInset
 import top.yukonga.mishka.ui.component.blur.rememberBlurBackdrop
 import top.yukonga.mishka.ui.component.overScrollVertical
 import top.yukonga.mishka.ui.util.horizontalCutoutPadding
@@ -151,49 +156,106 @@ private fun HomeScreenContent(
             }
         },
     ) { innerPadding ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .then(if (backdrop != null) Modifier.layerBackdrop(backdrop) else Modifier)
-                .horizontalCutoutPadding()
-                .scrollEndHaptic()
-                .overScrollVertical(scrollBehavior)
-                .nestedScroll(scrollBehavior.nestedScrollConnection),
-            contentPadding = PaddingValues(
-                top = innerPadding.calculateTopPadding(),
-                bottom = bottomPadding,
-            ),
-        ) {
-            statusSection(
-                state = uiState,
-                uptime = uptime,
-                onSwitchMode = onSwitchMode,
-                onSwitchTunStack = onSwitchTunStack,
-                onRestart = onRestart,
-                onStop = onStop,
-                onStart = onStartProxy,
-            )
-            latencySection(uiState, onTestLatency)
-            overviewCardsSection(
-                speed = speed,
-                state = uiState,
-                onSpeedClick = { showSpeedDetail = true },
-                onSubscriptionClick = {
-                    showSubscriptionTraffic = true
-                    onRefreshProviderTraffic()
-                },
-            )
-            systemCardsSection(
-                memory = memory,
-                systemInfo = systemInfo,
-            )
-            quickEntriesSection(
-                isRunning = uiState.isRunning,
-                onNavigateLog = onNavigateLog,
-                onNavigateProvider = onNavigateProvider,
-                onNavigateConnection = onNavigateConnection,
-                onNavigateDnsQuery = onNavigateDnsQuery,
-            )
+        BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+            val isTablet = (maxWidth - LocalTopBarStartInset.current()) >= 840.dp
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .then(if (backdrop != null) Modifier.layerBackdrop(backdrop) else Modifier)
+                    .horizontalCutoutPadding()
+                    .scrollEndHaptic()
+                    .overScrollVertical(scrollBehavior)
+                    .nestedScroll(scrollBehavior.nestedScrollConnection),
+                contentPadding = PaddingValues(
+                    top = innerPadding.calculateTopPadding(),
+                    bottom = bottomPadding,
+                ),
+            ) {
+                val hasSubscriptionQuota = (uiState.subscription?.Total ?: 0L) > 0L
+                if (isTablet) {
+                    item(key = "tablet_dashboard") {
+                        Row(modifier = Modifier.fillMaxWidth()) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                StatusContent(
+                                    state = uiState,
+                                    uptime = uptime,
+                                    onSwitchMode = onSwitchMode,
+                                    onSwitchTunStack = onSwitchTunStack,
+                                    onRestart = onRestart,
+                                    onStop = onStop,
+                                    onStart = onStartProxy,
+                                    useWideLayout = false,
+                                )
+                                LatencySectionContent(uiState, onTestLatency)
+                                if (hasSubscriptionQuota) {
+                                    QuickEntriesContent(
+                                        isRunning = uiState.isRunning,
+                                        onNavigateLog = onNavigateLog,
+                                        onNavigateProvider = onNavigateProvider,
+                                        onNavigateConnection = onNavigateConnection,
+                                        onNavigateDnsQuery = onNavigateDnsQuery,
+                                    )
+                                }
+                            }
+                            Column(modifier = Modifier.weight(1f)) {
+                                OverviewCardsContent(
+                                    speed = speed,
+                                    state = uiState,
+                                    onSpeedClick = { showSpeedDetail = true },
+                                    onSubscriptionClick = {
+                                        showSubscriptionTraffic = true
+                                        onRefreshProviderTraffic()
+                                    },
+                                )
+                                SystemCardsContent(
+                                    memory = memory,
+                                    systemInfo = systemInfo,
+                                )
+                                if (!hasSubscriptionQuota) {
+                                    QuickEntriesContent(
+                                        isRunning = uiState.isRunning,
+                                        onNavigateLog = onNavigateLog,
+                                        onNavigateProvider = onNavigateProvider,
+                                        onNavigateConnection = onNavigateConnection,
+                                        onNavigateDnsQuery = onNavigateDnsQuery,
+                                    )
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    statusSection(
+                        state = uiState,
+                        uptime = uptime,
+                        onSwitchMode = onSwitchMode,
+                        onSwitchTunStack = onSwitchTunStack,
+                        onRestart = onRestart,
+                        onStop = onStop,
+                        onStart = onStartProxy,
+                    )
+                    latencySection(uiState, onTestLatency)
+                    overviewCardsSection(
+                        speed = speed,
+                        state = uiState,
+                        onSpeedClick = { showSpeedDetail = true },
+                        onSubscriptionClick = {
+                            showSubscriptionTraffic = true
+                            onRefreshProviderTraffic()
+                        },
+                    )
+                    systemCardsSection(
+                        memory = memory,
+                        systemInfo = systemInfo,
+                    )
+                    quickEntriesSection(
+                        isRunning = uiState.isRunning,
+                        onNavigateLog = onNavigateLog,
+                        onNavigateProvider = onNavigateProvider,
+                        onNavigateConnection = onNavigateConnection,
+                        onNavigateDnsQuery = onNavigateDnsQuery,
+                    )
+                }
+            }
         }
     }
 
@@ -234,7 +296,90 @@ private fun HomeScreenRunningPreview() {
                 isRunning = true,
                 mode = "rule",
                 tunStack = "mips",
-                version = "1.19.0",
+                subscription = SubscriptionInfo(
+                    Upload = 12L * 1024 * 1024 * 1024,
+                    Download = 68L * 1024 * 1024 * 1024,
+                    Total = 200L * 1024 * 1024 * 1024,
+                    Expire = 1798761600L,
+                ),
+                latencyXiaomi = 42,
+                latencyCloudflare = 320,
+                latencyGoogle = 680,
+            ),
+            speed = SpeedSnapshot(
+                uploadSpeed = "128 KB/s",
+                downloadSpeed = "2.4 MB/s",
+                history = TrafficHistory(
+                    up = List(60) { i -> ((i % 7 + 1) * 40_000L) }.toPersistentList(),
+                    down = List(60) { i -> ((i % 5 + 2) * 380_000L) }.toPersistentList(),
+                    seq = 60,
+                ),
+            ),
+            memory = MemorySnapshot(
+                ramUsage = "38.4 MB",
+                ramTotal = "284 MB",
+            ),
+            systemInfo = SystemInfoSnapshot(
+                localIp = "172.19.0.1",
+                interfaceName = "tun0",
+                addressType = NetworkAddressType.Tun,
+                cpuUsage = "1.2%",
+            ),
+        )
+    }
+}
+
+@Preview(showBackground = true, widthDp = 840, heightDp = 420)
+@Composable
+private fun HomeScreenRunningWidePreview() {
+    MiuixTheme {
+        HomeScreenContent(
+            uiState = HomeUiState(
+                isRunning = true,
+                mode = "rule",
+                tunStack = "mips",
+                subscription = SubscriptionInfo(
+                    Upload = 12L * 1024 * 1024 * 1024,
+                    Download = 68L * 1024 * 1024 * 1024,
+                    Total = 200L * 1024 * 1024 * 1024,
+                    Expire = 1798761600L,
+                ),
+                latencyXiaomi = 42,
+                latencyCloudflare = 320,
+                latencyGoogle = 680,
+            ),
+            speed = SpeedSnapshot(
+                uploadSpeed = "128 KB/s",
+                downloadSpeed = "2.4 MB/s",
+                history = TrafficHistory(
+                    up = List(60) { i -> ((i % 7 + 1) * 40_000L) }.toPersistentList(),
+                    down = List(60) { i -> ((i % 5 + 2) * 380_000L) }.toPersistentList(),
+                    seq = 60,
+                ),
+            ),
+            memory = MemorySnapshot(
+                ramUsage = "38.4 MB",
+                ramTotal = "284 MB",
+            ),
+            systemInfo = SystemInfoSnapshot(
+                localIp = "172.19.0.1",
+                interfaceName = "tun0",
+                addressType = NetworkAddressType.Tun,
+                cpuUsage = "1.2%",
+            ),
+        )
+    }
+}
+
+@Preview(showBackground = true, widthDp = 1280, heightDp = 800)
+@Composable
+private fun HomeScreenRunningTabletPreview() {
+    MiuixTheme {
+        HomeScreenContent(
+            uiState = HomeUiState(
+                isRunning = true,
+                mode = "rule",
+                tunStack = "mips",
                 subscription = SubscriptionInfo(
                     Upload = 12L * 1024 * 1024 * 1024,
                     Download = 68L * 1024 * 1024 * 1024,

@@ -85,6 +85,37 @@ fun LazyListScope.overviewCardsSection(
 }
 
 @Composable
+internal fun OverviewCardsContent(
+    speed: SpeedSnapshot = SpeedSnapshot(),
+    state: HomeUiState = HomeUiState(),
+    onSpeedClick: () -> Unit = {},
+    onSubscriptionClick: () -> Unit = {},
+) {
+    SmallTitle(text = stringResource(R.string.home_overview))
+    SpeedHeroCard(
+        speed = speed,
+        isRunning = state.isRunning,
+        onSpeedClick = onSpeedClick,
+    )
+    val total = state.subscription?.Total?.coerceAtLeast(0) ?: 0
+    val used = state.subscription?.let { (it.Upload + it.Download).coerceAtLeast(0) } ?: 0
+    val hasQuota = total > 0
+    CapturedAnimatedVisibility(
+        visible = hasQuota,
+        enter = fadeIn() + expandVertically(),
+        exit = fadeOut() + shrinkVertically(),
+    ) {
+        SubscriptionQuotaCard(
+            used = used,
+            total = total,
+            expire = state.subscription?.Expire ?: 0L,
+            isRunning = state.isRunning,
+            onClick = onSubscriptionClick,
+        )
+    }
+}
+
+@Composable
 private fun SpeedHeroCard(
     speed: SpeedSnapshot,
     isRunning: Boolean,

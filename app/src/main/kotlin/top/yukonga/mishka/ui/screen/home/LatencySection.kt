@@ -51,26 +51,40 @@ fun LazyListScope.latencySection(
         LatencyHeader(state, onTestLatency)
     }
     item(key = "latency") {
-        Card(
+        LatencyCard(state)
+    }
+}
+
+@Composable
+internal fun LatencySectionContent(
+    state: HomeUiState = HomeUiState(),
+    onTestLatency: () -> Unit = {},
+) {
+    LatencyHeader(state, onTestLatency)
+    LatencyCard(state)
+}
+
+@Composable
+private fun LatencyCard(state: HomeUiState) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp)
+            .padding(bottom = 6.dp),
+        insideMargin = PaddingValues(16.dp),
+    ) {
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp)
-                .padding(bottom = 6.dp),
-            insideMargin = PaddingValues(16.dp),
+                .height(IntrinsicSize.Min),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(IntrinsicSize.Min),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                LatencyItem("Xiaomi", state.latencyXiaomi, Alignment.Start)
-                LatencyDivider()
-                LatencyItem("Cloudflare", state.latencyCloudflare, Alignment.CenterHorizontally)
-                LatencyDivider()
-                LatencyItem("Google", state.latencyGoogle, Alignment.End)
-            }
+            LatencyItem("Xiaomi", state.latencyXiaomi, Alignment.Start)
+            LatencyDivider()
+            LatencyItem("Cloudflare", state.latencyCloudflare, Alignment.CenterHorizontally)
+            LatencyDivider()
+            LatencyItem("Google", state.latencyGoogle, Alignment.End)
         }
     }
 }

@@ -80,6 +80,62 @@ fun LazyListScope.quickEntriesSection(
 }
 
 @Composable
+internal fun QuickEntriesContent(
+    isRunning: Boolean,
+    onNavigateLog: () -> Unit = {},
+    onNavigateProvider: () -> Unit = {},
+    onNavigateConnection: () -> Unit = {},
+    onNavigateDnsQuery: () -> Unit = {},
+) {
+    SmallTitle(text = stringResource(R.string.home_tools))
+    Column(
+        modifier = Modifier
+            .padding(horizontal = 12.dp)
+            .padding(bottom = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            QuickEntryCard(
+                modifier = Modifier.weight(1f),
+                title = stringResource(R.string.home_providers),
+                subtitle = stringResource(R.string.home_providers_subtitle),
+                isRunning = isRunning,
+                onClick = onNavigateProvider,
+            )
+            QuickEntryCard(
+                modifier = Modifier.weight(1f),
+                title = stringResource(R.string.home_connections),
+                subtitle = stringResource(R.string.home_connections_subtitle),
+                isRunning = isRunning,
+                onClick = onNavigateConnection,
+            )
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            QuickEntryCard(
+                modifier = Modifier.weight(1f),
+                title = stringResource(R.string.home_logs),
+                subtitle = stringResource(R.string.home_logs_subtitle),
+                isRunning = isRunning,
+                onClick = onNavigateLog,
+            )
+            QuickEntryCard(
+                modifier = Modifier.weight(1f),
+                title = stringResource(R.string.home_dns),
+                subtitle = stringResource(R.string.home_dns_subtitle),
+                isRunning = isRunning,
+                onClick = onNavigateDnsQuery,
+            )
+        }
+    }
+}
+
+@Composable
 private fun QuickEntryCard(
     modifier: Modifier = Modifier,
     title: String,
