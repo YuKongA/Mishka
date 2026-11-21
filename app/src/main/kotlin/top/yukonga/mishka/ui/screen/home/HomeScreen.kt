@@ -188,7 +188,6 @@ private fun HomeScreenContent(
                                         onRestart = onRestart,
                                         onStop = onStop,
                                         onStart = onStartProxy,
-                                        useWideLayout = false,
                                     )
                                     LatencySectionContent(uiState, onTestLatency)
                                     if (hasSubscriptionQuota) {

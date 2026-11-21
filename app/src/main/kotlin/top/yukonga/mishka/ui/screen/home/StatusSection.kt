@@ -7,6 +7,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -32,10 +33,8 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.path
-import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import top.yukonga.mishka.BuildConfig
@@ -48,7 +47,6 @@ import top.yukonga.mishka.ui.theme.ActionPalette
 import top.yukonga.mishka.ui.theme.LocalAppDarkMode
 import top.yukonga.mishka.ui.theme.RunState
 import top.yukonga.mishka.ui.theme.StatusColors
-import top.yukonga.mishka.ui.util.rememberIsWideScreen
 import top.yukonga.mishka.viewmodel.HomeUiState
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Card
@@ -68,7 +66,6 @@ import top.yukonga.miuix.kmp.preference.RadioButtonPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.PressFeedbackType
 import kotlin.math.ceil
-import kotlin.math.roundToInt
 
 fun LazyListScope.statusSection(
     state: HomeUiState = HomeUiState(),
@@ -101,7 +98,6 @@ internal fun StatusContent(
     onRestart: () -> Unit,
     onStop: () -> Unit,
     onStart: () -> Unit,
-    useWideLayout: Boolean = rememberIsWideScreen(),
 ) {
     val isRunning = state.isRunning
     val isStarting = state.isStarting
@@ -128,10 +124,9 @@ internal fun StatusContent(
         // 顶部左右结构：左状态卡（右下角 Badge）+ 右双配置卡
         val isTproxy = state.tunMode == TunMode.RootTproxy
         val inboundTproxyLabel = stringResource(R.string.home_inbound_tproxy, TPROXY_INBOUND_PORT)
-        val isWideScreen = useWideLayout
-        val statusCard = @Composable {
+        val statusCard = @Composable { modifier: Modifier ->
             Card(
-                modifier = Modifier.fillMaxSize(),
+                modifier = modifier,
                 colors = CardDefaults.defaultColors(color = statusContainer),
             ) {
                 val statusIcon = if (isRunning) CheckCircleOutlineIcon else RemoveCircleOutlineIcon
@@ -324,68 +319,38 @@ internal fun StatusContent(
             }
         }
 
-        Layout(
-            modifier = Modifier.fillMaxWidth(),
-            content = {
-                statusCard()
-                if (isWideScreen) {
-                    Column(modifier = Modifier.fillMaxSize()) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .weight(1f),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        ) {
-                            modeCard(
-                                Modifier
-                                    .weight(1f)
-                                    .fillMaxHeight(),
-                            )
-                            tunStackCard(
-                                Modifier
-                                    .weight(1f)
-                                    .fillMaxHeight(),
-                            )
-                        }
-                        Spacer(Modifier.height(12.dp))
-                        actionButtons()
-                    }
-                } else {
-                    Column(modifier = Modifier.fillMaxSize()) {
-                        modeCard(
-                            Modifier
-                                .fillMaxWidth()
-                                .weight(1f),
-                        )
-                        Spacer(Modifier.height(12.dp))
-                        tunStackCard(
-                            Modifier
-                                .fillMaxWidth()
-                                .weight(1f),
-                        )
-                    }
-                }
-            },
-        ) { measurables, constraints ->
-            val gap = 12.dp.roundToPx()
-            val availableWidth = (constraints.maxWidth - gap).coerceAtLeast(0)
-            val maxLeftWidth = if (isWideScreen) 144.dp.roundToPx() else 180.dp.roundToPx()
-            val leftWidth = (availableWidth * 0.44f).roundToInt().coerceAtMost(maxLeftWidth)
-            val rightWidth = (availableWidth - leftWidth).coerceAtLeast(0)
-            val leftMinHeight = measurables[0].minIntrinsicHeight(leftWidth)
-            val rightMinHeight = measurables[1].minIntrinsicHeight(rightWidth)
-            val height = maxOf(leftWidth, leftMinHeight, rightMinHeight)
-            val leftPlaceable = measurables[0].measure(Constraints.fixed(leftWidth, height))
-            val rightPlaceable = measurables[1].measure(Constraints.fixed(rightWidth, height))
-            layout(constraints.maxWidth, height) {
-                leftPlaceable.placeRelative(0, 0)
-                rightPlaceable.placeRelative(leftWidth + gap, 0)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(IntrinsicSize.Min),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            statusCard(
+                Modifier
+                    .weight(1f)
+                    .fillMaxHeight(),
+            )
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight(),
+            ) {
+                modeCard(
+                    Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                )
+                Spacer(Modifier.height(12.dp))
+                tunStackCard(
+                    Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                )
             }
         }
 
-        if (!isWideScreen) {
-            actionButtons()
-        }
+        actionButtons()
     }
 
     OptionSelectDialog(
