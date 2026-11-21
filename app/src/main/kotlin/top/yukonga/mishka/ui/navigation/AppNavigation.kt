@@ -503,6 +503,7 @@ fun AppNavigation(
                     .then(if (useNavigationRail) Modifier.background(MiuixTheme.colorScheme.surface) else Modifier)
                     .then(if (useNavigationRail) Modifier.clipToBounds() else Modifier),
             ) {
+                PageBackdropBox(modifier = Modifier.fillMaxSize()) {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -710,6 +711,7 @@ fun AppNavigation(
                         backdrop = sidebarBackdrop,
                         state = railState,
                     )
+                }
                 }
                 TopLayerHost(topLayer)
             }
@@ -949,7 +951,6 @@ private fun MainPage(
         }
     }
 
-    PageBackdropBox(modifier = Modifier.fillMaxSize()) {
         val homeLabel = stringResource(R.string.nav_home)
         val proxyLabel = stringResource(R.string.nav_proxy)
         val subscriptionLabel = stringResource(R.string.nav_subscription)
@@ -1036,7 +1037,6 @@ private fun MainPage(
                 )
             }
         }
-    }
 }
 
 // === MainPagerState ===

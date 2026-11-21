@@ -70,6 +70,12 @@ fun PageBackdropBox(
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit,
 ) {
+    if (LocalPageBackdrop.current != null) {
+        Box(modifier = modifier) {
+            content()
+        }
+        return
+    }
     val pageBackdrop = rememberBlurBackdrop()
     CompositionLocalProvider(LocalPageBackdrop provides pageBackdrop) {
         Box(
