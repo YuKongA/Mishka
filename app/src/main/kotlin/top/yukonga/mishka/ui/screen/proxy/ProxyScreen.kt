@@ -851,8 +851,8 @@ private fun ProxyScreenContent(
                                                 .clipToBounds(),
                                             bottomCornerRadius = rowBottomCorner,
                                             insidePadding = PaddingValues(
-                                                start = 12.dp,
-                                                end = 12.dp,
+                                                start = 10.dp,
+                                                end = 10.dp,
                                             ),
                                         ) {
                                             ProxyNodeRow(
@@ -1179,12 +1179,12 @@ private fun DefaultGroupIcon(name: String) {
     }
 }
 
-private val NodeRowHorizontalGap = 8.dp
-private val NodeRowVerticalGap = 12.dp
-private val NodeRowBottomPadding = 12.dp
+private val NodeRowHorizontalGap = 10.dp
+private val NodeRowVerticalGap = 10.dp
+private val NodeRowBottomPadding = 10.dp
 
 // 顶底距由行内 Layout 承担，否则高度收缩后残留段底色
-private val NodeRowTopPadding = 12.dp
+private val NodeRowTopPadding = 10.dp
 
 // 恒定分行，单双列由 Layout 连续插值，保证同 item 内平滑过渡
 @Composable
