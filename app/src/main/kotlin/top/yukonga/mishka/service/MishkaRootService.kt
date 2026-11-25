@@ -32,6 +32,8 @@ import top.yukonga.mishka.platform.ProxyServiceBridge
 import top.yukonga.mishka.platform.ProxyServiceController
 import top.yukonga.mishka.platform.ProxyServiceStatus
 import top.yukonga.mishka.platform.ProxyState
+import top.yukonga.mishka.platform.StartupProgress
+import top.yukonga.mishka.platform.StartupStep
 import top.yukonga.mishka.platform.StorageKeys
 import top.yukonga.mishka.platform.TunMode
 import top.yukonga.mishka.service.TransitionWakeLock.releaseQuietly
@@ -336,7 +338,10 @@ class MishkaRootService : Service() {
             stopServiceQuietly(op)
             return
         }
-        ProxyServiceBridge.updateState(ProxyServiceStatus(ProxyState.Starting, tunMode = tunMode))
+        ProxyServiceBridge.updateState(
+            ProxyServiceStatus(ProxyState.Starting, tunMode = tunMode),
+            StartupProgress(if (attachOnly) StartupStep.Reconnecting else StartupStep.Preparing),
+        )
 
         val storage = PlatformStorage(this@MishkaRootService)
         val tetherModeRequested = storage.getString(
@@ -379,6 +384,7 @@ class MishkaRootService : Service() {
             Log.i(TAG, "Submode changed while app was killed (active=$submodeActive, requested=${submode.storageValue}), restarting")
         }
         if (existingPid > 0 && existingSecret.isNotEmpty() && !subscriptionMismatch && !tetherModeMismatch && !submodeMismatch) {
+            reportStartupProgress(op, StartupProgress(StartupStep.Reconnecting))
             val ec = overrideStore.load().resolveExternalController()
             if (runner.attachToExisting(existingPid, existingSecret, ec, subscriptionId)) {
                 op.confirmedAlive = true
@@ -388,6 +394,7 @@ class MishkaRootService : Service() {
                 val activeMode = RootTetherHijacker.Mode.from(tetherModeActive.ifEmpty { tetherModeRequested })
                 val tproxySupported = submode == Submode.Tun && activeMode == RootTetherHijacker.Mode.PROXY &&
                         RootTetherHijacker.probeTproxySupport()
+                reportStartupProgress(op, StartupProgress(StartupStep.ApplyingRules))
                 if (!applyRootRules(storage, submode, tproxySupported, attach = true, op = op)) return
                 ProxyServiceBridge.updateState(
                     ProxyServiceStatus(
@@ -443,6 +450,7 @@ class MishkaRootService : Service() {
         // 监控若已离开 delay()，cancel 打断不了读日志，更停不掉已进入 NonCancellable 的回写。
         // 等它收敛后再 prepare，避免它随后 rm -rf 掉新沙箱，或 stopSelf 掉这次启动。
         if (!alreadyCleaned) {
+            reportStartupProgress(op, StartupProgress(StartupStep.CleaningUp))
             joinSuperseded(supersedeMonitor())
             if (runner.isRunning) {
                 runner.stop()
@@ -455,6 +463,7 @@ class MishkaRootService : Service() {
         // 上次停机若没来得及回写，这里补一次；runtime/ 为空时不取锁也不 fork su
         RootRuntimeCache.releaseAll(this@MishkaRootService, subscriptionRepository)
 
+        reportStartupProgress(op, StartupProgress(StartupStep.Preparing))
         // 3. 检查 ROOT 权限
         if (!RootHelper.hasRootAccess()) {
             Log.e(TAG, "Failed to obtain root access")
@@ -565,6 +574,7 @@ class MishkaRootService : Service() {
         // 规则 DNAT 到无人监听的端口。
         val rootDnsPort = RootDnsApplier.allocatePort()
         storage.putString(StorageKeys.ROOT_DNS_PORT, rootDnsPort.toString())
+        reportStartupProgress(op, StartupProgress(StartupStep.StartingCore))
         // age 加密订阅：runtime/ 保持密文，密钥与覆写选择来自同一份 imported DB 快照。
         val success = runner.start(
             subscriptionId = subscriptionId,
@@ -576,6 +586,7 @@ class MishkaRootService : Service() {
             transformPath = transformPlan.transformPath,
             preferTransformMixedPort = transformPlan.transformPath != null && viaProxy && userOverride.mixedPort == null,
             rootDnsPort = rootDnsPort,
+            onStartupProgress = { progress -> reportStartupProgress(op, progress) },
         )
         if (!success) {
             if (!teardownRootRulesOrReport(tunMode, op)) return
@@ -595,6 +606,7 @@ class MishkaRootService : Service() {
         storage.putString(StorageKeys.ROOT_TETHER_MODE_ACTIVE, tetherModeRequested)
         storage.putString(StorageKeys.ROOT_SUBMODE_ACTIVE, submode.storageValue)
 
+        reportStartupProgress(op, StartupProgress(StartupStep.ApplyingRules))
         if (!applyRootRules(storage, submode, tproxyForTether, attach = false, op = op)) return
 
         // 7. 更新状态和通知
@@ -617,6 +629,14 @@ class MishkaRootService : Service() {
             subscriptionId
         ) else ConfigGenerator.getWorkDir(this@MishkaRootService)
         startProcessMonitor(workDir, subscriptionId)
+    }
+
+    private fun reportStartupProgress(op: ActiveOp, progress: StartupProgress) {
+        if (destroyed || !isCurrentInstance(createdSerial)) return
+        val stillActive = synchronized(opLock) { activeOp === op && !op.closed }
+        if (stillActive) {
+            ProxyServiceBridge.updateStartupProgress(progress)
+        }
     }
 
     private suspend fun applyRootRules(

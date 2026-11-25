@@ -76,6 +76,7 @@ class ProxyServiceController(private val context: Context) {
     private var pendingRestartJob: Job? = null
 
     val status: StateFlow<ProxyServiceStatus> = ProxyServiceBridge.state
+    val startupProgress: StateFlow<StartupProgress?> = ProxyServiceBridge.startupProgress
 
     fun start(subscriptionId: String? = null) {
         val id = resolveStartSubscriptionId(subscriptionId) ?: return

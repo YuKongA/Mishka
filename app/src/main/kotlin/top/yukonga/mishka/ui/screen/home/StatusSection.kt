@@ -38,10 +38,13 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.path
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import top.yukonga.mishka.BuildConfig
 import top.yukonga.mishka.R
+import top.yukonga.mishka.platform.StartupProgress
+import top.yukonga.mishka.platform.StartupStep
 import top.yukonga.mishka.platform.TunMode
 import top.yukonga.mishka.ui.component.GlassDialogTextButton
 import top.yukonga.mishka.ui.component.blur.LocalPageBackdrop
@@ -50,6 +53,8 @@ import top.yukonga.mishka.ui.theme.ActionPalette
 import top.yukonga.mishka.ui.theme.RunState
 import top.yukonga.mishka.ui.theme.StatusColors
 import top.yukonga.mishka.viewmodel.HomeUiState
+import top.yukonga.miuix.kmp.basic.Button
+import top.yukonga.miuix.kmp.basic.ButtonColors
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.CardDefaults
@@ -57,7 +62,6 @@ import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
-import top.yukonga.miuix.kmp.basic.TextButtonColors
 import top.yukonga.miuix.kmp.glass.GlassCard
 import top.yukonga.miuix.kmp.glass.GlassDialog
 import top.yukonga.miuix.kmp.icon.MiuixIcons
@@ -72,6 +76,7 @@ import kotlin.math.ceil
 fun LazyListScope.statusSection(
     state: HomeUiState = HomeUiState(),
     uptime: String = "",
+    startupProgress: StartupProgress? = null,
     onSwitchMode: (String) -> Unit = {},
     onSwitchTunStack: (String) -> Unit = {},
     onRestart: () -> Unit = {},
@@ -82,6 +87,7 @@ fun LazyListScope.statusSection(
         StatusContent(
             state = state,
             uptime = uptime,
+            startupProgress = startupProgress,
             onSwitchMode = onSwitchMode,
             onSwitchTunStack = onSwitchTunStack,
             onRestart = onRestart,
@@ -95,6 +101,7 @@ fun LazyListScope.statusSection(
 internal fun StatusContent(
     state: HomeUiState,
     uptime: String,
+    startupProgress: StartupProgress? = null,
     onSwitchMode: (String) -> Unit,
     onSwitchTunStack: (String) -> Unit,
     onRestart: () -> Unit,
@@ -269,13 +276,28 @@ internal fun StatusContent(
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    TextButton(
-                        text = stringResource(R.string.home_stop),
+                    val stopLabel = if (state.isRestarting) {
+                        when {
+                            startupProgress != null -> startupProgressLabel(startupProgress)
+                            isStopping -> stringResource(R.string.home_stopping_btn)
+                            else -> stringResource(R.string.home_restarting)
+                        }
+                    } else {
+                        stringResource(R.string.home_stop)
+                    }
+                    Button(
                         onClick = onStop,
                         modifier = Modifier.weight(1f),
                         enabled = !state.isRestarting,
-                        colors = StatusColors.actionButton(ActionKind.Stop).asTextButtonColors(),
-                    )
+                        colors = StatusColors.actionButton(ActionKind.Stop).asButtonColors(),
+                    ) {
+                        Text(
+                            text = stopLabel,
+                            style = MiuixTheme.textStyles.button,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
                     val restartColors = StatusColors.actionButton(ActionKind.Restart)
                     val rotation = remember { Animatable(0f) }
                     LaunchedEffect(state.isRestarting) {
@@ -317,13 +339,24 @@ internal fun StatusContent(
                     colors = ButtonDefaults.textButtonColorsPrimary(),
                 )
             } else {
-                TextButton(
-                    text = if (isStarting) stringResource(R.string.home_starting_btn) else stringResource(R.string.home_start),
+                val startLabel = when {
+                    isStarting && startupProgress != null -> startupProgressLabel(startupProgress)
+                    isStarting -> stringResource(R.string.home_starting_btn)
+                    else -> stringResource(R.string.home_start)
+                }
+                Button(
                     onClick = onStart,
                     modifier = Modifier.fillMaxWidth(),
                     enabled = !isStarting,
-                    colors = ButtonDefaults.textButtonColorsPrimary(),
-                )
+                    colors = ButtonDefaults.buttonColorsPrimary(),
+                ) {
+                    Text(
+                        text = startLabel,
+                        style = MiuixTheme.textStyles.button,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
             }
         }
 
@@ -380,11 +413,11 @@ internal fun StatusContent(
     )
 }
 
-private fun ActionPalette.asTextButtonColors(): TextButtonColors = TextButtonColors(
+private fun ActionPalette.asButtonColors(): ButtonColors = ButtonColors(
     color = container,
     disabledColor = container.copy(alpha = 0.5f),
-    textColor = content,
-    disabledTextColor = content.copy(alpha = 0.5f),
+    contentColor = content,
+    disabledContentColor = content.copy(alpha = 0.5f),
 )
 
 // ROOT TPROXY 模式 mihomo tproxy-port（与 RootTproxyApplier.TPROXY_PORT 对齐，UI 仅展示用）
@@ -400,6 +433,45 @@ private fun modeLabel(mode: String): String =
 
 private fun tunStackLabel(stack: String): String =
     TUN_STACK_OPTIONS.firstOrNull { it.first == stack.lowercase() }?.second ?: stack.ifEmpty { "--" }
+
+@Composable
+private fun startupProgressLabel(progress: StartupProgress): String {
+    val label = startupStepLabel(progress)
+    return if (progress.detail.isNotBlank()) "$label · ${progress.detail}" else label
+}
+
+@Composable
+private fun startupStepLabel(progress: StartupProgress): String = when (progress.step) {
+    StartupStep.CleaningUp -> stringResource(R.string.home_startup_cleaning)
+    StartupStep.Reconnecting -> stringResource(R.string.home_startup_reconnecting)
+    StartupStep.Preparing -> stringResource(R.string.home_startup_preparing)
+    StartupStep.EstablishingVpn -> stringResource(R.string.home_startup_establishing_vpn)
+    StartupStep.StartingCore -> stringResource(R.string.home_startup_starting_core)
+    StartupStep.Transforming -> stringResource(R.string.home_startup_transforming)
+    StartupStep.ParsingConfig -> stringResource(R.string.home_startup_parsing)
+    StartupStep.DownloadingGeo -> stringResource(R.string.home_startup_downloading_geo)
+    StartupStep.LoadingGeo -> if (progress.total > 0) {
+        stringResource(R.string.home_startup_loading_geo_progress, progress.current, progress.total)
+    } else {
+        stringResource(R.string.home_startup_loading_geo)
+    }
+    StartupStep.StartingListeners -> stringResource(R.string.home_startup_starting_listeners)
+    StartupStep.LoadingProxyProviders -> if (progress.total > 0) {
+        stringResource(R.string.home_startup_loading_proxy_providers_progress, progress.current, progress.total)
+    } else {
+        stringResource(R.string.home_startup_loading_proxy_providers)
+    }
+
+    StartupStep.LoadingRuleProviders -> if (progress.total > 0) {
+        stringResource(R.string.home_startup_loading_rule_providers_progress, progress.current, progress.total)
+    } else {
+        stringResource(R.string.home_startup_loading_rule_providers)
+    }
+
+    StartupStep.DownloadingUi -> stringResource(R.string.home_startup_downloading_ui)
+    StartupStep.StartingDns -> stringResource(R.string.home_startup_starting_dns)
+    StartupStep.ApplyingRules -> stringResource(R.string.home_startup_applying_rules)
+}
 
 /**
  * 单选弹窗：点选即生效并自行关闭，底部只留取消。

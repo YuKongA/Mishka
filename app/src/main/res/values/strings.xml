@@ -122,6 +122,24 @@
     <string name="home_uptime_minutes">%1$dm</string>
     <string name="home_uptime_hours_minutes">%1$dh %2$dm</string>
     <string name="home_uptime_days_hours">%1$dd %2$dh</string>
+    <string name="home_startup_cleaning">Cleaning up</string>
+    <string name="home_startup_reconnecting">Reconnecting</string>
+    <string name="home_startup_preparing">Preparing</string>
+    <string name="home_startup_establishing_vpn">Creating VPN</string>
+    <string name="home_startup_starting_core">Starting core</string>
+    <string name="home_startup_transforming">Applying overrides</string>
+    <string name="home_startup_parsing">Parsing config</string>
+    <string name="home_startup_downloading_geo">Downloading Geo data</string>
+    <string name="home_startup_loading_geo">Loading Geo rules</string>
+    <string name="home_startup_loading_geo_progress">Loading Geo rules (%1$d/%2$d)</string>
+    <string name="home_startup_starting_listeners">Starting listeners</string>
+    <string name="home_startup_loading_proxy_providers">Loading proxy providers</string>
+    <string name="home_startup_loading_proxy_providers_progress">Loading proxies (%1$d/%2$d)</string>
+    <string name="home_startup_loading_rule_providers">Loading rule sets</string>
+    <string name="home_startup_loading_rule_providers_progress">Loading rules (%1$d/%2$d)</string>
+    <string name="home_startup_downloading_ui">Downloading Web UI</string>
+    <string name="home_startup_starting_dns">Starting DNS</string>
+    <string name="home_startup_applying_rules">Applying routing</string>
 
     <!-- Home - Action Buttons -->
     <string name="home_restart">Restart</string>

@@ -18,6 +18,7 @@ import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import org.koin.android.ext.android.inject
 import top.yukonga.mishka.MishkaApplication
@@ -31,6 +32,8 @@ import top.yukonga.mishka.platform.ProxyServiceBridge
 import top.yukonga.mishka.platform.ProxyServiceController
 import top.yukonga.mishka.platform.ProxyServiceStatus
 import top.yukonga.mishka.platform.ProxyState
+import top.yukonga.mishka.platform.StartupProgress
+import top.yukonga.mishka.platform.StartupStep
 import top.yukonga.mishka.platform.StorageKeys
 import top.yukonga.mishka.platform.TunMode
 import top.yukonga.mishka.service.TransitionWakeLock.releaseQuietly
@@ -205,7 +208,10 @@ class MishkaTunService : VpnService() {
                 if (!ProfileFileOps.hasValidConfig(this@MishkaTunService, subscriptionId)) {
                     throw IllegalStateException(getString(R.string.error_no_active_profile))
                 }
-                ProxyServiceBridge.updateState(ProxyServiceStatus(ProxyState.Starting, tunMode = TunMode.Vpn))
+                ProxyServiceBridge.updateState(
+                    ProxyServiceStatus(ProxyState.Starting, tunMode = TunMode.Vpn),
+                    StartupProgress(StartupStep.Preparing),
+                )
                 runner.stop()
                 closeVpnResources()
 
@@ -213,6 +219,7 @@ class MishkaTunService : VpnService() {
                 val hadRootPid = storage.getString(StorageKeys.ROOT_MIHOMO_PID, "").isNotEmpty()
                 val hasRoot = storage.getString(StorageKeys.HAS_ROOT, "false") == "true"
                 if (hadRootPid || (hasRoot && !rootCleanupDone)) {
+                    ProxyServiceBridge.updateStartupProgress(StartupProgress(StartupStep.CleaningUp))
                     val residualTun = storage.getString(StorageKeys.ROOT_TUN_DEVICE, RuntimeOverrideBuilder.DEFAULT_TUN_DEVICE)
                     RootHelper.cleanupOrphanedMihomo(tunDevice = residualTun)
                     RootTetherHijacker.teardown()
@@ -225,6 +232,7 @@ class MishkaTunService : VpnService() {
                     rootCleanupDone = true
                 }
 
+                ProxyServiceBridge.updateStartupProgress(StartupProgress(StartupStep.Preparing))
                 val userOverride = overrideStore.load()
                 val viaProxy = storage.getString(StorageKeys.SUBSCRIPTION_UPDATE_VIA_PROXY, "true") == "true"
                 val transformPlan = prepareRuntimeTransform(
@@ -254,6 +262,7 @@ class MishkaTunService : VpnService() {
                     }
                 } else null
 
+                ProxyServiceBridge.updateStartupProgress(StartupProgress(StartupStep.EstablishingVpn))
                 tunFd = establishVpn(storage, ipv6, proxyAddress)
                     ?: throw IllegalStateException(getString(R.string.error_vpn_denied))
                 ensureActive()
@@ -272,6 +281,7 @@ class MishkaTunService : VpnService() {
                     add("${RuntimeOverrideBuilder.VPN_GATEWAY}/${RuntimeOverrideBuilder.VPN_PREFIX}")
                     if (ipv6) add("${RuntimeOverrideBuilder.VPN_GATEWAY6}/${RuntimeOverrideBuilder.VPN_PREFIX6}")
                 }.joinToString(",")
+                ProxyServiceBridge.updateStartupProgress(StartupProgress(StartupStep.StartingCore))
                 val success = runner.start(
                     subscriptionId = subscriptionId,
                     useRoot = false,
@@ -284,6 +294,9 @@ class MishkaTunService : VpnService() {
                     vpnGateway = gateway,
                     vpnHttpFd = httpListenerFd,
                     vpnPlatformSocket = requireNotNull(platformBridge).socketName,
+                    onStartupProgress = { progress ->
+                        if (isActive) ProxyServiceBridge.updateStartupProgress(progress)
+                    },
                 )
                 if (!success) throw IllegalStateException(runner.errorMessage.ifBlank { getString(R.string.error_start_failed) })
                 ensureActive()

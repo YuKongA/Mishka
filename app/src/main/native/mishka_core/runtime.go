@@ -62,6 +62,7 @@ func runMihomo() int {
 		vpnReadyFile        string
 		rootDNS             bool
 		rootDNSPort         int
+		startupStatusFile   string
 	)
 	fs.StringVar(&homeDir, "d", "", "set configuration directory")
 	fs.StringVar(&configFile, "f", "", "specify configuration file")
@@ -78,6 +79,7 @@ func runMihomo() int {
 	fs.StringVar(&vpnReadyFile, "vpn-ready-file", "", "publish VPN readiness after listeners start")
 	fs.BoolVar(&rootDNS, "root-dns", false, "serve transparent ROOT DNS on localhost")
 	fs.IntVar(&rootDNSPort, "root-dns-port", 15353, "localhost port for ROOT DNS listener")
+	fs.StringVar(&startupStatusFile, "startup-status-file", "", "path to publish JSON startup progress")
 	if err := fs.Parse(os.Args[1:]); err != nil {
 		return 2
 	}
@@ -129,6 +131,8 @@ func runMihomo() int {
 		}
 		defer os.Remove(vpnReadyFile)
 	}
+	reporter := newStartupReporter(startupStatusFile)
+	defer reporter.Close()
 	registerSystemDNSRoute()
 
 	// 任何意外走系统 resolver 的代码路径立刻自爆，方便定位（mihomo 应当全程用自己的 DNS 栈）。
@@ -203,6 +207,7 @@ func runMihomo() int {
 	}
 
 	if transformPath != "" {
+		reporter.SetStage(stageTransforming, "")
 		if configBytes, err = applyTransformFile(configBytes, transformPath, ageSecretKey); err != nil {
 			fmt.Fprintln(os.Stderr, "apply transform:", err)
 			return 1
@@ -226,13 +231,17 @@ func runMihomo() int {
 		}
 	}()
 	defer executor.Shutdown()
-	if err := hub.Parse(configBytes, options...); err != nil {
+	reporter.PrepareGeoTotal(configBytes, overrideJSON, ageSecretKey)
+	reporter.SetStage(stageParsing, "")
+	initialOptions := append(append([]hub.Option(nil), options...), reporter.ConfigOption())
+	if err := hub.Parse(configBytes, initialOptions...); err != nil {
 		fmt.Fprintln(os.Stderr, "Parse config:", err)
 		return 1
 	}
 	var rootServer *rootDNSServer
 	var rootErrors <-chan error
 	if rootDNS {
+		reporter.SetStage(stageStartingDNS, "")
 		rootServer, err = startRootDNS(rootDNSPort)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "start ROOT DNS:", err)
@@ -261,6 +270,8 @@ func runMihomo() int {
 			return 1
 		}
 	}
+	reporter.SetStage(stageReady, "")
+	reporter.Close()
 
 	if updater.GeoAutoUpdate() {
 		updater.RegisterGeoUpdater()

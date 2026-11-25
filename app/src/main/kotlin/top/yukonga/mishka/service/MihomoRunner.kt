@@ -8,9 +8,13 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
 import top.yukonga.mishka.R
 import top.yukonga.mishka.platform.PlatformStorage
 import top.yukonga.mishka.platform.StorageKeys
+import top.yukonga.mishka.platform.StartupProgress
+import top.yukonga.mishka.platform.StartupStep
 import top.yukonga.mishka.platform.SystemDnsObserver
 import top.yukonga.mishka.util.describe
 import java.io.File
@@ -119,6 +123,7 @@ class MihomoRunner(private val context: Context) {
         vpnHttpFd: Int = -1,
         vpnPlatformSocket: String? = null,
         rootDnsPort: Int? = null,
+        onStartupProgress: (StartupProgress) -> Unit = {},
     ): Boolean = withContext(Dispatchers.IO) {
         if (isRunning) {
             Log.w(TAG, "mihomo already running")
@@ -152,12 +157,15 @@ class MihomoRunner(private val context: Context) {
             ProfileFileOps.ensureGeodataLinks(context, workDir)
         }
 
+        // 由 app UID 预建 0600 文件：ROOT 模式下核心原地覆写不改属主，Kotlin 侧免 su 直接读取与删除
+        val statusFile = runCatching {
+            File(context.cacheDir, "startup-${UUID.randomUUID()}.status").apply { writeText("") }
+        }.getOrNull()
         try {
             val readyFile = if (!useRoot) {
                 require(!vpnGateway.isNullOrEmpty() && !vpnPlatformSocket.isNullOrEmpty())
                 File(context.cacheDir, "vpn-${UUID.randomUUID()}.ready").also { vpnReadyFile = it }
             } else null
-            // age 加密订阅：config.yaml 加密落盘，运行时用 --age-secret-key 让 mihomo 加载时解密
             val args = buildList {
                 add("-d"); add(workDir.absolutePath)
                 add("-f"); add(configFile.absolutePath)
@@ -182,6 +190,9 @@ class MihomoRunner(private val context: Context) {
                 add("--ext-ctl"); add(externalController)
                 if (ageSecretKey.isNotEmpty()) {
                     add("--age-secret-key"); add(ageSecretKey)
+                }
+                if (statusFile != null) {
+                    add("--startup-status-file"); add(statusFile.absolutePath)
                 }
             }.toTypedArray()
             val logFile = File(workDir, "mihomo.log")
@@ -220,8 +231,8 @@ class MihomoRunner(private val context: Context) {
                 return@withContext false
             }
 
-            // 轮询 API 确认 mihomo 真正就绪，进程退出则快速失败
-            val result = waitForReady(useRoot, workDir)
+            // 轮询 API 确认 mihomo 真正就绪，进程退出则快速失败；同步读取核心启动阶段回传状态卡
+            val result = waitForReady(useRoot, workDir, statusFile, onStartupProgress)
             if (result != null) {
                 errorMessage = result
                 Log.e(TAG, errorMessage)
@@ -240,6 +251,8 @@ class MihomoRunner(private val context: Context) {
             errorMessage = context.getString(R.string.error_generic_start_failed, e.describe())
             Log.e(TAG, "Failed to start mihomo", e)
             false
+        } finally {
+            statusFile?.delete()
         }
     }
 
@@ -295,17 +308,53 @@ class MihomoRunner(private val context: Context) {
      * 轮询等待 mihomo 就绪。返回 null 表示成功，返回错误消息表示失败。
      * VPN 等原生的成功确认文件和带鉴权 API；ROOT 另需透明 DNS 入口就绪。
      */
-    private suspend fun waitForReady(useRoot: Boolean, workDir: File): String? {
-        var rootRound = 0
+    private suspend fun waitForReady(
+        useRoot: Boolean,
+        workDir: File,
+        statusFile: File?,
+        onStartupProgress: (StartupProgress) -> Unit,
+    ): String? {
+        var pollTick = 0
+        var rootInitRounds = 0
+        var rootApiChecks = 0
         var vpnWaitRounds = 0
         var vpnApiChecks = 0
-        while (!useRoot || rootRound < 20) {
-            delay(500)
-            val checkLiveness = !useRoot || rootRound++ % LIVENESS_CHECK_EVERY == 0
+        var coreSawStage = false
+        var coreReportedReady = false
+        var lastEmitted: StartupProgress? = null
+        while (true) {
+            delay(STARTUP_POLL_INTERVAL_MS)
+            pollTick++
+
+            val parsed = readStartupStatus(statusFile)
+            if (parsed != null) {
+                coreSawStage = true
+                if (parsed.stage == CORE_STAGE_READY) {
+                    coreReportedReady = true
+                } else {
+                    val progress = parsed.toStartupProgress()
+                    if (progress != null && progress != lastEmitted) {
+                        lastEmitted = progress
+                        onStartupProgress(progress)
+                    }
+                }
+            }
+
+            // HTTP/ready-file 检查维持 500ms 节奏，状态文件每 250ms 刷新一次
+            if (pollTick % READY_CHECK_EVERY_TICKS != 0) continue
+            val readyRound = pollTick / READY_CHECK_EVERY_TICKS
+            val checkLiveness = !useRoot || (readyRound - 1) % LIVENESS_CHECK_EVERY == 0
+
             if (useRoot) {
                 if (isRootDnsReady(secret, externalController, timeoutMs = 500)) {
                     delay(500)
                     return scanLogForTunError(true, workDir)
+                }
+                if (coreSawStage && !coreReportedReady) {
+                    // 核心仍在 hub.Parse 内下载 Provider/Geo/UI，不消耗 10s API 探测预算
+                    if (++rootInitRounds >= CORE_INIT_MAX_ROUNDS) break
+                } else if (++rootApiChecks >= API_CHECK_MAX_ROUNDS) {
+                    break
                 }
             } else {
                 // provider 初始化不占用 API 探测预算，原生 ready 后才开始计数；
@@ -313,11 +362,12 @@ class MihomoRunner(private val context: Context) {
                 val ready = vpnReadyFile?.takeIf { it.isFile }?.readText() == "ready"
                 if (ready) {
                     if (isApiAuthorized(secret, externalController, timeoutMs = 500)) return null
-                    if (++vpnApiChecks >= 20) break
-                } else if (++vpnWaitRounds >= VPN_READY_MAX_ROUNDS) {
+                    if (++vpnApiChecks >= API_CHECK_MAX_ROUNDS) break
+                } else if (++vpnWaitRounds >= CORE_INIT_MAX_ROUNDS) {
                     break
                 }
             }
+
             if (!checkLiveness) continue
             val alive = if (useRoot) RootHelper.isAliveAsRoot(childPid) else isProcessAlive(childPid)
             if (!alive) {
@@ -339,6 +389,13 @@ class MihomoRunner(private val context: Context) {
         } else {
             timeoutMessage
         }
+    }
+
+    private fun readStartupStatus(file: File?): CoreStartupStatus? {
+        if (file == null) return null
+        val text = runCatching { if (file.isFile) file.readText() else "" }.getOrNull() ?: return null
+        if (text.isBlank()) return null
+        return runCatching { startupJson.decodeFromString<CoreStartupStatus>(text) }.getOrNull()
     }
 
     /**
@@ -434,13 +491,44 @@ class MihomoRunner(private val context: Context) {
         return null
     }
 
+    @Serializable
+    private data class CoreStartupStatus(
+        val stage: String = "",
+        val detail: String = "",
+        val current: Int = 0,
+        val total: Int = 0,
+    ) {
+        fun toStartupProgress(): StartupProgress? {
+            val step = when (stage) {
+                "transforming" -> StartupStep.Transforming
+                "parsing" -> StartupStep.ParsingConfig
+                "downloading_geo" -> StartupStep.DownloadingGeo
+                "loading_geo" -> StartupStep.LoadingGeo
+                "starting_listeners" -> StartupStep.StartingListeners
+                "loading_proxy_providers" -> StartupStep.LoadingProxyProviders
+                "loading_rule_providers" -> StartupStep.LoadingRuleProviders
+                "downloading_ui" -> StartupStep.DownloadingUi
+                "starting_dns" -> StartupStep.StartingDns
+                else -> return null
+            }
+            return StartupProgress(step = step, detail = detail, current = current, total = total)
+        }
+    }
+
     companion object {
         private const val TAG = "MihomoRunner"
+        private const val CORE_STAGE_READY = "ready"
+        private val startupJson = Json { ignoreUnknownKeys = true }
 
-        /** waitForReady 每几轮（每轮 500ms）做一次判活 */
+        private const val STARTUP_POLL_INTERVAL_MS = 250L
+        /** 每 2 轮（500ms）执行一次 ready / HTTP API 探测 */
+        private const val READY_CHECK_EVERY_TICKS = 2
+        /** waitForReady 每几轮（每轮 500ms）做一次 ROOT 判活（2s 一次，避免频繁 fork su） */
         private const val LIVENESS_CHECK_EVERY = 4
-        /** VPN 等待原生 ready 文件的最大轮次（每轮 500ms，共 120s），兜底防止后台永久卡死 */
-        private const val VPN_READY_MAX_ROUNDS = 240
+        /** 核心初始化最大轮次（每轮 500ms，共 120s），兜底防止后台永久卡死 */
+        private const val CORE_INIT_MAX_ROUNDS = 240
+        /** 原生 ready 后等待 API / ROOT DNS 响应的最大轮次（每轮 500ms，共 10s） */
+        private const val API_CHECK_MAX_ROUNDS = 20
 
         private const val GRACEFUL_STOP_TIMEOUT_MS = 3000
         private const val FORCE_STOP_TIMEOUT_MS = 500

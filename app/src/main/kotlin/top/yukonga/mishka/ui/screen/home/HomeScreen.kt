@@ -28,6 +28,7 @@ import kotlinx.collections.immutable.toPersistentList
 import top.yukonga.mishka.R
 import top.yukonga.mishka.domain.model.SubscriptionInfo
 import top.yukonga.mishka.platform.NetworkAddressType
+import top.yukonga.mishka.platform.StartupProgress
 import top.yukonga.mishka.ui.component.AdaptiveTopAppBar
 import top.yukonga.mishka.ui.component.blur.BlurredBar
 import top.yukonga.mishka.ui.component.blur.LocalTopBarStartInset
@@ -72,6 +73,7 @@ fun HomeScreen(
     val systemInfo by (viewModel?.systemInfoState?.collectAsStateWithLifecycle() ?: remember { mutableStateOf(SystemInfoSnapshot()) })
     val uptimeSeconds by (viewModel?.uptimeState?.collectAsStateWithLifecycle() ?: remember { mutableLongStateOf(-1L) })
     val uptime = formatUptime(uptimeSeconds)
+    val startupProgress by (viewModel?.startupProgress?.collectAsStateWithLifecycle() ?: remember { mutableStateOf(null) })
     val topConnectionRates by (
             viewModel?.topConnectionRates?.collectAsStateWithLifecycle()
                 ?: remember { mutableStateOf(null) }
@@ -85,6 +87,7 @@ fun HomeScreen(
         memory = memory,
         systemInfo = systemInfo,
         uptime = uptime,
+        startupProgress = startupProgress,
         topConnectionRates = topConnectionRates,
         onStartConnectionRateTracking = { viewModel?.startConnectionRateTracking() },
         onStopConnectionRateTracking = { viewModel?.stopConnectionRateTracking() },
@@ -112,6 +115,7 @@ private fun HomeScreenContent(
     memory: MemorySnapshot = MemorySnapshot(),
     systemInfo: SystemInfoSnapshot = SystemInfoSnapshot(),
     uptime: String = "",
+    startupProgress: StartupProgress? = null,
     topConnectionRates: kotlinx.collections.immutable.ImmutableList<top.yukonga.mishka.viewmodel.ConnectionRate>? = null,
     onStartConnectionRateTracking: () -> Unit = {},
     onStopConnectionRateTracking: () -> Unit = {},
@@ -183,6 +187,7 @@ private fun HomeScreenContent(
                                     StatusContent(
                                         state = uiState,
                                         uptime = uptime,
+                                        startupProgress = startupProgress,
                                         onSwitchMode = onSwitchMode,
                                         onSwitchTunStack = onSwitchTunStack,
                                         onRestart = onRestart,
@@ -235,6 +240,7 @@ private fun HomeScreenContent(
                     statusSection(
                         state = uiState,
                         uptime = uptime,
+                        startupProgress = startupProgress,
                         onSwitchMode = onSwitchMode,
                         onSwitchTunStack = onSwitchTunStack,
                         onRestart = onRestart,

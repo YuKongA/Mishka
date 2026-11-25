@@ -120,6 +120,24 @@
     <string name="home_uptime_minutes">%1$d 分鐘</string>
     <string name="home_uptime_hours_minutes">%1$d 小時 %2$d 分</string>
     <string name="home_uptime_days_hours">%1$d 天 %2$d 時</string>
+    <string name="home_startup_cleaning">清理殘留狀態</string>
+    <string name="home_startup_reconnecting">重新連線核心</string>
+    <string name="home_startup_preparing">準備執行環境</string>
+    <string name="home_startup_establishing_vpn">建立 VPN 通道</string>
+    <string name="home_startup_starting_core">啟動核心</string>
+    <string name="home_startup_transforming">套用覆寫規則</string>
+    <string name="home_startup_parsing">解析設定檔</string>
+    <string name="home_startup_downloading_geo">下載 Geo 資料</string>
+    <string name="home_startup_loading_geo">載入 Geo 規則</string>
+    <string name="home_startup_loading_geo_progress">載入 Geo 規則 (%1$d/%2$d)</string>
+    <string name="home_startup_starting_listeners">啟動監聽服務</string>
+    <string name="home_startup_loading_proxy_providers">載入節點來源</string>
+    <string name="home_startup_loading_proxy_providers_progress">載入節點來源 (%1$d/%2$d)</string>
+    <string name="home_startup_loading_rule_providers">載入規則集</string>
+    <string name="home_startup_loading_rule_providers_progress">載入規則集 (%1$d/%2$d)</string>
+    <string name="home_startup_downloading_ui">下載外部面板</string>
+    <string name="home_startup_starting_dns">啟動 DNS 服務</string>
+    <string name="home_startup_applying_rules">設定路由規則</string>
 
     <!-- Home - Action Buttons -->
     <string name="home_restart">重新啟動</string>
