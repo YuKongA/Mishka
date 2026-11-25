@@ -66,10 +66,11 @@ internal fun SpeedDetailSheet(
                 )
             }
         },
-    ) {
+    ) { innerPadding ->
         Box(
             modifier = Modifier
                 .fillMaxWidth()
+                .padding(innerPadding)
                 .sheetContentSafePadding()
                 .heightIn(min = 200.dp)
                 .sheetHeightTransition(),

@@ -49,7 +49,7 @@
 | `WindowListPopup` | `GlassIconDropdownMenu` / `GlassTransformPopup` | 锚点加 `.glassPopupAnchor(anchor)`，内部 `Icon` **必须**加 `.glassPopupAnchorContent(anchor)` |
 | `TabRow` | `GlassSegmentedTabRow` | 传 `backdrop` 与 `surfaceAlpha`；置顶栏 `bottomContent` 或列表内时静止态为 `0f`（`if (blurActive && contentUnderTopBar) 1f else 0f`） |
 | `WindowDialog` | `GlassDialog` | 传 `backdrop = LocalPageBackdrop.current`；按钮换 `GlassDialogButton`（`Normal` / `Primary`） |
-| `WindowBottomSheet` | `GlassBottomSheet` | 传 `backdrop = LocalPageBackdrop.current`；支持 `progressiveBlur`（默认开）与 `scrollOffset`，内容接收 `innerPadding: PaddingValues`（设 `insideMargin = DpSize(0.dp, 0.dp)` 时由列表消费避让顶栏） |
+| `WindowBottomSheet` | `GlassBottomSheet` | 传 `backdrop = LocalPageBackdrop.current`；支持 `progressiveBlur`（默认开）与 `scrollOffset`，内容需消费 `innerPadding: PaddingValues`（如 `.padding(innerPadding)` 或列表 `contentPadding`）以避让顶栏 |
 | `TextField`（`GlassDialog` 内） | `GlassTextField` | 内置玻璃材质与动态取色适配的半透明底色与标签配色 |
 | `Card`（玻璃浮层/动效背景内） | `GlassCard` | 统一半透明填充与动态取色对比度 |
 | `SearchBar` / `SearchPager` | `GlassSearchOverlay` | 配合 `rememberGlassSearchBarAlpha` 与 `glassSearchBarTransition`，见第 7 节 |
