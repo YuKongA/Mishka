@@ -245,9 +245,16 @@ fun AppNavigation(
     val settingsDetailStack = rememberSaveable(saver = SettingsDetailStackSaver) { mutableStateListOf() }
     val pagerState = rememberPagerState(pageCount = { 4 })
     val useNavigationRail = rememberIsWideScreen()
+    val railState = if (useNavigationRail) {
+        rememberGlassNavigationRailState(
+            initialExpanded = storage?.getString(StorageKeys.NAV_RAIL_EXPANDED, "false") == "true",
+        )
+    } else {
+        null
+    }
     val mainPagerState = rememberMainPagerState(
         pagerState = pagerState,
-        animatePageChanges = !useNavigationRail,
+        animatePageChanges = railState == null || !railState.expanded,
     )
 
     // 深链导入：回 Main 并把 pager 切到订阅 Tab 后直接压预填添加页（订阅管理是 pager Tab，无二级路由）
@@ -288,13 +295,6 @@ fun AppNavigation(
 
     val topLayer = remember { TopLayerState() }
 
-    val railState = if (useNavigationRail) {
-        rememberGlassNavigationRailState(
-            initialExpanded = storage?.getString(StorageKeys.NAV_RAIL_EXPANDED, "false") == "true",
-        )
-    } else {
-        null
-    }
     if (railState != null) {
         LaunchedEffect(railState.expanded, storage) {
             storage?.putString(StorageKeys.NAV_RAIL_EXPANDED, railState.expanded.toString())
@@ -547,7 +547,7 @@ fun AppNavigation(
                             onBack = { navigator.pop() },
                             transition = navTransition,
                             effects = NavDisplayEffects(
-                                cornerClipRadius = if (useNavigationRail) 0.dp else rememberNavSystemCornerRadius(),
+                                cornerClipRadius = rememberNavSystemCornerRadius(),
                             ),
                         ) {
                             entry<Route.Main>(swipeDismiss = swipeDismiss) {

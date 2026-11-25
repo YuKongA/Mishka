@@ -86,8 +86,9 @@ fun SubscriptionScreen(
         onUpdateAll = { viewModel.updateAllSubscriptions() },
         onNavigateAdd = { viewModel.clearError(); onNavigateAdd() },
         onSelect = { id ->
-            viewModel.setActive(id)
-            onActiveChanged?.invoke()
+            if (viewModel.setActive(id)) {
+                onActiveChanged?.invoke()
+            }
         },
         onRefresh = { viewModel.fetchSubscription(it) },
         onDelete = { id ->

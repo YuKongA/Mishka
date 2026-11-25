@@ -1,10 +1,6 @@
 package top.yukonga.mishka.ui.component
 
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.WindowInsetsSides
@@ -15,14 +11,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
@@ -42,10 +35,6 @@ import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.ScrollBehavior
 import top.yukonga.miuix.kmp.basic.SmallTopAppBar
 import top.yukonga.miuix.kmp.basic.TopAppBar
-import top.yukonga.miuix.kmp.blur.BlendColorEntry
-import top.yukonga.miuix.kmp.blur.BlurDefaults
-import top.yukonga.miuix.kmp.blur.ProgressiveBlur
-import top.yukonga.miuix.kmp.blur.progressiveTextureBlur
 import top.yukonga.miuix.kmp.glass.GlassIconButton
 import top.yukonga.miuix.kmp.glass.GlassTopAppBar
 import top.yukonga.miuix.kmp.glass.GlassTopAppBarDefaults
@@ -109,78 +98,28 @@ fun AdaptiveTopAppBar(
             (isContentScrolled ?: (scrollBehavior?.state?.let { it.contentOffset < -1f } ?: false)) || overscrolled
         }
     }
-    // 当前 miuix GlassTopAppBarLayout 在 progressiveBlur=true 时未计入 contentModifier 的额外顶部高度；
-    // 更新包含该修复的 miuix 新版后，可删除此 customProgressiveBlur 外层 Layout 包装。
     val blurEnabled = LocalBlurEnabled.current
-    val hasExtraTop by remember(extraTopInset) { computedStateOf { extraTopInset() > 0.dp } }
-    val customProgressiveBlur = hasExtraTop && blurEnabled && backdrop != null
-    val customBandAlpha by animateFloatAsState(
-        targetValue = if (resolvedContentScrolled) 1f else 0f,
-        animationSpec = tween(durationMillis = 100, easing = LinearEasing),
-        label = "adaptiveTopBarBandAlpha",
+    GlassTopAppBar(
+        title = title,
+        isContentScrolled = resolvedContentScrolled,
+        modifier = modifier,
+        contentModifier = contentModifier
+            .then(if (overrideHorizontalInsets) Modifier.horizontalCutoutPadding(applySidebarInset = false) else Modifier)
+            .topBarExtraTopInset(extraTopInset)
+            .topBarStartInset(startInset),
+        expandable = expandable,
+        progressiveBlur = blurEnabled,
+        backdrop = backdrop,
+        scrollBehavior = scrollBehavior,
+        bandBrush = bandBrush,
+        bandOverhang = GlassTopAppBarDefaults.BandOverhang,
+        defaultWindowInsetsPadding = if (overrideHorizontalInsets) false else defaultWindowInsetsPadding,
+        titleAlpha = { titleAlpha() * barTitleAlpha() },
+        centerObstructionStart = centerObstructionStart,
+        navigationIcon = navigationIcon,
+        actions = { Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { actions() } },
+        bottomContent = bottomContent,
     )
-    Layout(
-        content = {
-            if (customProgressiveBlur) {
-                val blendColors = remember(surfaceColor) {
-                    listOf(BlendColorEntry(surfaceColor.copy(alpha = 0.3f)))
-                }
-                val blurColors = BlurDefaults.blurColors(blendColors = blendColors)
-                Box(
-                    modifier = Modifier
-                        .graphicsLayer { alpha = customBandAlpha }
-                        .progressiveTextureBlur(
-                            backdrop = backdrop,
-                            shape = RectangleShape,
-                            gradient = ProgressiveBlur.Top.copy(curve = 0.25f),
-                            blurRadius = GlassTopAppBarDefaults.ProgressiveBlurRadius.value,
-                            colors = blurColors,
-                            enabled = customBandAlpha > 0.001f,
-                        ),
-                )
-            } else {
-                Box(modifier = Modifier)
-            }
-            GlassTopAppBar(
-                title = title,
-                isContentScrolled = resolvedContentScrolled,
-                modifier = modifier,
-                contentModifier = contentModifier
-                    .then(if (overrideHorizontalInsets) Modifier.horizontalCutoutPadding(applySidebarInset = false) else Modifier)
-                    .topBarExtraTopInset(extraTopInset)
-                    .topBarStartInset(startInset),
-                expandable = expandable,
-                progressiveBlur = if (customProgressiveBlur) false else blurEnabled,
-                backdrop = backdrop,
-                scrollBehavior = scrollBehavior,
-                bandBrush = bandBrush,
-                bandOverhang = GlassTopAppBarDefaults.BandOverhang,
-                backgroundAlpha = if (customProgressiveBlur) {
-                    { 0f }
-                } else {
-                    { 1f }
-                },
-                defaultWindowInsetsPadding = if (overrideHorizontalInsets) false else defaultWindowInsetsPadding,
-                titleAlpha = { titleAlpha() * barTitleAlpha() },
-                centerObstructionStart = centerObstructionStart,
-                navigationIcon = navigationIcon,
-                actions = { Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { actions() } },
-                bottomContent = bottomContent,
-            )
-        },
-    ) { measurables, constraints ->
-        val foreground = measurables[1].measure(constraints)
-        val bandHeight = if (customProgressiveBlur) {
-            ((foreground.height + 20.dp.toPx()) * 1.2f).toInt().coerceAtLeast(foreground.height)
-        } else {
-            0
-        }
-        val background = measurables[0].measure(Constraints.fixed(foreground.width, bandHeight))
-        layout(foreground.width, foreground.height) {
-            if (bandHeight > 0) background.placeRelative(0, 0)
-            foreground.placeRelative(0, 0)
-        }
-    }
 }
 
 @Composable

@@ -419,6 +419,7 @@ class SubscriptionRepositoryImpl(
 
     // uuid 同步写：调用方紧接着的 restartProxy 需要立刻读到新值，不能延后到下一个调度 tick
     override fun setActive(id: String) {
+        if (_activeUuid.value == id) return
         _activeUuid.value = id
         storage.putString(StorageKeys.ACTIVE_PROFILE_UUID, id)
         scope.launch {

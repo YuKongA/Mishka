@@ -170,8 +170,10 @@ class SubscriptionViewModel(
         }
     }
 
-    fun setActive(id: String) {
+    fun setActive(id: String): Boolean {
+        if (_uiState.value.subscriptions.find { it.id == id }?.isActive == true) return false
         repository.setActive(id)
+        return true
     }
 
     /**

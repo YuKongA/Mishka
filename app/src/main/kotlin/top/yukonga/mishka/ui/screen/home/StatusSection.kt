@@ -15,10 +15,13 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -44,19 +47,18 @@ import top.yukonga.mishka.ui.component.GlassDialogTextButton
 import top.yukonga.mishka.ui.component.blur.LocalPageBackdrop
 import top.yukonga.mishka.ui.theme.ActionKind
 import top.yukonga.mishka.ui.theme.ActionPalette
-import top.yukonga.mishka.ui.theme.LocalAppDarkMode
 import top.yukonga.mishka.ui.theme.RunState
 import top.yukonga.mishka.ui.theme.StatusColors
 import top.yukonga.mishka.viewmodel.HomeUiState
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.CardDefaults
-import top.yukonga.miuix.kmp.basic.DropdownDefaults
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.basic.TextButtonColors
+import top.yukonga.miuix.kmp.glass.GlassCard
 import top.yukonga.miuix.kmp.glass.GlassDialog
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.glass.ChevronForward
@@ -113,6 +115,65 @@ internal fun StatusContent(
 
     var showModeDialog by remember { mutableStateOf(false) }
     var showTunStackDialog by remember { mutableStateOf(false) }
+    val isTproxy = state.tunMode == TunMode.RootTproxy
+    val inboundTproxyLabel = stringResource(R.string.home_inbound_tproxy, TPROXY_INBOUND_PORT)
+    val tunStackClickable = isRunning && !isTproxy
+    val modeAnchorContent = @Composable { rowModifier: Modifier ->
+        Row(
+            modifier = rowModifier.fillMaxSize(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column {
+                Text(
+                    text = stringResource(R.string.home_mode),
+                    fontSize = 13.sp,
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                )
+                Text(
+                    text = modeLabel(state.mode),
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MiuixTheme.colorScheme.onSurface,
+                )
+            }
+            Icon(
+                imageVector = MiuixIcons.Glass.ChevronForward,
+                contentDescription = null,
+                modifier = Modifier.size(18.dp),
+                tint = MiuixTheme.colorScheme.onSurfaceVariantSummary.copy(alpha = 0.6f),
+            )
+        }
+    }
+    val tunStackAnchorContent = @Composable { rowModifier: Modifier ->
+        Row(
+            modifier = rowModifier.fillMaxSize(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column {
+                Text(
+                    text = if (isTproxy) stringResource(R.string.home_inbound) else stringResource(R.string.home_tun),
+                    fontSize = 13.sp,
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                )
+                Text(
+                    text = if (isTproxy) inboundTproxyLabel else tunStackLabel(state.tunStack),
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MiuixTheme.colorScheme.onSurface,
+                )
+            }
+            if (tunStackClickable) {
+                Icon(
+                    imageVector = MiuixIcons.Glass.ChevronForward,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp),
+                    tint = MiuixTheme.colorScheme.onSurfaceVariantSummary.copy(alpha = 0.6f),
+                )
+            }
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -122,8 +183,6 @@ internal fun StatusContent(
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         // 顶部左右结构：左状态卡（右下角 Badge）+ 右双配置卡
-        val isTproxy = state.tunMode == TunMode.RootTproxy
-        val inboundTproxyLabel = stringResource(R.string.home_inbound_tproxy, TPROXY_INBOUND_PORT)
         val statusCard = @Composable { modifier: Modifier ->
             Card(
                 modifier = modifier,
@@ -189,69 +248,18 @@ internal fun StatusContent(
                 showIndication = true,
                 pressFeedbackType = PressFeedbackType.Sink,
             ) {
-                Row(
-                    modifier = Modifier.fillMaxSize(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Column {
-                        Text(
-                            text = stringResource(R.string.home_mode),
-                            fontSize = 13.sp,
-                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                        )
-                        Text(
-                            text = modeLabel(state.mode),
-                            fontSize = 20.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = MiuixTheme.colorScheme.onSurface,
-                        )
-                    }
-                    Icon(
-                        imageVector = MiuixIcons.Glass.ChevronForward,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp),
-                        tint = MiuixTheme.colorScheme.onSurfaceVariantSummary.copy(alpha = 0.6f),
-                    )
-                }
+                modeAnchorContent(Modifier)
             }
         }
         val tunStackCard = @Composable { modifier: Modifier ->
             Card(
                 modifier = modifier,
                 insideMargin = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
-                onClick = { if (isRunning && !isTproxy) showTunStackDialog = true },
-                showIndication = isRunning && !isTproxy,
-                pressFeedbackType = if (isRunning && !isTproxy) PressFeedbackType.Sink else PressFeedbackType.None,
+                onClick = { if (tunStackClickable) showTunStackDialog = true },
+                showIndication = tunStackClickable,
+                pressFeedbackType = if (tunStackClickable) PressFeedbackType.Sink else PressFeedbackType.None,
             ) {
-                val clickable = isRunning && !isTproxy
-                Row(
-                    modifier = Modifier.fillMaxSize(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Column {
-                        Text(
-                            text = if (isTproxy) stringResource(R.string.home_inbound) else stringResource(R.string.home_tun),
-                            fontSize = 13.sp,
-                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                        )
-                        Text(
-                            text = if (isTproxy) inboundTproxyLabel else tunStackLabel(state.tunStack),
-                            fontSize = 20.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = MiuixTheme.colorScheme.onSurface,
-                        )
-                    }
-                    if (clickable) {
-                        Icon(
-                            imageVector = MiuixIcons.Glass.ChevronForward,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp),
-                            tint = MiuixTheme.colorScheme.onSurfaceVariantSummary.copy(alpha = 0.6f),
-                        )
-                    }
-                }
+                tunStackAnchorContent(Modifier)
             }
         }
         val actionButtons = @Composable {
@@ -394,8 +402,7 @@ private fun tunStackLabel(stack: String): String =
     TUN_STACK_OPTIONS.firstOrNull { it.first == stack.lowercase() }?.second ?: stack.ifEmpty { "--" }
 
 /**
- * 单选弹窗：点选即生效并自行关闭（`collapseOnSelection` 默认 true），底部只留取消。
- * 选中项的高亮底色 + 勾选走 [DropdownDefaults.dialogDropdownColors]。
+ * 单选弹窗：点选即生效并自行关闭，底部只留取消。
  */
 @Composable
 private fun OptionSelectDialog(
@@ -415,14 +422,12 @@ private fun OptionSelectDialog(
         title = title,
         onDismissRequest = onDismiss,
     ) {
-        Column {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.defaultColors(
-                    color = MiuixTheme.colorScheme.onBackground.copy(
-                        alpha = if (LocalAppDarkMode.current) 36f / 255f else 15f / 255f,
-                    ),
-                ),
+        Column(modifier = Modifier.heightIn(max = 500.dp)) {
+            GlassCard(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f, fill = false)
+                    .verticalScroll(rememberScrollState()),
             ) {
                 options.forEach { (value, label) ->
                     RadioButtonPreference(
