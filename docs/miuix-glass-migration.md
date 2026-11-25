@@ -1,4 +1,4 @@
-# Miuix 0.9.5-beta01 ~ beta03 Glass 迁移指南
+# Miuix 0.9.5 Glass 迁移指南
 
 面向 Compose + miuix 应用的通用迁移参考，涵盖组件替换、采样架构与关键踩坑约束。
 
@@ -41,7 +41,7 @@
 
 | 旧组件 | 新组件 | 关键注意事项 |
 | --- | --- | --- |
-| `TopAppBar` / `SmallTopAppBar` | `GlassTopAppBar` | 父容器禁止 `clipToBounds()`（会切掉 `bandOverhang` 渐隐带与阴影）；配合 `overScrollVertical(onOffsetChanged = { scrollBehavior.state.overscrollOffset = it })` 置于 `.nestedScroll(...)` 前；`bottomContent` 含 `GlassSegmentedTabRow` 时列表顶部不加重复 `Spacer` |
+| `TopAppBar` / `SmallTopAppBar` | `GlassTopAppBar` | 父容器禁止 `clipToBounds()`（会切掉 `bandOverhang` 渐隐带与阴影）；配合 `overScrollVertical(onOffsetChanged = { scrollBehavior.state.overscrollOffset = it })` 置于 `.nestedScroll(...)` 前，列表需同时设 `overscrollEffect = null` 防重复越界；`bottomContent` 含 `GlassSegmentedTabRow` 时列表顶部不加重复 `Spacer` |
 | `NavigationBar` | `GlassNavigationBar` | 图标切换为 `MiuixIcons.Glass.*`；未开模糊时 `backdrop = null` |
 | `IosLiquidGlassNavigationBar` | 补水平安全区 inset | 外层 `BoxWithConstraints` 增加 `WindowInsets.displayCutout.union(WindowInsets.navigationBars).only(WindowInsetsSides.Horizontal)` |
 | `NavigationRail` | `GlassNavigationRail` | 见第 4 节 |
@@ -51,6 +51,8 @@
 | `WindowDialog` | `GlassDialog` | 传入 `backdrop = LocalPageBackdrop.current`；内部按钮同步换为 `GlassDialogButton`（`Normal` / `Primary`） |
 | `WindowBottomSheet` | `GlassBottomSheet` | 传入 `backdrop = LocalPageBackdrop.current` |
 | `TextField`（`GlassDialog` 内） | `GlassTextField` | 与 `GlassDialogButton` 共用 `onBackground` 半透明底色体系 |
+| `Card`（`GlassDialog` / `GlassBottomSheet` / 动效背景内） | `GlassCard` | 统一半透明填充与动态取色对比度 |
+| `SearchBar` / `SearchPager` | `GlassSearchOverlay` | 配合 `rememberGlassSearchBarAlpha` 与 `glassSearchBarTransition` 使用，见第 8 节 |
 
 > **圆角与材质**：所有 `miuix-glass` 组件默认已内置 `GlassShape`，无需额外传 `RoundedCornerShape` 或覆盖 `shape`。
 
@@ -67,7 +69,7 @@
 导航行为：
 - 二级页面期间将 `selectedIndex` 设为 `-1`。
 - 从二级页点击侧边栏切换 Tab 时，先启用 0ms 无动画过渡 `InstantNavTransition`（短暂延迟后复位）并 `popUntil { it is Route.Main }`。
-- 宽屏下可将 `NavDisplayEffects(cornerClipRadius = 0.dp)` 置零。
+- 仅在全屏全宽显示时保留 `rememberNavSystemCornerRadius()`；多窗口模式（`isInMultiWindowMode()`）或存在分栏（如双栏内嵌子栈）时将 `NavDisplayEffects(cornerClipRadius = 0.dp)` 置零。
 
 ### 4.2 全屏背景延伸与内容避让
 - **不要**在 `NavDisplay` 外层用 `.layout` 裁剪或右移容器，否则背景与顶栏模糊会被硬截断。
@@ -92,18 +94,39 @@
 
 ---
 
-## 6. Compose 1.13.0 与渲染细节（0.9.5-beta02 同步）
+## 6. Compose 1.13.0 与渲染约束
 
 - **状态与动画新 API**：`derivedStateOf` 迁移至 `computedStateOf`；`AnimatedVisibility` 迁移至 `CapturedAnimatedVisibility`。
 - **输入框状态化**：`TextField` / `BasicTextField` 统一使用 `TextFieldState`（`rememberTextFieldState`、`TextFieldLineLimits.SingleLine`、`onKeyboardAction`、`decorator`）；字符长度限制用 `maxLengthReject` / `maxLengthTrim` 替代已废弃的 `maxLength`。
 - **容器尺寸基准**：根部用 `BoxWithConstraints(Modifier.fillMaxSize())` 注入 `LocalContainerSize`，宽屏与视口计算优先读取它再回退 `LocalWindowInfo.current.containerSize`。
 - **分段卡片防漏缝**：自绘分段卡片（`CardSegment`）在 `!isLast && bottomCornerRadius == 0.dp && color.alpha == 1f` 时向下 `drawBehind` 延伸 2px，避免 0.5x 降采样 RenderNode 光栅化产生抗锯齿黑缝。
+- **顶栏透明带与越界驱动**：`GlassTopAppBar` 在非折叠态保留 100ms 线性过渡，折叠态随 `collapsedFraction` 推进渐进模糊带；`overscrollOffset < -1f` 直接驱动按钮悬浮材质及非折叠态渐进模糊带。
+- **`GlassSegmentedTabRow` 静止不透明度**：列表内或未滚动的顶栏 `bottomContent` 中应保持 `surfaceAlpha = 0f`，滚动/越界后再切至 `1f`，避免静止态误显遮罩。
+- **侧栏与路由重组优化**：`LocalTopAppBarCenterObstructionStart` 使用 `compositionLocalOf`，传入 `LocalTopAppBarTitleAlpha` 与 `LocalTopBarStartInset` 的 lambda 需以 `remember(railState)` / 顶层常量稳定引用；`LazyColumn` 中的多行静态偏好卡统一拆分为 `groupedCardItems`（按行 item）。
+- **图标、弹窗与卡片**：全量使用 `MiuixIcons.Glass.*`（原生 `28.dp`，超大水印图标建议自建矢量路径）；`GlassDialog` 内输入框使用 `GlassTextField`；玻璃表面内的分组卡片统一使用 `GlassCard`；`NavDisplayEffects(cornerClipRadius)` 仅在全屏全宽显示时保留 `rememberNavSystemCornerRadius()`，在 `isInMultiWindowMode()` 或存在分栏时置 `0.dp`。
 
 ---
 
-## 7. 0.9.5-beta03 同步要点
+## 7. 顶栏搜索栏与程序化滚动
 
-- **顶栏透明带与越界驱动**：`GlassTopAppBar` 移除 100ms mask 渐隐延迟的旧 `visualContentOffset` 路径（保留非折叠态 100ms 线性过渡，折叠态随 `collapsedFraction`），`overscrollOffset < -1f` 直接参与驱动渐进模糊与按钮悬浮材质。
-- **`GlassSegmentedTabRow` 静止不透明度**：列表内或未滚动的顶栏 `bottomContent` 中应保持 `surfaceAlpha = 0f`，滚动/越界后再切至 `1f`，避免静止态误显遮罩。
-- **侧栏与路由重组优化**：`LocalTopAppBarCenterObstructionStart` 使用 `compositionLocalOf`，传入 `LocalTopAppBarTitleAlpha` 与 `LocalTopBarStartInset` 的 lambda 需以 `remember(railState)` / 顶层常量稳定引用；`LazyColumn` 中的多行静态偏好卡统一拆分为 `groupedCardItems`（按行 item）。
-- **图标与弹窗规范**：全量使用 `MiuixIcons.Glass.*`（原生 `28.dp`，超大水印图标建议自建矢量路径）；`GlassDialog` 内输入框使用 `GlassTextField`，嵌套 `Card` 可采用 `onBackground.copy(alpha = if (isDark) 36f / 255f else 15f / 255f)` 保持浅/深色与动态取色下的通透对比度。
+### 7.1 顶栏触发的 `GlassSearchOverlay`
+从 `miuix-glass` 直接使用 `GlassSearchOverlay`、`GlassSearchOverlayDefaults`、`rememberGlassSearchBarAlpha` 与 `glassSearchBarTransition`：
+- **宿主与顶栏分离动画**：
+  - `Scaffold.modifier` 仅挂 `graphicsLayer { alpha = barAlpha.value }`，并在 `searchExpanded` 时追加 `clearAndSetSemantics { }` 屏蔽无障碍穿透。
+  - `glassSearchBarTransition(expanded = searchExpanded, blurEnabled = blurEnabled) { 1f }` **只挂到 `AdaptiveTopAppBar.contentModifier`**，避免整页列表被离屏录制模糊。
+- **结果列表与渐进模糊顶带**：
+  - 将 `searchListState = rememberLazyListState()` 提至 `GlassSearchOverlay` 外层，通过 `scrollOffset`（无条目 `0f`、`firstVisibleItemIndex > 0` 取 `Float.MAX_VALUE`、否则 `firstVisibleItemScrollOffset.toFloat()`）与 `scrollMaterialThreshold = GlassSearchOverlayDefaults.VerticalPadding + 6.dp` 驱动搜索胶囊与取消按钮在结果滚至栏下时从实底过渡为玻璃态，并开启渐进模糊顶带。
+  - 传入 `topInsets`（`systemBars ∪ captionBar ∪ displayCutout` 顶部）、`searchTopPadding = LocalTopBarExtraTopInset.current`、`horizontalInsetsModifier = Modifier.horizontalCutoutPadding()`、`blurEnabled = LocalBlurEnabled.current` 与 `MiuixIcons.Glass.*` 图标。
+  - 结果 `LazyColumn` 用匿名 `PaddingValues` 延迟计算顶部让位 `topInsets + searchTopPadding() + BarHeight + VerticalPadding * 2`（避开组合期读取帧率级 inset），同步加 `.horizontalCutoutPadding()` 与 `overscrollEffect = null`，并在 `LaunchedEffect(query)` 变动时将列表滚回顶部。
+
+### 7.2 程序化滚动与顶栏模糊激活
+- `LazyListState.animateScrollToItem` 不经过 `NestedScrollConnection`，不会更新 `scrollBehavior.state.contentOffset` 与 `heightOffset`。
+- 若页面存在自动跟随/跳转滚动（如日志流贴底），需显式传 `isContentScrolled = listState.canScrollBackward` 给 `AdaptiveTopAppBar`，并在 `canScrollBackward` 为真且 `heightOffset > heightOffsetLimit` 时通过 `animate(...)` 将 `scrollBehavior.state.heightOffset` 折叠至 `heightOffsetLimit`（清空列表时复位 `0f`），否则手机端 `GlassTopAppBar` 的渐进模糊带不会激活。
+
+---
+
+## 8. 关于页（`AboutPage` / `AboutScreen`）
+
+- **卡片去 `textureBlur` 改用 `GlassCard`**：不再对关于页分组卡片套用卡片级 `textureBlur` 与手写 `ColorBlendToken`，直接放置 `GlassCard` 透出底层 `BgEffectBackground` 动效，降低离屏模糊开销。
+- **标题分段显隐**：以 `showTitle by remember { computedStateOf { scrollProgress >= 0.45f } }` 触发 `animateFloatAsState(if (showTitle) 1f else 0f, tween(200))` 控制顶栏标题淡入淡出，替代按滚动比例逐帧线性插值；`titleAlpha` 仍以 lambda `{ titleAlpha.value }` 透传至绘制阶段读取。
+- **背景动效门控与列表越界**：`BgEffectBackground` 通过 `alpha = { 1f - scrollProgress }` 在绘制阶段判断可见性，首屏完全滚出后自动停止帧循环与色阶推进；正文 `LazyColumn` 设 `overscrollEffect = null` 避免与 `overScrollVertical` 重复越界。
