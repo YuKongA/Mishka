@@ -1,62 +1,102 @@
 package top.yukonga.mishka.ui.screen.log
 
+import androidx.compose.animation.core.animate
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
+import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.captionBar
+import androidx.compose.foundation.layout.displayCutout
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.union
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.computedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalClipboard
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.launch
 import top.yukonga.mishka.R
-import top.yukonga.mishka.domain.model.LogMessage
+import top.yukonga.mishka.platform.showToast
 import top.yukonga.mishka.ui.component.AdaptiveTopAppBar
 import top.yukonga.mishka.ui.component.BackNavigationIcon
-import top.yukonga.mishka.ui.component.GlassSearchOverlay
+import top.yukonga.mishka.ui.component.GlassDialogTextButton
 import top.yukonga.mishka.ui.component.TopBarIconButton
 import top.yukonga.mishka.ui.component.blur.BlurredBar
+import top.yukonga.mishka.ui.component.blur.LocalBlurEnabled
+import top.yukonga.mishka.ui.component.blur.LocalTopBarExtraTopInset
+import top.yukonga.mishka.ui.component.blur.LocalPageBackdrop
+import top.yukonga.mishka.ui.component.blur.PageBackdropBox
 import top.yukonga.mishka.ui.component.blur.rememberBlurBackdrop
-import top.yukonga.mishka.ui.component.glassSearchBarTransition
 import top.yukonga.mishka.ui.component.overScrollVertical
-import top.yukonga.mishka.ui.component.rememberGlassSearchBarAlpha
+import top.yukonga.mishka.ui.platform.setPlainText
+import top.yukonga.mishka.ui.theme.StatusColors
 import top.yukonga.mishka.ui.util.horizontalCutoutPadding
+import top.yukonga.mishka.util.logLevelTag
+import top.yukonga.mishka.viewmodel.IndexedLog
 import top.yukonga.mishka.viewmodel.LogViewModel
 import top.yukonga.miuix.kmp.basic.Card
+import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.blur.layerBackdrop
+import top.yukonga.miuix.kmp.glass.GlassDialog
+import top.yukonga.miuix.kmp.glass.GlassSearchOverlay
+import top.yukonga.miuix.kmp.glass.GlassSearchOverlayDefaults
+import top.yukonga.miuix.kmp.glass.glassSearchBarTransition
+import top.yukonga.miuix.kmp.glass.rememberGlassSearchBarAlpha
+import top.yukonga.miuix.kmp.glass.GlassDialogButtonRole
 import top.yukonga.miuix.kmp.icon.MiuixIcons
+import top.yukonga.miuix.kmp.icon.glass.Close
+import top.yukonga.miuix.kmp.icon.glass.ChevronForward
 import top.yukonga.miuix.kmp.squircle.squircleBackground
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.overScrollVertical
@@ -74,8 +114,9 @@ fun LogScreen(
     val scrollBehavior = MiuixScrollBehavior()
     val listState = rememberLazyListState()
     var searchExpanded by remember { mutableStateOf(false) }
+    var selectedLog by remember { mutableStateOf<IndexedLog?>(null) }
 
-    DisposableEffect(Unit) {
+    DisposableEffect(viewModel) {
         viewModel.connect()
         onDispose { viewModel.disconnect() }
     }
@@ -96,30 +137,67 @@ fun LogScreen(
         }
     }
 
+    val contentUnderTopBar by remember(listState) {
+        computedStateOf { listState.canScrollBackward }
+    }
+
     // key 用单调递增的末条 id：缓冲写满后 size 恒定，不能再以 size 变化驱动自动跟随
     val lastLogId = logs.lastOrNull()?.id
     LaunchedEffect(lastLogId) {
-        // 搜索态下主列表被弹出层盖住，滚它也看不见，收起后还会停在错位置
-        if (lastLogId != null && autoScrollEnabled && !searchExpanded) {
-            listState.animateScrollToItem(logs.lastIndex)
+        if (lastLogId == null) {
+            scrollBehavior.state.heightOffset = 0f
+            scrollBehavior.state.contentOffset = 0f
+            return@LaunchedEffect
+        }
+        // 搜索态下主列表被弹出层盖住，滚它也看不见，收起后还会停在错位置；
+        // 索引包含 top_spacer (0) 与末尾 bottom_spacer (logs.size + 1)
+        if (autoScrollEnabled && !searchExpanded && selectedLog == null) {
+            listState.animateScrollToItem(logs.size + 1)
         }
     }
 
+    // animateScrollToItem 不经过 NestedScrollConnection，导致 heightOffset 停在 0、
+    // GlassTopAppBar 的渐进模糊带与大标题折叠不触发；单独跟踪列表回滚态补齐折叠
+    LaunchedEffect(contentUnderTopBar, autoScrollEnabled, searchExpanded, selectedLog) {
+        val scrollState = scrollBehavior.state
+        if (contentUnderTopBar &&
+            autoScrollEnabled &&
+            !searchExpanded &&
+            selectedLog == null &&
+            scrollState.heightOffsetLimit < 0f &&
+            scrollState.heightOffset > scrollState.heightOffsetLimit
+        ) {
+            animate(
+                initialValue = scrollState.heightOffset,
+                targetValue = scrollState.heightOffsetLimit,
+                animationSpec = scrollBehavior.snapAnimationSpec ?: spring(),
+            ) { value, _ ->
+                scrollState.heightOffset = value
+            }
+        }
+    }
     val backdrop = rememberBlurBackdrop()
     val blurActive = backdrop != null
+    val blurEnabled = LocalBlurEnabled.current
+    val searchListState = rememberLazyListState()
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MiuixTheme.colorScheme.surface)
+    PageBackdropBox(
+        modifier = Modifier.background(MiuixTheme.colorScheme.surface),
     ) {
         Scaffold(
-            modifier = Modifier.glassSearchBarTransition(searchExpanded) { barAlpha.value },
+            modifier = Modifier
+                .graphicsLayer { alpha = barAlpha.value }
+                .then(if (searchExpanded) Modifier.clearAndSetSemantics { } else Modifier),
             topBar = {
                 BlurredBar(backdrop = backdrop, blurActive = blurActive) {
                     AdaptiveTopAppBar(
                         title = stringResource(R.string.log_title),
+                        contentModifier = Modifier.glassSearchBarTransition(
+                            expanded = searchExpanded,
+                            blurEnabled = blurEnabled,
+                        ) { 1f },
                         scrollBehavior = scrollBehavior,
+                        isContentScrolled = contentUnderTopBar,
                         navigationIcon = { BackNavigationIcon(onBack) },
                         actions = {
                             TopBarIconButton(
@@ -146,6 +224,7 @@ fun LogScreen(
                     .overScrollVertical(scrollBehavior)
                     .nestedScroll(scrollBehavior.nestedScrollConnection),
                 state = listState,
+                overscrollEffect = null,
                 contentPadding = PaddingValues(
                     top = innerPadding.calculateTopPadding(),
                 ),
@@ -153,19 +232,47 @@ fun LogScreen(
                 if (logs.isEmpty()) {
                     item(key = "empty", contentType = "empty") {
                         Column(
-                            modifier = Modifier.fillParentMaxSize(),
+                            modifier = Modifier
+                                .fillParentMaxSize()
+                                .padding(horizontal = 24.dp),
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.Center,
                         ) {
-                            Text(
-                                text = if (uiState.isConnected) {
-                                    stringResource(R.string.log_waiting)
-                                } else {
-                                    stringResource(R.string.log_not_connected)
-                                },
-                                fontSize = 16.sp,
-                                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                            )
+                            when {
+                                uiState.isLogDisabled -> {
+                                    Text(
+                                        text = stringResource(R.string.log_disabled),
+                                        fontSize = 16.sp,
+                                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                                        textAlign = TextAlign.Center,
+                                    )
+                                    Text(
+                                        text = stringResource(R.string.log_disabled_hint),
+                                        modifier = Modifier.padding(top = 6.dp),
+                                        fontSize = 14.sp,
+                                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                                        textAlign = TextAlign.Center,
+                                    )
+                                }
+
+                                !uiState.isConnected -> {
+                                    Text(
+                                        text = stringResource(R.string.log_not_connected),
+                                        fontSize = 16.sp,
+                                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                                        textAlign = TextAlign.Center,
+                                    )
+                                }
+
+                                uiState.isConfigLoaded -> {
+                                    Text(
+                                        text = stringResource(R.string.log_waiting),
+                                        fontSize = 16.sp,
+                                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                                        textAlign = TextAlign.Center,
+                                    )
+                                }
+                            }
                         }
                     }
                 } else {
@@ -179,7 +286,10 @@ fun LogScreen(
                     key = { it.id },
                     contentType = { "log" },
                 ) { indexedLog ->
-                    LogCard(indexedLog.message)
+                    LogCard(
+                        entry = indexedLog,
+                        onClick = { selectedLog = indexedLog },
+                    )
                 }
 
                 item(key = "bottom_spacer", contentType = "spacer") {
@@ -192,19 +302,57 @@ fun LogScreen(
             }
         }
 
+        val searchTopInsets = WindowInsets.systemBars
+            .union(WindowInsets.captionBar)
+            .union(WindowInsets.displayCutout)
+            .only(WindowInsetsSides.Top)
+        val searchTopPadding = LocalTopBarExtraTopInset.current
+        val searchBarSpace = GlassSearchOverlayDefaults.BarHeight + GlassSearchOverlayDefaults.VerticalPadding * 2
         GlassSearchOverlay(
             expanded = searchExpanded,
             onDismissRequest = { searchExpanded = false },
+            scrollMaterialThreshold = GlassSearchOverlayDefaults.VerticalPadding + 6.dp,
             label = stringResource(R.string.log_search),
+            scrollOffset = {
+                when {
+                    searchListState.layoutInfo.totalItemsCount == 0 -> 0f
+                    searchListState.firstVisibleItemIndex > 0 -> Float.MAX_VALUE
+                    else -> searchListState.firstVisibleItemScrollOffset.toFloat()
+                }
+            },
+            topInsets = searchTopInsets,
+            searchTopPadding = searchTopPadding,
+            blurEnabled = blurEnabled,
+            horizontalInsetsModifier = Modifier.horizontalCutoutPadding(),
+            searchIcon = MiuixIcons.Glass.GlassSearch,
+            closeIcon = MiuixIcons.Glass.Close,
         ) { query ->
             val filteredLogs = remember(query, logs) {
                 viewModel.filteredLogs(query)
             }
-            val imeBottomPadding = WindowInsets.ime.asPaddingValues().calculateBottomPadding()
+            LaunchedEffect(query) {
+                if (searchListState.firstVisibleItemIndex != 0 || searchListState.firstVisibleItemScrollOffset != 0) {
+                    searchListState.scrollToItem(0)
+                }
+            }
+            val topInsetsPadding = searchTopInsets.asPaddingValues()
+            val searchContentPadding = remember(topInsetsPadding, searchTopPadding, searchBarSpace) {
+                object : PaddingValues {
+                    override fun calculateLeftPadding(layoutDirection: LayoutDirection) = 0.dp
+                    override fun calculateRightPadding(layoutDirection: LayoutDirection) = 0.dp
+                    override fun calculateTopPadding() =
+                        topInsetsPadding.calculateTopPadding() + searchTopPadding() + searchBarSpace
+                    override fun calculateBottomPadding() = 0.dp
+                }
+            }
             LazyColumn(
+                state = searchListState,
                 modifier = Modifier
                     .fillMaxSize()
+                    .horizontalCutoutPadding()
                     .overScrollVertical(),
+                overscrollEffect = null,
+                contentPadding = searchContentPadding,
             ) {
                 item {
                     Spacer(Modifier.height(6.dp))
@@ -231,201 +379,273 @@ fun LogScreen(
                         key = { it.id },
                         contentType = { "log" },
                     ) { indexedLog ->
-                        LogCard(indexedLog.message)
+                        LogCard(
+                            entry = indexedLog,
+                            onClick = { selectedLog = indexedLog },
+                        )
                     }
                 }
 
                 item {
                     Spacer(
                         Modifier
-                            .height(imeBottomPadding)
+                            .height(24.dp)
                             .navigationBarsPadding(),
                     )
                 }
             }
         }
+
+        LogDetailDialog(
+            entry = selectedLog,
+            onDismiss = { selectedLog = null },
+        )
     }
-}
-
-/**
- * 解析后的日志条目
- */
-private data class ParsedLog(
-    val protocol: String = "",
-    val source: String = "",
-    val target: String = "",
-    val rule: String = "",
-    val proxy: String = "",
-    val raw: String = "",
-)
-
-/**
- * 解析 mihomo 日志 payload
- * 格式: [TCP] 198.18.0.1:45552 --> statusapi.micloud.xiaomi.com:443 match GeoSite(cn) using 全球直连(DIRECT)
- */
-private fun parsePayload(payload: String): ParsedLog {
-    val raw = payload.trim()
-
-    // 提取协议 [TCP] / [UDP]
-    val protocolMatch = Regex("^\\[(\\w+)]").find(raw)
-    val protocol = protocolMatch?.groupValues?.get(1) ?: ""
-    val rest = if (protocolMatch != null) raw.substring(protocolMatch.range.last + 1).trim() else raw
-
-    // 提取 source --> target
-    val arrowIdx = rest.indexOf("-->")
-    if (arrowIdx < 0) return ParsedLog(raw = raw)
-
-    val source = rest.substring(0, arrowIdx).trim()
-    val afterArrow = rest.substring(arrowIdx + 3).trim()
-
-    // 提取 match ... using ...
-    val matchIdx = afterArrow.indexOf(" match ")
-    if (matchIdx < 0) {
-        return ParsedLog(protocol = protocol, source = source, target = afterArrow, raw = raw)
-    }
-
-    val target = afterArrow.substring(0, matchIdx).trim()
-    val matchPart = afterArrow.substring(matchIdx + 7).trim()
-
-    val usingIdx = matchPart.indexOf(" using ")
-    val rule: String
-    val proxy: String
-    if (usingIdx >= 0) {
-        rule = matchPart.substring(0, usingIdx).trim()
-        proxy = matchPart.substring(usingIdx + 7).trim()
-    } else {
-        rule = matchPart
-        proxy = ""
-    }
-
-    return ParsedLog(protocol = protocol, source = source, target = target, rule = rule, proxy = proxy, raw = raw)
 }
 
 @Composable
-private fun LogCard(log: LogMessage) {
-    val levelInfo = getLevelInfo(log.type)
-    val parsed = remember(log.payload) { parsePayload(log.payload) }
+private fun LogCard(
+    entry: IndexedLog,
+    onClick: () -> Unit,
+) {
+    val log = entry.message
+    val parsed = entry.parsed
+    val levelInfo = logLevelInfo(log.type)
     val isParsed = parsed.target.isNotEmpty()
-
+    val layoutDirection = LocalLayoutDirection.current
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 12.dp)
             .padding(bottom = 12.dp),
-        insideMargin = PaddingValues(12.dp),
+        onClick = onClick,
+        showIndication = true,
+        insideMargin = PaddingValues(16.dp),
     ) {
-        Column(
-            verticalArrangement = Arrangement.spacedBy(4.dp),
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            // 顶行：级别标签 + 协议
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
-                LevelBadge(levelInfo)
+                if (isParsed) {
+                    Text(
+                        text = parsed.target,
+                        modifier = Modifier.basicMarquee(),
+                        fontWeight = FontWeight(550),
+                        color = MiuixTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        softWrap = false,
+                    )
 
-                Spacer(Modifier.width(8.dp))
-
-                if (isParsed && parsed.protocol.isNotEmpty()) {
-                    ProtocolBadge(parsed.protocol)
-                    Spacer(Modifier.width(8.dp))
-                }
-
-                Text(
-                    text = levelInfo.name,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = levelInfo.color,
-                )
-            }
-
-            if (isParsed) {
-                // 目标地址
-                Text(
-                    text = parsed.target,
-                    fontSize = 13.sp,
-                    fontFamily = FontFamily.Monospace,
-                    fontWeight = FontWeight.Medium,
-                    color = MiuixTheme.colorScheme.onSurface,
-                )
-
-                // 规则 + 代理
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                ) {
                     if (parsed.rule.isNotEmpty()) {
                         Text(
                             text = parsed.rule,
-                            fontSize = 11.sp,
+                            fontSize = 12.sp,
                             color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
                         )
                     }
+
                     if (parsed.proxy.isNotEmpty()) {
                         Text(
                             text = parsed.proxy,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = levelInfo.color.copy(alpha = 0.8f),
+                            modifier = Modifier.basicMarquee(),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight(550),
+                            color = levelInfo.color,
+                            maxLines = 1,
+                            softWrap = false,
+                        )
+                    }
+                } else {
+                    Text(
+                        text = parsed.body.ifEmpty { log.payload },
+                        fontSize = 13.sp,
+                        lineHeight = 18.sp,
+                        fontFamily = FontFamily.Monospace,
+                        color = MiuixTheme.colorScheme.onSurface,
+                        maxLines = 3,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+
+                Row(
+                    modifier = Modifier.padding(top = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    LogTag(
+                        label = levelInfo.tag,
+                        backgroundColor = levelInfo.color.copy(alpha = 0.14f),
+                        contentColor = levelInfo.color,
+                    )
+                    if (parsed.protocol.isNotEmpty()) {
+                        LogTag(
+                            label = parsed.protocol,
+                            backgroundColor = MiuixTheme.colorScheme.secondaryContainer,
+                            contentColor = MiuixTheme.colorScheme.onSecondaryContainer,
                         )
                     }
                 }
-            } else {
-                // 无法解析，原样显示
+            }
+
+            Icon(
+                imageVector = MiuixIcons.Glass.ChevronForward,
+                contentDescription = null,
+                modifier = Modifier
+                    .padding(start = 8.dp)
+                    .size(18.dp)
+                    .graphicsLayer {
+                        if (layoutDirection == LayoutDirection.Rtl) scaleX = -1f
+                    },
+                tint = MiuixTheme.colorScheme.onSurfaceVariantActions,
+            )
+        }
+    }
+}
+
+@Composable
+private fun LogTag(
+    label: String,
+    backgroundColor: Color,
+    contentColor: Color,
+) {
+    Box(
+        modifier = Modifier.squircleBackground(backgroundColor, 6.dp),
+    ) {
+        Text(
+            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
+            text = label,
+            color = contentColor,
+            fontSize = 9.sp,
+            fontWeight = FontWeight(750),
+            maxLines = 1,
+            softWrap = false,
+        )
+    }
+}
+
+@Composable
+private fun LogDetailDialog(
+    entry: IndexedLog?,
+    onDismiss: () -> Unit,
+) {
+    // 关闭动画期间保留最后一条日志，避免弹窗淡出途中内容闪空
+    var lastEntry by remember { mutableStateOf(entry) }
+    if (entry != null) lastEntry = entry
+    val displayEntry = lastEntry ?: return
+    val displayLog = displayEntry.message
+    val parsed = displayEntry.parsed
+    val levelInfo = logLevelInfo(displayLog.type)
+    val clipboard = LocalClipboard.current
+    val clipboardScope = rememberCoroutineScope()
+    val copiedMsg = stringResource(R.string.common_copied)
+
+    val levelLabel = stringResource(R.string.log_detail_level)
+    val protocolLabel = stringResource(R.string.log_detail_protocol)
+    val sourceLabel = stringResource(R.string.log_detail_source)
+    val targetLabel = stringResource(R.string.log_detail_target)
+    val ruleLabel = stringResource(R.string.log_detail_rule)
+    val proxyLabel = stringResource(R.string.log_detail_proxy)
+    val rawLabel = stringResource(R.string.log_detail_raw)
+
+    val detailText = remember(
+        displayLog,
+        parsed,
+        levelInfo.tag,
+        levelLabel,
+        protocolLabel,
+        sourceLabel,
+        targetLabel,
+        ruleLabel,
+        proxyLabel,
+        rawLabel,
+    ) {
+        val fields = buildList {
+            add(levelLabel to levelInfo.tag)
+            if (parsed.protocol.isNotEmpty()) add(protocolLabel to parsed.protocol)
+            if (parsed.source.isNotEmpty()) add(sourceLabel to parsed.source)
+            if (parsed.target.isNotEmpty()) add(targetLabel to parsed.target)
+            if (parsed.rule.isNotEmpty()) add(ruleLabel to parsed.rule)
+            if (parsed.proxy.isNotEmpty()) add(proxyLabel to parsed.proxy)
+            add(rawLabel to displayLog.payload.trim())
+        }
+        buildAnnotatedString {
+            fields.forEachIndexed { index, (key, value) ->
+                if (index > 0) append('\n')
+                withStyle(SpanStyle(fontWeight = FontWeight.Bold)) {
+                    append("$key: ")
+                }
+                append(value)
+            }
+        }
+    }
+
+    GlassDialog(
+        show = entry != null,
+        backdrop = LocalPageBackdrop.current,
+        title = parsed.target.ifEmpty { stringResource(R.string.log_detail_title) },
+        onDismissRequest = onDismiss,
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(max = 500.dp),
+        ) {
+            SelectionContainer(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f, fill = false)
+                    .verticalScroll(rememberScrollState()),
+            ) {
                 Text(
-                    text = log.payload,
-                    fontSize = 12.sp,
+                    text = detailText,
+                    fontSize = 13.sp,
+                    lineHeight = 19.sp,
                     fontFamily = FontFamily.Monospace,
                     color = MiuixTheme.colorScheme.onSurface,
+                )
+            }
+            Spacer(Modifier.height(16.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                GlassDialogTextButton(
+                    text = stringResource(R.string.common_copy),
+                    modifier = Modifier.weight(1f),
+                    onClick = {
+                        clipboardScope.launch { clipboard.setPlainText(displayLog.payload.trim()) }
+                        showToast(copiedMsg)
+                    },
+                )
+                GlassDialogTextButton(
+                    text = stringResource(R.string.common_close),
+                    modifier = Modifier.weight(1f),
+                    role = GlassDialogButtonRole.Primary,
+                    onClick = onDismiss,
                 )
             }
         }
     }
 }
 
-@Composable
-private fun LevelBadge(levelInfo: LevelInfo) {
-    Box(
-        modifier = Modifier
-            .size(width = 20.dp, height = 16.dp)
-            .squircleBackground(levelInfo.color, 3.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            text = levelInfo.label,
-            fontSize = 9.sp,
-            fontWeight = FontWeight.Bold,
-            fontFamily = FontFamily.Monospace,
-            color = Color.White,
-        )
-    }
-}
+@Immutable
+private data class LevelInfo(val tag: String, val color: Color)
 
 @Composable
-private fun ProtocolBadge(protocol: String) {
-    Box(
-        modifier = Modifier
-            .squircleBackground(MiuixTheme.colorScheme.onSurface.copy(alpha = 0.08f), 3.dp)
-            .padding(horizontal = 5.dp, vertical = 1.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            text = protocol,
-            fontSize = 9.sp,
-            fontWeight = FontWeight.Bold,
-            fontFamily = FontFamily.Monospace,
-            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-        )
+@ReadOnlyComposable
+private fun logLevelInfo(type: String): LevelInfo {
+    val tag = logLevelTag(type)
+    val color = when (type.lowercase()) {
+        "error" -> StatusColors.danger
+        "warning" -> StatusColors.warning
+        "info" -> StatusColors.info
+        "debug" -> StatusColors.healthy
+        else -> StatusColors.neutral
     }
-}
-
-private data class LevelInfo(val label: String, val name: String, val color: Color)
-
-private fun getLevelInfo(type: String): LevelInfo {
-    return when (type.lowercase()) {
-        "error" -> LevelInfo("E", "Error", Color(0xFFFF5252))
-        "warning" -> LevelInfo("W", "Warning", Color(0xFFFFB74D))
-        "info" -> LevelInfo("I", "Info", Color(0xFF69C0FF))
-        "debug" -> LevelInfo("D", "Debug", Color(0xFF81C784))
-        else -> LevelInfo("V", "Verbose", Color(0xFFBDBDBD))
-    }
+    return LevelInfo(tag, color)
 }

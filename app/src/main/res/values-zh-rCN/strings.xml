@@ -90,6 +90,7 @@
     <string name="refresh_complete">刷新完成</string>
     <string name="common_more">更多</string>
     <string name="common_close">关闭</string>
+    <string name="common_copy">复制</string>
     <string name="common_delete">删除</string>
     <string name="common_edit">编辑</string>
     <string name="common_update">更新</string>
@@ -284,6 +285,16 @@
     <string name="log_no_match">无匹配结果</string>
     <string name="log_waiting">等待日志...</string>
     <string name="log_not_connected">未连接</string>
+    <string name="log_disabled">日志未启用</string>
+    <string name="log_disabled_hint">当前日志等级为 silent，请在配置或覆写设置中启用</string>
+    <string name="log_detail_title">日志详情</string>
+    <string name="log_detail_level">级别</string>
+    <string name="log_detail_protocol">协议</string>
+    <string name="log_detail_source">来源</string>
+    <string name="log_detail_target">目标</string>
+    <string name="log_detail_rule">规则</string>
+    <string name="log_detail_proxy">代理</string>
+    <string name="log_detail_raw">原始日志</string>
 
     <!-- DNS -->
     <string name="dns_title">DNS 查询</string>

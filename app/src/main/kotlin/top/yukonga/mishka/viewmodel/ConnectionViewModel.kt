@@ -13,6 +13,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import top.yukonga.mishka.domain.model.ConnectionInfo
 import top.yukonga.mishka.domain.repository.MihomoRepository
+import top.yukonga.mishka.util.SearchMatcher
+import top.yukonga.mishka.util.SearchQuery
 
 @Immutable
 data class ConnectionUiState(
@@ -94,14 +96,23 @@ class ConnectionViewModel : ViewModel() {
     }
 
     fun filteredConnections(searchQuery: String = _uiState.value.searchQuery): ImmutableList<ConnectionInfo> {
-        val query = searchQuery.lowercase()
-        if (query.isBlank()) return _uiState.value.connections
-        return _uiState.value.connections.filter { conn ->
-            conn.metadata.host.lowercase().contains(query) ||
-                    conn.metadata.process.lowercase().contains(query) ||
-                    conn.rule.lowercase().contains(query) ||
-                    conn.metadata.destinationIP.contains(query) ||
-                    conn.chains.any { it.lowercase().contains(query) }
+        val parsedQuery = SearchQuery.parse(searchQuery)
+        if (parsedQuery.isEmpty) return _uiState.value.connections
+        return SearchMatcher.rank(
+            items = _uiState.value.connections,
+            query = parsedQuery,
+        ) { conn ->
+            val meta = conn.metadata
+            val primaryHost = meta.host.ifEmpty { "${meta.destinationIP}:${meta.destinationPort}" }
+            field(primaryHost, allowAcronym = true)
+            field(meta.process, allowAcronym = true)
+            fields(conn.chains)
+            field(conn.rulePayload)
+            field(conn.rule)
+            field(meta.network)
+            if (meta.host.isNotEmpty()) field(meta.destinationIP)
+            field(meta.destinationPort)
+            field(meta.sourceIP)
         }.toPersistentList()
     }
 

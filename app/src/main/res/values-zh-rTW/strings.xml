@@ -90,6 +90,7 @@
     <string name="refresh_complete">重新整理完成</string>
     <string name="common_more">更多</string>
     <string name="common_close">關閉</string>
+    <string name="common_copy">複製</string>
     <string name="common_delete">刪除</string>
     <string name="common_edit">編輯</string>
     <string name="common_update">更新</string>
@@ -284,6 +285,16 @@
     <string name="log_no_match">無符合結果</string>
     <string name="log_waiting">等待日誌...</string>
     <string name="log_not_connected">未連線</string>
+    <string name="log_disabled">日誌未啟用</string>
+    <string name="log_disabled_hint">目前日誌等級為 silent，請在設定檔或覆寫設定中啟用</string>
+    <string name="log_detail_title">日誌詳情</string>
+    <string name="log_detail_level">等級</string>
+    <string name="log_detail_protocol">協定</string>
+    <string name="log_detail_source">來源</string>
+    <string name="log_detail_target">目標</string>
+    <string name="log_detail_rule">規則</string>
+    <string name="log_detail_proxy">代理</string>
+    <string name="log_detail_raw">原始日誌</string>
 
     <!-- DNS -->
     <string name="dns_title">DNS 查詢</string>

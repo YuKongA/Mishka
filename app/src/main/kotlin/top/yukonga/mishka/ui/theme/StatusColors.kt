@@ -31,6 +31,11 @@ object StatusColors {
         @Composable @ReadOnlyComposable
         get() = if (LocalAppDarkMode.current) Green300Dark else Green600Light
 
+    /** 蓝：一般信息 / Info 日志 */
+    val info: Color
+        @Composable @ReadOnlyComposable
+        get() = if (LocalAppDarkMode.current) Blue300Dark else Blue600Light
+
     /** 延迟语义：null=未测、<0=超时、<200=优、<500=一般、>=500=差 */
     @Composable
     @ReadOnlyComposable

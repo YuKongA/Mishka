@@ -46,12 +46,12 @@ import top.yukonga.mishka.viewmodel.MemorySnapshot
 import top.yukonga.mishka.viewmodel.ProviderTrafficInfo
 import top.yukonga.mishka.viewmodel.SystemInfoSnapshot
 import top.yukonga.miuix.kmp.basic.Card
-import top.yukonga.miuix.kmp.basic.CardDefaults
 import top.yukonga.miuix.kmp.basic.CircularProgressIndicator
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.glass.GlassBottomSheet
+import top.yukonga.miuix.kmp.glass.GlassCard
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.glass.Close
 import top.yukonga.miuix.kmp.icon.glass.Refresh
@@ -330,19 +330,14 @@ private fun TrafficDetailPanel(
     total: String,
     expire: String,
 ) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth(),
+    GlassCard(
+        modifier = Modifier.fillMaxWidth(),
         cornerRadius = 12.dp,
         insideMargin = PaddingValues(
             start = 12.dp,
             top = 12.dp,
             end = 12.dp,
             bottom = 14.dp,
-        ),
-        colors = CardDefaults.defaultColors(
-            // onSurface 低透明度叠加在 sheet 背景上，深浅色均得到轻微对比的面板底色
-            color = MiuixTheme.colorScheme.onSurface.copy(alpha = 0.04f),
         ),
     ) {
         Column(

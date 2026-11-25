@@ -7,6 +7,14 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.captionBar
+import androidx.compose.foundation.layout.displayCutout
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -18,8 +26,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -27,12 +37,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -41,15 +54,14 @@ import top.yukonga.mishka.domain.model.ConnectionInfo
 import top.yukonga.mishka.ui.component.AdaptiveTopAppBar
 import top.yukonga.mishka.ui.component.BackNavigationIcon
 import top.yukonga.mishka.ui.component.GlassDialogTextButton
-import top.yukonga.mishka.ui.component.GlassSearchOverlay
 import top.yukonga.mishka.ui.component.TopBarIconButton
 import top.yukonga.mishka.ui.component.blur.BlurredBar
+import top.yukonga.mishka.ui.component.blur.LocalBlurEnabled
+import top.yukonga.mishka.ui.component.blur.LocalTopBarExtraTopInset
 import top.yukonga.mishka.ui.component.blur.LocalPageBackdrop
 import top.yukonga.mishka.ui.component.blur.PageBackdropBox
 import top.yukonga.mishka.ui.component.blur.rememberBlurBackdrop
-import top.yukonga.mishka.ui.component.glassSearchBarTransition
 import top.yukonga.mishka.ui.component.overScrollVertical
-import top.yukonga.mishka.ui.component.rememberGlassSearchBarAlpha
 import top.yukonga.mishka.ui.util.horizontalCutoutPadding
 import top.yukonga.mishka.util.FormatUtils
 import top.yukonga.mishka.viewmodel.ConnectionViewModel
@@ -62,6 +74,10 @@ import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.glass.GlassDialog
 import top.yukonga.miuix.kmp.glass.GlassDialogButtonRole
+import top.yukonga.miuix.kmp.glass.GlassSearchOverlay
+import top.yukonga.miuix.kmp.glass.GlassSearchOverlayDefaults
+import top.yukonga.miuix.kmp.glass.glassSearchBarTransition
+import top.yukonga.miuix.kmp.glass.rememberGlassSearchBarAlpha
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.glass.Close
 import top.yukonga.miuix.kmp.squircle.squircleBackground
@@ -91,14 +107,22 @@ fun ConnectionScreen(
 
     val backdrop = rememberBlurBackdrop()
     val blurActive = backdrop != null
+    val blurEnabled = LocalBlurEnabled.current
+    val searchListState = rememberLazyListState()
 
     PageBackdropBox(modifier = Modifier.background(MiuixTheme.colorScheme.surface)) {
         Scaffold(
-            modifier = Modifier.glassSearchBarTransition(searchExpanded) { barAlpha.value },
+            modifier = Modifier
+                .graphicsLayer { alpha = barAlpha.value }
+                .then(if (searchExpanded) Modifier.clearAndSetSemantics { } else Modifier),
             topBar = {
                 BlurredBar(backdrop = backdrop, blurActive = blurActive) {
                     AdaptiveTopAppBar(
                         title = stringResource(R.string.connection_title),
+                        contentModifier = Modifier.glassSearchBarTransition(
+                            expanded = searchExpanded,
+                            blurEnabled = blurEnabled,
+                        ) { 1f },
                         scrollBehavior = scrollBehavior,
                         navigationIcon = { BackNavigationIcon(onBack) },
                         actions = {
@@ -125,6 +149,7 @@ fun ConnectionScreen(
                     .scrollEndHaptic()
                     .overScrollVertical(scrollBehavior)
                     .nestedScroll(scrollBehavior.nestedScrollConnection),
+                    overscrollEffect = null,
                 contentPadding = PaddingValues(
                     top = innerPadding.calculateTopPadding(),
                 ),
@@ -180,18 +205,57 @@ fun ConnectionScreen(
             }
         }
 
+        val searchTopInsets = WindowInsets.systemBars
+            .union(WindowInsets.captionBar)
+            .union(WindowInsets.displayCutout)
+            .only(WindowInsetsSides.Top)
+        val searchTopPadding = LocalTopBarExtraTopInset.current
+        val searchBarSpace = GlassSearchOverlayDefaults.BarHeight + GlassSearchOverlayDefaults.VerticalPadding * 2
         GlassSearchOverlay(
             expanded = searchExpanded,
             onDismissRequest = { searchExpanded = false },
+            scrollMaterialThreshold = GlassSearchOverlayDefaults.VerticalPadding + 6.dp,
             label = stringResource(R.string.connection_search),
+            scrollOffset = {
+                when {
+                    searchListState.layoutInfo.totalItemsCount == 0 -> 0f
+                    searchListState.firstVisibleItemIndex > 0 -> Float.MAX_VALUE
+                    else -> searchListState.firstVisibleItemScrollOffset.toFloat()
+                }
+            },
+            topInsets = searchTopInsets,
+            searchTopPadding = searchTopPadding,
+            blurEnabled = blurEnabled,
+            horizontalInsetsModifier = Modifier.horizontalCutoutPadding(),
+            searchIcon = MiuixIcons.Glass.GlassSearch,
+            closeIcon = MiuixIcons.Glass.Close,
         ) { query ->
             val filteredConnections = remember(query, uiState.connections) {
                 viewModel.filteredConnections(query)
             }
+            LaunchedEffect(query) {
+                if (searchListState.firstVisibleItemIndex != 0 || searchListState.firstVisibleItemScrollOffset != 0) {
+                    searchListState.scrollToItem(0)
+                }
+            }
+            val topInsetsPadding = searchTopInsets.asPaddingValues()
+            val searchContentPadding = remember(topInsetsPadding, searchTopPadding, searchBarSpace) {
+                object : PaddingValues {
+                    override fun calculateLeftPadding(layoutDirection: LayoutDirection) = 0.dp
+                    override fun calculateRightPadding(layoutDirection: LayoutDirection) = 0.dp
+                    override fun calculateTopPadding() =
+                        topInsetsPadding.calculateTopPadding() + searchTopPadding() + searchBarSpace
+                    override fun calculateBottomPadding() = 0.dp
+                }
+            }
             LazyColumn(
+                state = searchListState,
                 modifier = Modifier
                     .fillMaxSize()
+                    .horizontalCutoutPadding()
                     .overScrollVertical(),
+                overscrollEffect = null,
+                contentPadding = searchContentPadding,
             ) {
                 item {
                     Spacer(Modifier.height(6.dp))
@@ -222,7 +286,11 @@ fun ConnectionScreen(
                 }
 
                 item {
-                    Spacer(Modifier.navigationBarsPadding())
+                    Spacer(
+                        Modifier
+                            .height(24.dp)
+                            .navigationBarsPadding(),
+                    )
                 }
             }
         }

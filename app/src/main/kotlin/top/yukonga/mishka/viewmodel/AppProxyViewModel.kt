@@ -27,6 +27,8 @@ import top.yukonga.mishka.platform.ProxyServiceBridge
 import top.yukonga.mishka.platform.ProxyServiceController
 import top.yukonga.mishka.platform.ProxyState
 import top.yukonga.mishka.platform.StorageKeys
+import top.yukonga.mishka.util.SearchMatcher
+import top.yukonga.mishka.util.SearchQuery
 
 enum class AppProxyMode { AllowAll, AllowSelected, DenySelected }
 
@@ -75,12 +77,7 @@ class AppProxyViewModel(
         _uiState.map { ListInput(it.apps, it.searchQuery, it.showSystemApps) }.distinctUntilChanged(),
         _sortAnchor,
     ) { (apps, query, showSystem), anchor ->
-        apps.filterApps(query, showSystem)
-            .sortedWith(
-                compareByDescending<AppInfo> { it.packageName in anchor }
-                    .thenBy { it.appName.lowercase() }
-            )
-            .toPersistentList()
+        apps.searchAndSort(query, showSystem, anchor)
     }
         // 第一个订阅者出现时才枚举 PackageManager。VM 是 Koin single，随冷启动构造，
         // 而多数会话根本不会打开分应用代理页——枚举 + 逐包 loadLabel 是几百毫秒 CPU
@@ -219,12 +216,34 @@ class AppProxyViewModel(
     }
 }
 
+private fun List<AppInfo>.searchAndSort(
+    query: String,
+    showSystemApps: Boolean,
+    anchor: Set<String>,
+): ImmutableList<AppInfo> {
+    val visible = if (showSystemApps) this else filter { !it.isSystemApp }
+    val defaultOrder = compareByDescending<AppInfo> { it.packageName in anchor }
+        .thenBy { it.appName.lowercase() }
+    val parsedQuery = SearchQuery.parse(query)
+    if (parsedQuery.isEmpty) {
+        return visible.sortedWith(defaultOrder).toPersistentList()
+    }
+    return SearchMatcher.rank(
+        items = visible,
+        query = parsedQuery,
+        tieBreaker = defaultOrder,
+    ) { app ->
+        field(app.appName, allowAcronym = true)
+        field(app.packageName, allowAcronym = true)
+    }.toPersistentList()
+}
+
 private fun List<AppInfo>.filterApps(query: String, showSystemApps: Boolean): List<AppInfo> {
-    val q = query.lowercase()
-    return filter { app ->
-        (showSystemApps || !app.isSystemApp) &&
-                (q.isBlank() ||
-                        app.appName.lowercase().contains(q) ||
-                        app.packageName.lowercase().contains(q))
+    val visible = if (showSystemApps) this else filter { !it.isSystemApp }
+    val parsedQuery = SearchQuery.parse(query)
+    if (parsedQuery.isEmpty) return visible
+    return SearchMatcher.filter(visible, parsedQuery) { app ->
+        field(app.appName, allowAcronym = true)
+        field(app.packageName, allowAcronym = true)
     }
 }

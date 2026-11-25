@@ -88,6 +88,7 @@
     <string name="refresh_complete">Обновление завершено</string>
     <string name="common_more">Еще</string>
     <string name="common_close">Закрыть</string>
+    <string name="common_copy">Копировать</string>
     <string name="common_delete">Удалить</string>
     <string name="common_edit">Изменить</string>
     <string name="common_update">Обновить</string>
@@ -266,6 +267,16 @@
     <string name="log_no_match">Ничего не найдено</string>
     <string name="log_waiting">Ожидание логов...</string>
     <string name="log_not_connected">Не подключено</string>
+    <string name="log_disabled">Журналирование отключено</string>
+    <string name="log_disabled_hint">Уровень логирования — silent. Включите его в конфигурации или параметрах переопределения.</string>
+    <string name="log_detail_title">Подробности журнала</string>
+    <string name="log_detail_level">Уровень</string>
+    <string name="log_detail_protocol">Протокол</string>
+    <string name="log_detail_source">Источник</string>
+    <string name="log_detail_target">Назначение</string>
+    <string name="log_detail_rule">Правило</string>
+    <string name="log_detail_proxy">Прокси</string>
+    <string name="log_detail_raw">Исходная запись</string>
 
     <!-- DNS -->
     <string name="dns_title">DNS-запрос</string>

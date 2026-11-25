@@ -1,5 +1,8 @@
 package top.yukonga.mishka.ui.util
 
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
@@ -17,6 +20,8 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.layout
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalWindowInfo
@@ -66,6 +71,18 @@ fun rememberIsWideScreen(): Boolean {
     val containerSize = LocalContainerSize.current ?: LocalWindowInfo.current.containerSize
     val density = LocalPlatformDensity.current ?: LocalDensity.current
     return with(density) { containerSize.width.toDp() >= WideScreenMinWidth }
+}
+
+@Composable
+fun isInMultiWindowMode(): Boolean {
+    LocalConfiguration.current
+    return LocalContext.current.findActivity()?.isInMultiWindowMode == true
+}
+
+private tailrec fun Context.findActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else -> null
 }
 
 /**

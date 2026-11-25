@@ -92,6 +92,7 @@
     <string name="refresh_complete">Refresh complete</string>
     <string name="common_more">More</string>
     <string name="common_close">Close</string>
+    <string name="common_copy">Copy</string>
     <string name="common_delete">Delete</string>
     <string name="common_edit">Edit</string>
     <string name="common_update">Update</string>
@@ -286,6 +287,16 @@
     <string name="log_no_match">No matching results</string>
     <string name="log_waiting">Waiting for logs...</string>
     <string name="log_not_connected">Not connected</string>
+    <string name="log_disabled">Logging disabled</string>
+    <string name="log_disabled_hint">Log level is set to silent. Enable it in your config or Override Settings.</string>
+    <string name="log_detail_title">Log Details</string>
+    <string name="log_detail_level">Level</string>
+    <string name="log_detail_protocol">Protocol</string>
+    <string name="log_detail_source">Source</string>
+    <string name="log_detail_target">Target</string>
+    <string name="log_detail_rule">Rule</string>
+    <string name="log_detail_proxy">Proxy</string>
+    <string name="log_detail_raw">Raw</string>
 
     <!-- DNS -->
     <string name="dns_title">DNS Query</string>

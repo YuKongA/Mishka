@@ -112,6 +112,7 @@ import top.yukonga.mishka.ui.util.DualPaneDividerWidth
 import top.yukonga.mishka.ui.util.DualPaneMinWidth
 import top.yukonga.mishka.ui.util.LocalHorizontalCutoutSides
 import top.yukonga.mishka.ui.util.calculateDualPaneMasterWidth
+import top.yukonga.mishka.ui.util.isInMultiWindowMode
 import top.yukonga.mishka.ui.util.rememberHorizontalSafeInsets
 import top.yukonga.mishka.ui.util.rememberIsWideScreen
 import top.yukonga.mishka.viewmodel.AppProxyViewModel
@@ -542,12 +543,13 @@ fun AppNavigation(
                         LocalTopBarStartInset provides topBarStartInset,
                         LocalCollapsedRailTopObstruction provides collapsedRailTopObstruction,
                     ) {
+                        val navCornerRadius = if (isInMultiWindowMode()) 0.dp else rememberNavSystemCornerRadius()
                         NavDisplay(
                             backStack = backStack,
                             onBack = { navigator.pop() },
                             transition = navTransition,
                             effects = NavDisplayEffects(
-                                cornerClipRadius = rememberNavSystemCornerRadius(),
+                                cornerClipRadius = navCornerRadius,
                             ),
                         ) {
                             entry<Route.Main>(swipeDismiss = swipeDismiss) {
