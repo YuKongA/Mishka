@@ -15,6 +15,8 @@ import kotlinx.coroutines.launch
 import top.yukonga.mishka.R
 import top.yukonga.mishka.service.MishkaRootService
 import top.yukonga.mishka.service.MishkaTunService
+import top.yukonga.mishka.service.TransitionWakeLock
+import top.yukonga.mishka.service.TransitionWakeLock.releaseQuietly
 import java.io.File
 
 enum class ProxyState {
@@ -91,16 +93,40 @@ class ProxyServiceController(private val context: Context) {
         val intent = buildServiceIntent(mode, Op.Start).apply {
             putExtra(EXTRA_SUBSCRIPTION_ID, id)
         }
-        context.startForegroundService(intent)
+        val handoffToken = TransitionWakeLock.holdHandoff(context, intent)
+        try {
+            context.startForegroundService(intent)
+        } catch (t: Throwable) {
+            TransitionWakeLock.releaseHandoff(handoffToken)
+            throw t
+        }
     }
 
-    private fun restartValidated(id: String) {
+    private fun restartValidated(id: String, onlyIfAlive: Boolean = false) {
         // 优先读 bridge：代理运行中时它反映实际 Service；否则读 storage（用户最新选择）
         val mode = activeModeOrStored()
         val intent = buildServiceIntent(mode, Op.Restart).apply {
             putExtra(EXTRA_SUBSCRIPTION_ID, id)
+            if (onlyIfAlive && mode != TunMode.Vpn) {
+                putExtra(MishkaRootService.EXTRA_ONLY_IF_ALIVE, true)
+            }
         }
-        context.startService(intent)
+        val serviceRunning = ProxyServiceBridge.state.value.state.let {
+            it == ProxyState.Running || it == ProxyState.Starting || it == ProxyState.Stopping
+        }
+        val handoffToken = TransitionWakeLock.holdHandoff(context, intent)
+        try {
+            // Service 已在当前进程前台运行时用 startService 避免施加新的 startForeground 窗口；
+            // 进程被杀后仅 ROOT mihomo 存活的场景下 Service 尚未启动，走 startForegroundService。
+            if (serviceRunning) {
+                context.startService(intent)
+            } else {
+                context.startForegroundService(intent)
+            }
+        } catch (t: Throwable) {
+            TransitionWakeLock.releaseHandoff(handoffToken)
+            throw t
+        }
     }
 
     fun stop() {
@@ -185,7 +211,12 @@ class ProxyServiceController(private val context: Context) {
             ProxyState.Running -> restart(subscriptionId)
 
             ProxyState.Starting, ProxyState.Stopping -> {
-                pendingRestartJob = scope.launch {
+                val waitWakeLock = TransitionWakeLock.acquire(
+                    context,
+                    WAKELOCK_TAG_PENDING_RESTART,
+                    TransitionWakeLock.SERVICE_START_TIMEOUT_MS,
+                )
+                val job = scope.launch {
                     val settled = ProxyServiceBridge.state.first {
                         it.state != ProxyState.Starting && it.state != ProxyState.Stopping
                     }
@@ -194,9 +225,20 @@ class ProxyServiceController(private val context: Context) {
                     runCatching { restart(subscriptionId) }
                         .onFailure { Log.e(TAG, "pending restart failed", it) }
                 }
+                job.invokeOnCompletion { waitWakeLock.releaseQuietly() }
+                pendingRestartJob = job
             }
 
-            ProxyState.Stopped, ProxyState.Error -> {
+            ProxyState.Stopped -> {
+                // ROOT 模式下 app 进程被系统回收时 bridge 回到 Stopped，但 root mihomo 仍可能存活；
+                // 仅在 Service 端复核旧进程确仍存活时才重启，避免把已崩溃的代理静默拉起。
+                if (rootProcessLikelyAlive()) {
+                    val id = resolveStartSubscriptionId(subscriptionId) ?: return
+                    restartValidated(id, onlyIfAlive = true)
+                }
+            }
+
+            ProxyState.Error -> {
                 // 没有在跑的代理：下次启动自然读到新配置
             }
         }
@@ -238,7 +280,13 @@ class ProxyServiceController(private val context: Context) {
             putExtra(EXTRA_SUBSCRIPTION_ID, id)
             putExtra(MishkaRootService.EXTRA_ATTACH_ONLY, true)
         }
-        context.startForegroundService(intent)
+        val handoffToken = TransitionWakeLock.holdHandoff(context, intent)
+        try {
+            context.startForegroundService(intent)
+        } catch (t: Throwable) {
+            TransitionWakeLock.releaseHandoff(handoffToken)
+            throw t
+        }
     }
 
     /**
@@ -378,10 +426,9 @@ class ProxyServiceController(private val context: Context) {
             return
         }
 
-        // 卡在 Stopping 状态（异步块被取消的残留场景），直接重置
+        // Stopping 可能是正在进行的后台重启/停止，不能在 onResume 时强行抹成 Stopped（会中断
+        // pendingRestartJob 并在界面闪现假停止态）；Service 销毁时 onDestroy 会负责发布终态。
         if (bridgeState == ProxyState.Stopping) {
-            storage.putString(StorageKeys.SERVICE_WAS_RUNNING, "false")
-            ProxyServiceBridge.updateState(ProxyServiceStatus(ProxyState.Stopped))
             return
         }
 
@@ -428,6 +475,7 @@ class ProxyServiceController(private val context: Context) {
     }
 
     companion object {
+        private const val WAKELOCK_TAG_PENDING_RESTART = "mishka:pending-restart"
         private const val TAG = "ProxyServiceController"
         const val EXTRA_SUBSCRIPTION_ID = "subscription_id"
     }

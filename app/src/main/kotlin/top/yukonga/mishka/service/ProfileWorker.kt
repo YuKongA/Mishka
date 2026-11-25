@@ -21,7 +21,7 @@ import top.yukonga.mishka.data.repository.SubscriptionRepositoryImpl
 import top.yukonga.mishka.platform.PlatformStorage
 import top.yukonga.mishka.platform.ProxyServiceController
 import top.yukonga.mishka.util.describe
-import java.util.concurrent.atomic.AtomicInteger
+import top.yukonga.mishka.service.TransitionWakeLock.releaseQuietly
 
 /**
  * 配置后台更新前台服务。
@@ -32,8 +32,10 @@ import java.util.concurrent.atomic.AtomicInteger
 class ProfileWorker : Service() {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    private val inFlight = AtomicInteger(0)
-
+    private val stateLock = Any()
+    private var inFlight = 0
+    private var latestStartId = 0
+    private val updatedUuids = LinkedHashSet<String>()
     // onCreate 起前台失败后已 stopSelf，之后到达的 start 不能再接活
     @Volatile
     private var foregroundFailed = false
@@ -63,40 +65,84 @@ class ProfileWorker : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (foregroundFailed) return START_NOT_STICKY
-        when (intent?.action) {
-            ACTION_SCHEDULE_UPDATES -> launchTracked(startId) { updateScheduler.reconcileNow() }
+        if (foregroundFailed) {
+            TransitionWakeLock.releaseHandoff(intent)
+            return START_NOT_STICKY
+        }
+        try {
+            val task: (suspend () -> Unit)? = when (intent?.action) {
+                ACTION_SCHEDULE_UPDATES -> ({ updateScheduler.reconcileNow() })
 
-            ACTION_UPDATE_PROFILE -> {
-                val uuid = intent.data?.host
-                if (uuid != null) launchTracked(startId) { runUpdate(uuid) } else stopIfIdle(startId)
+                ACTION_UPDATE_PROFILE -> intent.data?.host?.let { uuid -> { runUpdate(uuid) } }
+
+                else -> null
             }
-
-            else -> stopIfIdle(startId)
+            if (task != null) {
+                launchTracked(startId, task)
+            } else {
+                val stopId = synchronized(stateLock) {
+                    latestStartId = startId
+                    if (inFlight == 0) latestStartId else null
+                }
+                stopId?.let(::stopSelfResult)
+            }
+        } finally {
+            TransitionWakeLock.releaseHandoff(intent)
         }
         return START_NOT_STICKY
     }
 
     /**
-     * 跑一件任务，完成后以**本次** startId 请求停止。
+     * 跑一件任务，并在整批并发任务归零时以最新 `startId` 请求停止。
      *
-     * `stopSelfResult` 只在没有更新的 start 到达时才真停，那条更新的请求会由它自己的任务
-     * 再试一次——「等 10s 再 drain 队列」做不到这点：`poll()` 返回 null 与 `stopSelf()` 之间
-     * 到达的请求入队后无人 join，onDestroy 的 `scope.cancel()` 直接把它掐掉，更新静默失败。
+     * `latestStartId`、`inFlight` 与 `updatedUuids` 同受 `stateLock` 保护：既避免乱序完成时
+     * 较早任务的旧 `startId` 让 `stopSelfResult` 返回 false 滞留前台服务，又保证新到达的
+     * `onStartCommand` 不会被前一批的收尾提前停掉。
      */
     private fun launchTracked(startId: Int, block: suspend () -> Unit) {
-        inFlight.incrementAndGet()
-        scope.launch {
-            try {
-                block()
-            } finally {
-                if (inFlight.decrementAndGet() == 0) stopSelfResult(startId)
-            }
+        synchronized(stateLock) {
+            latestStartId = startId
+            inFlight++
         }
-    }
-
-    private fun stopIfIdle(startId: Int) {
-        if (inFlight.get() == 0) stopSelfResult(startId)
+        val wakeLock = TransitionWakeLock.acquire(
+            this,
+            WAKELOCK_TAG,
+            TransitionWakeLock.PROFILE_UPDATE_TIMEOUT_MS,
+        )
+        val job = try {
+            scope.launch {
+                try {
+                    block()
+                } finally {
+                    val (drained, stopId) = synchronized(stateLock) {
+                        inFlight--
+                        if (inFlight == 0) {
+                            val ids = updatedUuids.toList()
+                            updatedUuids.clear()
+                            ids to latestStartId
+                        } else {
+                            emptyList<String>() to null
+                        }
+                    }
+                    // 同批多个定时更新全部完成后再触发一次重启，避免切掉后续订阅的 mixed-port
+                    // 代理连接，也避免 ROOT 重启的 RootRuntimeCache.release 卡在下一条订阅的 processLock 上。
+                    drained.forEach { id ->
+                        runCatching { serviceController.restartAfterProfileUpdate(id) }
+                            .onFailure { Log.e(TAG, "Failed to trigger restart after updating $id", it) }
+                    }
+                    stopId?.let(::stopSelfResult)
+                }
+            }
+        } catch (t: Throwable) {
+            val stopId = synchronized(stateLock) {
+                inFlight--
+                if (inFlight == 0) latestStartId else null
+            }
+            wakeLock.releaseQuietly()
+            stopId?.let(::stopSelfResult)
+            throw t
+        }
+        job.invokeOnCompletion { wakeLock.releaseQuietly() }
     }
 
     override fun onDestroy() {
@@ -139,9 +185,7 @@ class ProfileWorker : Service() {
 
             processor.update(uuid)
 
-            // 本 Service 自身是前台服务，app 因此处于前台状态，这里发给 Tun/Root Service 的
-            // startService 不受后台启动限制
-            serviceController.restartAfterProfileUpdate(uuid)
+            synchronized(stateLock) { updatedUuids.add(uuid) }
 
             NotificationHelper.notifyProfileUpdateSuccess(this, imported.name)
             Log.i(TAG, "Profile ${imported.name} updated successfully")
@@ -158,6 +202,7 @@ class ProfileWorker : Service() {
     }
 
     companion object {
+        private const val WAKELOCK_TAG = "mishka:profile-worker"
         private const val TAG = "ProfileWorker"
         const val ACTION_SCHEDULE_UPDATES = "top.yukonga.mishka.action.SCHEDULE_UPDATES"
         const val ACTION_UPDATE_PROFILE = "top.yukonga.mishka.action.UPDATE_PROFILE"

@@ -207,6 +207,7 @@ class HomeViewModel(
                 when (status.state) {
                     ProxyState.Starting -> {
                         _uiState.value = _uiState.value.copy(
+                            isRunning = false,
                             isStarting = true,
                             isStopping = false,
                             tunMode = status.tunMode,
@@ -217,6 +218,7 @@ class HomeViewModel(
                     ProxyState.Running -> {
                         _uiState.value = _uiState.value.copy(
                             isStarting = false,
+                            isStopping = false,
                             isRestarting = false,
                             isRunning = true,
                             tunMode = status.tunMode,
@@ -227,7 +229,11 @@ class HomeViewModel(
                     }
 
                     ProxyState.Stopping -> {
-                        _uiState.value = _uiState.value.copy(isRunning = false, isStopping = true)
+                        _uiState.value = _uiState.value.copy(
+                            isRunning = false,
+                            isStarting = false,
+                            isStopping = true,
+                        )
                     }
 
                     ProxyState.Stopped -> {

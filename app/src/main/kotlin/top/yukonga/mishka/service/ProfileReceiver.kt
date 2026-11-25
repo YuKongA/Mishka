@@ -44,9 +44,11 @@ class ProfileReceiver : BroadcastReceiver() {
                 this.action = action
                 if (uuid != null) data = Uri.parse("uuid://$uuid")
             }
+            val handoffToken = TransitionWakeLock.holdHandoff(context, intent)
             try {
                 context.startForegroundService(intent)
             } catch (e: Exception) {
+                TransitionWakeLock.releaseHandoff(handoffToken)
                 // Android 12+ ForegroundServiceStartNotAllowedException 及各 OEM ROM 后台启动限制；
                 // 吞异常避免 BroadcastReceiver 进程崩溃，同时主动 re-arm 保调度链不断
                 Log.e(TAG, "startForegroundService failed for $action", e)

@@ -38,19 +38,15 @@ object RootHelper {
 
     /** 进程退出后管道很快 EOF，给读线程一点收尾时间。 */
     private const val DRAIN_JOIN_MS = 500L
+    private const val START_ROOT_TIMEOUT_MS = 10_000L
 
     fun hasRootAccess(): Boolean {
         return try {
             val process = ProcessBuilder("su", "-c", "id")
                 .redirectErrorStream(true)
                 .start()
-            val exited = process.waitFor(3, TimeUnit.SECONDS)
-            if (!exited) {
-                process.destroyForcibly()
-                return false
-            }
-            val output = process.inputStream.bufferedReader().readText()
-            process.exitValue() == 0 && output.contains("uid=0")
+            val (code, output) = awaitDrained(process, timeoutSeconds = 3)
+            code == 0 && output.contains("uid=0")
         } catch (_: Exception) {
             false
         }
@@ -59,7 +55,8 @@ object RootHelper {
     /**
      * 后台启动 mihomo，重定向输出到日志文件，返回真实 PID。
      *
-     * args 含密钥，逐个转义且不进日志。
+     * args 含密钥，逐个转义且不进日志。不能等 stdout EOF（部分 su 包装器会继承管道直到子进程退出），
+     * 但读取首行 PID 必须有超时，避免后台 su 卡住时无限阻塞。
      */
     fun startAsRoot(binary: String, args: Array<String>, workDir: String, logFile: String): Int {
         val argsStr = args.joinToString(" ") { escapeShellSingleQuoted(it) }
@@ -70,11 +67,23 @@ object RootHelper {
             val process = ProcessBuilder("su", "-g", CORE_GID.toString(), "-c", command)
                 .redirectErrorStream(true)
                 .start()
-            val reader = process.inputStream.bufferedReader()
-            val pidLine = reader.readLine()?.trim() ?: ""
+            var pidLine = ""
+            val readThread = Thread {
+                runCatching {
+                    pidLine = process.inputStream.bufferedReader().readLine()?.trim().orEmpty()
+                }
+            }.apply { isDaemon = true; start() }
+            readThread.join(START_ROOT_TIMEOUT_MS)
+            if (readThread.isAlive) {
+                Log.e(TAG, "Timed out waiting for mihomo PID from su")
+                process.destroyForcibly()
+                runCatching { process.inputStream.close() }
+                readThread.join(DRAIN_JOIN_MS)
+                return -1
+            }
+            runCatching { process.inputStream.close() }
             val pid = pidLine.toIntOrNull() ?: -1
             Log.i(TAG, "mihomo actual PID: $pid")
-            process.inputStream.close()
             pid
         } catch (e: Exception) {
             Log.e(TAG, "Failed to start as root: ${e.message}")
@@ -108,9 +117,8 @@ object RootHelper {
             val process = ProcessBuilder("su", "-c", "tail -n $maxLines $path 2>/dev/null")
                 .redirectErrorStream(true)
                 .start()
-            val output = process.inputStream.bufferedReader().readText()
-            process.waitFor(3, TimeUnit.SECONDS)
-            output.trim()
+            val (code, output) = awaitDrained(process, timeoutSeconds = 3)
+            if (code == -1) "" else output
         } catch (_: Exception) {
             ""
         }
@@ -125,9 +133,8 @@ object RootHelper {
             val process = ProcessBuilder("su", "-c", "cat /proc/$pid/cmdline 2>/dev/null")
                 .redirectErrorStream(true)
                 .start()
-            val output = process.inputStream.bufferedReader().readText()
-            process.waitFor(3, TimeUnit.SECONDS)
-            output
+            val (code, output) = awaitDrained(process, timeoutSeconds = 3)
+            if (code == -1) "" else output
         } catch (_: Exception) {
             ""
         }
@@ -138,40 +145,51 @@ object RootHelper {
             val process = ProcessBuilder("su", "-c", "kill -0 $pid")
                 .redirectErrorStream(true)
                 .start()
-            process.waitFor(3, TimeUnit.SECONDS)
-            process.exitValue() == 0
+            awaitDrained(process, timeoutSeconds = 3).code == 0
         } catch (_: Exception) {
             false
         }
     }
 
+    /**
+     * 单次 su 完成 SIGTERM → 轮询等待 → SIGKILL 升级 → TUN 兜底清理，避免启停路径反复 fork su。
+     */
     fun killAsRoot(pid: Int, tunDevice: String = "Mishka"): Boolean {
-        try {
+        if (pid <= 0) return true
+        val tunDelete = "ip link delete ${escapeShellSingleQuoted(tunDevice)} 2>/dev/null; true"
+        val script = """
+            kill $pid 2>/dev/null || true
+            i=0; while [ ${'$'}i -lt 6 ]; do
+                kill -0 $pid 2>/dev/null || { $tunDelete; exit 0; }
+                sleep 0.5
+                i=${'$'}((i+1))
+            done
+            kill -0 $pid 2>/dev/null || { $tunDelete; exit 0; }
+            kill -9 $pid 2>/dev/null || true
+            i=0; while [ ${'$'}i -lt 4 ]; do
+                kill -0 $pid 2>/dev/null || { $tunDelete; exit 0; }
+                sleep 0.5
+                i=${'$'}((i+1))
+            done
+            kill -0 $pid 2>/dev/null || { $tunDelete; exit 0; }
+            exit 1
+        """.trimIndent()
+        return try {
             Log.i(TAG, "Killing root process: pid=$pid")
-            runRootCommand("kill $pid")
-            for (i in 1..6) {
-                Thread.sleep(500)
-                if (!isAliveAsRoot(pid)) {
-                    Log.i(TAG, "Process $pid terminated after SIGTERM")
-                    return true
-                }
+            val process = ProcessBuilder("su", "-c", script)
+                .redirectErrorStream(true)
+                .start()
+            val (code, output) = awaitDrained(process, timeoutSeconds = 10)
+            if (code == 0) {
+                Log.i(TAG, "Process $pid terminated")
+                true
+            } else {
+                Log.w(TAG, "Process $pid still alive after SIGKILL (code=$code, out=${output.take(200)})")
+                false
             }
-            // SIGKILL（进程无法优雅清理，需要手动清理 TUN 残留）
-            Log.w(TAG, "Process $pid still alive after SIGTERM, sending SIGKILL")
-            runRootCommand("kill -9 $pid")
-            for (i in 1..4) {
-                Thread.sleep(500)
-                if (!isAliveAsRoot(pid)) {
-                    Log.i(TAG, "Process $pid terminated after SIGKILL")
-                    cleanupRootNetwork(tunDevice)
-                    return true
-                }
-            }
-            Log.e(TAG, "Process $pid still alive after SIGKILL")
-            return false
         } catch (e: Exception) {
             Log.w(TAG, "Failed to kill root process: ${e.message}")
-            return false
+            false
         }
     }
 
@@ -203,8 +221,7 @@ object RootHelper {
             val process = ProcessBuilder("su", "-c", command)
                 .redirectErrorStream(true)
                 .start()
-            process.waitFor(3, TimeUnit.SECONDS)
-            process.exitValue() == 0
+            awaitDrained(process, timeoutSeconds = 3).code == 0
         } catch (_: Exception) {
             false
         }
@@ -254,13 +271,12 @@ object RootHelper {
             val process = ProcessBuilder("su", "-c", script)
                 .redirectErrorStream(true)
                 .start()
-            val exited = process.waitFor(8, TimeUnit.SECONDS)
-            if (!exited) {
-                process.destroyForcibly()
+            val (code, _) = awaitDrained(process, timeoutSeconds = 8)
+            if (code == -1) {
                 Log.e(TAG, "cleanupOrphanedMihomo timed out")
                 return
             }
-            if (process.exitValue() == 1) {
+            if (code == 1) {
                 Log.e(TAG, "Orphaned mihomo still alive after SIGKILL")
             }
         } catch (_: Exception) {
@@ -297,12 +313,7 @@ object RootHelper {
             val process = ProcessBuilder("su", "-c", "rm -rf $escaped")
                 .redirectErrorStream(true)
                 .start()
-            val exited = process.waitFor(8, TimeUnit.SECONDS)
-            if (!exited) {
-                process.destroyForcibly()
-                return false
-            }
-            process.exitValue() == 0
+            awaitDrained(process, timeoutSeconds = 8).code == 0
         } catch (_: Exception) {
             false
         }

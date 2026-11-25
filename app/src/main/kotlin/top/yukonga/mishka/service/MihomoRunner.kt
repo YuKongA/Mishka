@@ -258,11 +258,14 @@ class MihomoRunner(private val context: Context) {
             if (isRootMode) {
                 val tunDevice = PlatformStorage(context).getString(StorageKeys.ROOT_TUN_DEVICE, "Mishka")
                 val killed = RootHelper.killAsRoot(target, tunDevice)
-                if (!killed) {
+                confirmedDead = if (killed) {
+                    // killAsRoot 内部已通过 kill -0 确认进程退出
+                    true
+                } else {
                     RootHelper.killMihomoByName(tunDevice)
+                    // pkill 兜底后复查确认是否真的杀掉
+                    !RootHelper.isAliveAsRoot(target)
                 }
-                // pkill 兜底后不复查的话，杀掉与否无从得知
-                confirmedDead = !RootHelper.isAliveAsRoot(target)
             } else {
                 val result = ProcessHelper.nativeStop(target, GRACEFUL_STOP_TIMEOUT_MS, FORCE_STOP_TIMEOUT_MS)
                 confirmedDead = result >= 0 || result == ProcessHelper.STOP_NOT_CHILD
@@ -294,6 +297,7 @@ class MihomoRunner(private val context: Context) {
      */
     private suspend fun waitForReady(useRoot: Boolean, workDir: File): String? {
         var rootRound = 0
+        var vpnWaitRounds = 0
         var vpnApiChecks = 0
         while (!useRoot || rootRound < 20) {
             delay(500)
@@ -304,11 +308,14 @@ class MihomoRunner(private val context: Context) {
                     return scanLogForTunError(true, workDir)
                 }
             } else {
-                // provider 初始化不占用 API 探测预算，原生 ready 后才开始计数。
+                // provider 初始化不占用 API 探测预算，原生 ready 后才开始计数；
+                // 仍设总上限（120s），避免子进程在后台永久卡死于 hub.Parse 时无限停在 Starting。
                 val ready = vpnReadyFile?.takeIf { it.isFile }?.readText() == "ready"
                 if (ready) {
                     if (isApiAuthorized(secret, externalController, timeoutMs = 500)) return null
                     if (++vpnApiChecks >= 20) break
+                } else if (++vpnWaitRounds >= VPN_READY_MAX_ROUNDS) {
+                    break
                 }
             }
             if (!checkLiveness) continue
@@ -432,6 +439,8 @@ class MihomoRunner(private val context: Context) {
 
         /** waitForReady 每几轮（每轮 500ms）做一次判活 */
         private const val LIVENESS_CHECK_EVERY = 4
+        /** VPN 等待原生 ready 文件的最大轮次（每轮 500ms，共 120s），兜底防止后台永久卡死 */
+        private const val VPN_READY_MAX_ROUNDS = 240
 
         private const val GRACEFUL_STOP_TIMEOUT_MS = 3000
         private const val FORCE_STOP_TIMEOUT_MS = 500

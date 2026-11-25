@@ -11,7 +11,6 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
@@ -35,6 +34,7 @@ import top.yukonga.mishka.platform.ProxyServiceStatus
 import top.yukonga.mishka.platform.ProxyState
 import top.yukonga.mishka.platform.StorageKeys
 import top.yukonga.mishka.platform.TunMode
+import top.yukonga.mishka.service.TransitionWakeLock.releaseQuietly
 import top.yukonga.mishka.util.describe
 import top.yukonga.mishka.viewmodel.AppProxyMode
 import java.io.File
@@ -91,13 +91,40 @@ class MishkaRootService : Service() {
     @Volatile
     private var preparedRuntime: PreparedRuntime? = null
 
-    // 自动连接与补发 BOOT_COMPLETED 的 BootReceiver 会各发一次 ACTION_START，两条启动协程
-    // 并发跑 iptables 会互抢 xtables.lock。@Volatile：主线程写，stop/restart 在 IO 协程读
-    @Volatile
-    private var startJob: Job? = null
+    private enum class OpKind { Start, Restart, Stop }
 
-    @Volatile
-    private var startJobAttachOnly = false
+    /**
+     * 单个启停/重启操作的生命周期句柄。
+     *
+     * 所有启停/重启共享单一 [activeOp] 串行交接，避免并发跑 iptables 互抢 xtables.lock。
+     * [stopStartId] 与 [closed] 同受 [opLock] 保护：被吸收的重复/空 Intent 只在操作尚未进入
+     * `stopServiceQuietly` 关门前推进 [stopStartId]，防止旧 startId 或关门后被吸收的新 startId
+     * 导致僵尸前台服务；被新操作取代后因 `activeOp !== op` 不再收尾。
+     * [confirmedAlive] 随运行动态升格，使抢占进行中 `attachOnly`/`onlyIfAlive` 的重启能感知已确认存活的代理。
+     */
+    private class ActiveOp(
+        val kind: OpKind,
+        val attachOnly: Boolean = false,
+        val onlyIfAlive: Boolean = false,
+        initialStartId: Int,
+    ) {
+        var stopStartId: Int = initialStartId
+        var closed: Boolean = false
+
+        @Volatile
+        var confirmedAlive: Boolean = when (kind) {
+            OpKind.Start -> !attachOnly
+            OpKind.Restart -> !onlyIfAlive
+            OpKind.Stop -> false
+        }
+
+        @Volatile
+        var job: Job? = null
+    }
+
+    private val opLock = Any()
+    private var activeOp: ActiveOp? = null
+    private var foregroundReady = false
 
     // onDestroy 不取消。进程已死后的回写放这里，等 processLock 时不会被 scope.cancel() 丢掉。
     private val cleanupScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -139,6 +166,7 @@ class MishkaRootService : Service() {
             stopSelf()
             return
         }
+        foregroundReady = true
         // 监听动态通知设置变化，实时切换通知样式
         notificationRefreshJob = scope.launch {
             ProxyServiceBridge.notificationRefresh.collect {
@@ -155,6 +183,10 @@ class MishkaRootService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (!foregroundReady) {
+            TransitionWakeLock.releaseHandoff(intent)
+            return START_NOT_STICKY
+        }
         // 优先用 Intent 带的 submode；缺失时读 storage active snapshot 作兜底（stop/restart 路径）
         val requested = Submode.from(intent?.getStringExtra(EXTRA_SUBMODE))
         currentSubmode = if (intent?.hasExtra(EXTRA_SUBMODE) == true) {
@@ -163,19 +195,42 @@ class MishkaRootService : Service() {
             val active = PlatformStorage(this).getString(StorageKeys.ROOT_SUBMODE_ACTIVE, "")
             Submode.from(active.ifEmpty { requested.storageValue })
         }
-        when (intent?.action) {
-            ACTION_START -> {
-                val subscriptionId = intent.getStringExtra(ProxyServiceController.EXTRA_SUBSCRIPTION_ID)
-                // attach-only：reopen 触发的重连请求，只允许重连活着的进程，禁止全新启动
-                val attachOnly = intent.getBooleanExtra(EXTRA_ATTACH_ONLY, false)
-                startProxy(subscriptionId, attachOnly)
-            }
+        try {
+            when (intent?.action) {
+                ACTION_START -> {
+                    val subscriptionId = intent.getStringExtra(ProxyServiceController.EXTRA_SUBSCRIPTION_ID)
+                    // attach-only：reopen 触发的重连请求，只允许重连活着的进程，禁止全新启动
+                    val attachOnly = intent.getBooleanExtra(EXTRA_ATTACH_ONLY, false)
+                    startProxy(subscriptionId, attachOnly, startId)
+                }
 
-            ACTION_STOP -> stopProxy()
-            ACTION_RESTART -> {
-                val subscriptionId = intent.getStringExtra(ProxyServiceController.EXTRA_SUBSCRIPTION_ID)
-                restartProxy(subscriptionId)
+                ACTION_STOP -> stopProxy(startId)
+                ACTION_RESTART -> {
+                    val subscriptionId = intent.getStringExtra(ProxyServiceController.EXTRA_SUBSCRIPTION_ID)
+                    val onlyIfAlive = intent.getBooleanExtra(EXTRA_ONLY_IF_ALIVE, false)
+                    restartProxy(subscriptionId, onlyIfAlive, startId)
+                }
+
+                else -> {
+                    val absorbed = synchronized(opLock) {
+                        val existing = activeOp?.takeIf { !it.closed && it.job?.isActive == true }
+                        if (existing != null) {
+                            existing.stopStartId = startId
+                            true
+                        } else {
+                            false
+                        }
+                    }
+                    if (!absorbed && ProxyServiceBridge.state.value.state != ProxyState.Running) {
+                        // START_STICKY 重拉（intent == null）或未知 action 且无活跃任务/运行态，及时收尾避免挂空前台
+                        if (stopSelfResult(startId)) {
+                            stopForeground(STOP_FOREGROUND_REMOVE)
+                        }
+                    }
+                }
             }
+        } finally {
+            TransitionWakeLock.releaseHandoff(intent)
         }
         return START_STICKY
     }
@@ -184,145 +239,210 @@ class MishkaRootService : Service() {
         mode == TunMode.RootTun || mode == TunMode.RootTproxy
 
     /**
-     * 启动代理。**幂等**：已有启动协程在跑时忽略本次请求。唯一例外是 fresh START 抢占
-     * 进行中的 attach-only——后者失败只保持停止，而 fresh 请求要求「必须跑起来」。
+     * 启动代理。**幂等**：已有启动/重启协程在跑时忽略本次请求。例外：① fresh START 抢占
+     * 进行中的 attach-only（后者失败只保持停止，fresh 请求要求「必须跑起来」）；② fresh START
+     * 接在正在执行的 STOP 后，等其清理收敛再拉起。
      */
-    private fun startProxy(subscriptionId: String? = null, attachOnly: Boolean = false) {
-        val inFlight = startJob?.takeIf { it.isActive }
-        if (inFlight != null) {
-            if (attachOnly || !startJobAttachOnly) {
-                Log.i(TAG, "Start in progress, ignoring duplicate START (attachOnly=$attachOnly)")
-                return
+    private fun startProxy(
+        subscriptionId: String? = null,
+        attachOnly: Boolean = false,
+        startId: Int = 0,
+    ) {
+        val op = ActiveOp(kind = OpKind.Start, attachOnly = attachOnly, initialStartId = startId)
+        val inFlightOp = synchronized(opLock) {
+            val existing = activeOp?.takeIf { !it.closed && it.job?.isActive == true }
+            if (existing != null) {
+                val absorb = when (existing.kind) {
+                    OpKind.Start -> attachOnly || !existing.attachOnly
+                    OpKind.Restart -> attachOnly || !existing.onlyIfAlive
+                    OpKind.Stop -> attachOnly
+                }
+                if (absorb) {
+                    existing.stopStartId = startId
+                    Log.i(TAG, "${existing.kind} in progress, ignoring START (attachOnly=$attachOnly)")
+                    return
+                }
             }
-            Log.i(TAG, "Fresh START supersedes in-flight attach-only start")
-            inFlight.cancel()
+            activeOp = op
+            existing
         }
-        startJobAttachOnly = attachOnly
-        startJob = scope.launch {
-            // 抢占时等被取消者收敛，避免两条协程同时跑 iptables
-            inFlight?.join()
-            val submode = currentSubmode
-            val tunMode = submode.tunMode
-            Log.i(TAG, "Starting proxy (ROOT $submode), subscription: $subscriptionId, attachOnly=$attachOnly")
-            // 防御外部直拉 Service：无 config 时 mihomo 启动失败且 root 写的日志难以定位
-            if (!ProfileFileOps.hasValidConfig(this@MishkaRootService, subscriptionId)) {
-                Log.e(TAG, "No valid subscription config (id=$subscriptionId), aborting start")
-                ProxyServiceBridge.updateState(
-                    ProxyServiceStatus(
-                        ProxyState.Error,
-                        errorMessage = getString(R.string.error_no_active_profile),
-                        tunMode = tunMode,
-                    )
+        val inFlightJob = inFlightOp?.job
+        if (inFlightOp != null) {
+            Log.i(TAG, "Fresh START supersedes in-flight ${inFlightOp.kind}")
+            inFlightJob?.cancel()
+        }
+        val submode = currentSubmode
+        val serial = createdSerial
+        val wakeLock = TransitionWakeLock.acquire(
+            this,
+            WAKELOCK_TAG_START,
+            TransitionWakeLock.SERVICE_START_TIMEOUT_MS,
+        )
+        val job = scope.launch {
+            try {
+                // 抢占时等被取消者收敛，避免两条协程同时跑 iptables
+                inFlightJob?.join()
+                if (!isCurrentInstance(serial)) return@launch
+                runStartProxy(
+                    subscriptionId = subscriptionId,
+                    submode = submode,
+                    attachOnly = attachOnly,
+                    op = op,
+                    alreadyCleaned = false,
                 )
-                stopSelf()
-                return@launch
-            }
-            ProxyServiceBridge.updateState(ProxyServiceStatus(ProxyState.Starting, tunMode = tunMode))
-
-            val storage = PlatformStorage(this@MishkaRootService)
-            val tetherModeRequested = storage.getString(
-                StorageKeys.ROOT_TETHER_MODE,
-                RootTetherHijacker.Mode.BYPASS.storageValue,
-            )
-            val tetherModeActive = storage.getString(StorageKeys.ROOT_TETHER_MODE_ACTIVE, "")
-            val submodeActive = storage.getString(StorageKeys.ROOT_SUBMODE_ACTIVE, "")
-
-            // 1. 尝试重连已有的 mihomo 进程（app 被杀后 root 进程仍存活）
-            val existingPid = storage.getString(StorageKeys.ROOT_MIHOMO_PID, "").toIntOrNull() ?: -1
-            val existingSecret = storage.getString(StorageKeys.ROOT_MIHOMO_SECRET, "")
-            val existingSubscriptionId = storage.getString(StorageKeys.ROOT_ACTIVE_SUBSCRIPTION_ID, "").ifEmpty { null }
-            // 请求的订阅与运行中的不一致时拒绝重连，走全新启动加载新 config
-            val subscriptionMismatch = existingPid > 0 && subscriptionId != existingSubscriptionId
-            // 用户在 app 被杀期间改过 tether mode：运行中的 mihomo 的 tproxy-port 配置已锁死，
-            // 再 attach 上去 hijacker 规则会与 mihomo 实际监听状态错位（PROXY 的 TPROXY 规则
-            // 指向不存在的端口 / BYPASS 下无效的 tproxy 进程）→ 拒绝 attach，走全新启动
-            val tetherModeMismatch = existingPid > 0 &&
-                    tetherModeActive.isNotEmpty() &&
-                    tetherModeActive != tetherModeRequested
-            // 用户在 app 被杀期间改过 submode（TUN ↔ TPROXY）：mihomo 启动参数和 iptables
-            // 规则集差异巨大，无法 attach，必须 fresh restart
-            val submodeMismatch = existingPid > 0 &&
-                    submodeActive.isNotEmpty() &&
-                    submodeActive != submode.storageValue
-            if (subscriptionMismatch) {
-                Log.i(
-                    TAG,
-                    "Existing process pid=$existingPid runs subscription=$existingSubscriptionId, requested=$subscriptionId, restarting"
-                )
-            }
-            if (tetherModeMismatch) {
-                Log.i(
-                    TAG,
-                    "Tether mode changed while app was killed (active=$tetherModeActive, requested=$tetherModeRequested), restarting"
-                )
-            }
-            if (submodeMismatch) {
-                Log.i(TAG, "Submode changed while app was killed (active=$submodeActive, requested=${submode.storageValue}), restarting")
-            }
-            if (existingPid > 0 && existingSecret.isNotEmpty() && !subscriptionMismatch && !tetherModeMismatch && !submodeMismatch) {
-                val ec = overrideStore.load().resolveExternalController()
-                if (runner.attachToExisting(existingPid, existingSecret, ec, subscriptionId)) {
-                    val existingStartTime =
-                        storage.getString(StorageKeys.ROOT_START_TIME, "").toLongOrNull() ?: Clock.System.now().toEpochMilliseconds()
-                    Log.i(TAG, "Reconnected to existing mihomo: pid=$existingPid submode=${submode.storageValue}")
-                    val activeMode = RootTetherHijacker.Mode.from(tetherModeActive.ifEmpty { tetherModeRequested })
-                    val tproxySupported = submode == Submode.Tun && activeMode == RootTetherHijacker.Mode.PROXY &&
-                            RootTetherHijacker.probeTproxySupport()
-                    if (!applyRootRules(storage, submode, tproxySupported, attach = true)) return@launch
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.e(TAG, "Unexpected error in ROOT startProxy", e)
+                withContext(NonCancellable) {
+                    runner.stop()
+                    runCatching { teardownAllRootRules() }
+                }
+                if (!destroyed && isCurrentInstance(serial)) {
                     ProxyServiceBridge.updateState(
                         ProxyServiceStatus(
-                            ProxyState.Running,
-                            secret = existingSecret,
-                            externalController = ec,
-                            tunMode = tunMode,
-                            startTime = existingStartTime,
-                            mihomoPid = runner.pid
+                            ProxyState.Error,
+                            errorMessage = getString(R.string.error_generic_start_failed, e.describe()),
+                            tunMode = submode.tunMode,
                         )
                     )
-                    dynamicNotification.startOrFallbackStatic(storage, tunMode)
-                    storage.putString(StorageKeys.SERVICE_WAS_RUNNING, "true")
-                    // 重连到活着的 mihomo：它仍在 runtime/{uuid}/ 下跑，监控日志从同一目录读。
-                    // 代次取重连当下的值；之后的 prepare 会递增，这次监控就不能再删沙箱。
-                    if (subscriptionId != null) bindRuntimeEpoch(RootRuntimeCache.epochOf(subscriptionId))
-                    val workDir = if (subscriptionId != null) ProfileFileOps.getRuntimeDir(
-                        this@MishkaRootService,
-                        subscriptionId
-                    ) else ConfigGenerator.getWorkDir(this@MishkaRootService)
-                    startProcessMonitor(workDir, subscriptionId)
-                    return@launch
+                    stopServiceQuietly(op)
                 }
-                Log.i(TAG, "Existing process pid=$existingPid failed attach verification, cleaning up")
-                clearPersistedState(storage)
             }
+        }
+        op.job = job
+        job.invokeOnCompletion { wakeLock.releaseQuietly() }
+    }
 
-            // attach-only 请求（app reopen 触发的重连）：没有活着的进程可重连时，
-            // 绝不回退到全新启动——用户未主动请求启动，只是打开了 app。清状态、置 Stopped 后退出。
-            // 设备重启 / 进程崩溃后打开 app 会走到这里，避免"未开自动重启却自动跑起来"。
-            if (attachOnly) {
-                // 阻塞的进程/API 探测不会响应 cancel；先让位，避免 stopSelf 杀掉接替的启动。
-                if (!isActive) {
-                    Log.i(TAG, "Attach-only start superseded, leaving state to the new start")
-                    return@launch
-                }
-                Log.i(TAG, "Attach-only reopen: no live mihomo to reconnect, staying stopped")
-                RootHelper.cleanupOrphanedMihomo(
-                    tunDevice = storage.getString(StorageKeys.ROOT_TUN_DEVICE, RuntimeOverrideBuilder.DEFAULT_TUN_DEVICE)
+    private suspend fun runStartProxy(
+        subscriptionId: String?,
+        submode: Submode,
+        attachOnly: Boolean,
+        op: ActiveOp,
+        alreadyCleaned: Boolean,
+    ) {
+        val tunMode = submode.tunMode
+        Log.i(TAG, "Starting proxy (ROOT $submode), subscription: $subscriptionId, attachOnly=$attachOnly")
+        // 防御外部直拉 Service：无 config 时 mihomo 启动失败且 root 写的日志难以定位
+        if (!ProfileFileOps.hasValidConfig(this@MishkaRootService, subscriptionId)) {
+            Log.e(TAG, "No valid subscription config (id=$subscriptionId), aborting start")
+            ProxyServiceBridge.updateState(
+                ProxyServiceStatus(
+                    ProxyState.Error,
+                    errorMessage = getString(R.string.error_no_active_profile),
+                    tunMode = tunMode,
                 )
-                if (!teardownRootRulesOrReport(tunMode)) return@launch
-                currentCoroutineContext().ensureActive()
-                clearPersistedState(storage)
-                storage.putString(StorageKeys.SERVICE_WAS_RUNNING, "false")
-                ProxyServiceBridge.markStopped(tunMode)
-                stopForeground(STOP_FOREGROUND_REMOVE)
-                stopSelf()
-                return@launch
-            }
+            )
+            stopServiceQuietly(op)
+            return
+        }
+        ProxyServiceBridge.updateState(ProxyServiceStatus(ProxyState.Starting, tunMode = tunMode))
 
-            // 2. 清理残留进程（上次的进程已失效，确保干净启动）
-            // 先停自身 runner（Service 实例被复用时可能仍持有旧状态），再 pkill 孤儿进程
-            // 同时清理 TUN 接口防止下次启动 sing-tun EEXIST（silent failure 源头）
-            // 监控若已离开 delay()，cancel 打断不了读日志，更停不掉已进入 NonCancellable 的回写。
-            // 等它收敛后再 prepare，避免它随后 rm -rf 掉新沙箱，或 stopSelf 掉这次启动。
+        val storage = PlatformStorage(this@MishkaRootService)
+        val tetherModeRequested = storage.getString(
+            StorageKeys.ROOT_TETHER_MODE,
+            RootTetherHijacker.Mode.BYPASS.storageValue,
+        )
+        val tetherModeActive = storage.getString(StorageKeys.ROOT_TETHER_MODE_ACTIVE, "")
+        val submodeActive = storage.getString(StorageKeys.ROOT_SUBMODE_ACTIVE, "")
+
+        // 1. 尝试重连已有的 mihomo 进程（app 被杀后 root 进程仍存活）
+        val existingPid = storage.getString(StorageKeys.ROOT_MIHOMO_PID, "").toIntOrNull() ?: -1
+        val existingSecret = storage.getString(StorageKeys.ROOT_MIHOMO_SECRET, "")
+        val existingSubscriptionId = storage.getString(StorageKeys.ROOT_ACTIVE_SUBSCRIPTION_ID, "").ifEmpty { null }
+        // 请求的订阅与运行中的不一致时拒绝重连，走全新启动加载新 config
+        val subscriptionMismatch = existingPid > 0 && subscriptionId != existingSubscriptionId
+        // 用户在 app 被杀期间改过 tether mode：运行中的 mihomo 的 tproxy-port 配置已锁死，
+        // 再 attach 上去 hijacker 规则会与 mihomo 实际监听状态错位（PROXY 的 TPROXY 规则
+        // 指向不存在的端口 / BYPASS 下无效的 tproxy 进程）→ 拒绝 attach，走全新启动
+        val tetherModeMismatch = existingPid > 0 &&
+                tetherModeActive.isNotEmpty() &&
+                tetherModeActive != tetherModeRequested
+        // 用户在 app 被杀期间改过 submode（TUN ↔ TPROXY）：mihomo 启动参数和 iptables
+        // 规则集差异巨大，无法 attach，必须 fresh restart
+        val submodeMismatch = existingPid > 0 &&
+                submodeActive.isNotEmpty() &&
+                submodeActive != submode.storageValue
+        if (subscriptionMismatch) {
+            Log.i(
+                TAG,
+                "Existing process pid=$existingPid runs subscription=$existingSubscriptionId, requested=$subscriptionId, restarting"
+            )
+        }
+        if (tetherModeMismatch) {
+            Log.i(
+                TAG,
+                "Tether mode changed while app was killed (active=$tetherModeActive, requested=$tetherModeRequested), restarting"
+            )
+        }
+        if (submodeMismatch) {
+            Log.i(TAG, "Submode changed while app was killed (active=$submodeActive, requested=${submode.storageValue}), restarting")
+        }
+        if (existingPid > 0 && existingSecret.isNotEmpty() && !subscriptionMismatch && !tetherModeMismatch && !submodeMismatch) {
+            val ec = overrideStore.load().resolveExternalController()
+            if (runner.attachToExisting(existingPid, existingSecret, ec, subscriptionId)) {
+                op.confirmedAlive = true
+                val existingStartTime =
+                    storage.getString(StorageKeys.ROOT_START_TIME, "").toLongOrNull() ?: Clock.System.now().toEpochMilliseconds()
+                Log.i(TAG, "Reconnected to existing mihomo: pid=$existingPid submode=${submode.storageValue}")
+                val activeMode = RootTetherHijacker.Mode.from(tetherModeActive.ifEmpty { tetherModeRequested })
+                val tproxySupported = submode == Submode.Tun && activeMode == RootTetherHijacker.Mode.PROXY &&
+                        RootTetherHijacker.probeTproxySupport()
+                if (!applyRootRules(storage, submode, tproxySupported, attach = true, op = op)) return
+                ProxyServiceBridge.updateState(
+                    ProxyServiceStatus(
+                        ProxyState.Running,
+                        secret = existingSecret,
+                        externalController = ec,
+                        tunMode = tunMode,
+                        startTime = existingStartTime,
+                        mihomoPid = runner.pid
+                    )
+                )
+                dynamicNotification.startOrFallbackStatic(storage, tunMode)
+                storage.putString(StorageKeys.SERVICE_WAS_RUNNING, "true")
+                // 重连到活着的 mihomo：它仍在 runtime/{uuid}/ 下跑，监控日志从同一目录读。
+                // 代次取重连当下的值；之后的 prepare 会递增，这次监控就不能再删沙箱。
+                if (subscriptionId != null) bindRuntimeEpoch(RootRuntimeCache.epochOf(subscriptionId))
+                val workDir = if (subscriptionId != null) ProfileFileOps.getRuntimeDir(
+                    this@MishkaRootService,
+                    subscriptionId
+                ) else ConfigGenerator.getWorkDir(this@MishkaRootService)
+                startProcessMonitor(workDir, subscriptionId)
+                return
+            }
+            Log.i(TAG, "Existing process pid=$existingPid failed attach verification, cleaning up")
+            clearPersistedState(storage)
+        }
+
+        // attach-only 请求（app reopen 触发的重连）：没有活着的进程可重连时，
+        // 绝不回退到全新启动——用户未主动请求启动，只是打开了 app。清状态、置 Stopped 后退出。
+        // 设备重启 / 进程崩溃后打开 app 会走到这里，避免"未开自动重启却自动跑起来"。
+        if (attachOnly) {
+            // 阻塞的进程/API 探测不会响应 cancel；先让位，避免 stopSelf 杀掉接替的启动。
+            if (!currentCoroutineContext().isActive) {
+                Log.i(TAG, "Attach-only start superseded, leaving state to the new start")
+                return
+            }
+            Log.i(TAG, "Attach-only reopen: no live mihomo to reconnect, staying stopped")
+            RootHelper.cleanupOrphanedMihomo(
+                tunDevice = storage.getString(StorageKeys.ROOT_TUN_DEVICE, RuntimeOverrideBuilder.DEFAULT_TUN_DEVICE)
+            )
+            if (!teardownRootRulesOrReport(tunMode, op)) return
+            currentCoroutineContext().ensureActive()
+            clearPersistedState(storage)
+            storage.putString(StorageKeys.SERVICE_WAS_RUNNING, "false")
+            ProxyServiceBridge.markStopped(tunMode)
+            stopServiceQuietly(op)
+            return
+        }
+
+        // 2. 清理残留进程（上次的进程已失效，确保干净启动）
+        // 先停自身 runner（Service 实例被复用时可能仍持有旧状态），再 pkill 孤儿进程
+        // 同时清理 TUN 接口防止下次启动 sing-tun EEXIST（silent failure 源头）
+        // 监控若已离开 delay()，cancel 打断不了读日志，更停不掉已进入 NonCancellable 的回写。
+        // 等它收敛后再 prepare，避免它随后 rm -rf 掉新沙箱，或 stopSelf 掉这次启动。
+        if (!alreadyCleaned) {
             joinSuperseded(supersedeMonitor())
             if (runner.isRunning) {
                 runner.stop()
@@ -330,86 +450,47 @@ class MishkaRootService : Service() {
             val currentTun = storage.getString(StorageKeys.ROOT_TUN_DEVICE, RuntimeOverrideBuilder.DEFAULT_TUN_DEVICE)
             RootHelper.cleanupOrphanedMihomo(tunDevice = currentTun)
             // 启动前把上一次残留的 iptables 规则（另一个 submode 可能还没清干净）彻底擦一遍
-            if (!teardownRootRulesOrReport(tunMode)) return@launch
-            // 上次停机若没来得及回写，这里补一次；进程已在上面杀掉
-            RootRuntimeCache.releaseAll(this@MishkaRootService, subscriptionRepository)
+            if (!teardownRootRulesOrReport(tunMode, op)) return
+        }
+        // 上次停机若没来得及回写，这里补一次；runtime/ 为空时不取锁也不 fork su
+        RootRuntimeCache.releaseAll(this@MishkaRootService, subscriptionRepository)
 
-            // 3. 检查 ROOT 权限
-            if (!RootHelper.hasRootAccess()) {
-                Log.e(TAG, "Failed to obtain root access")
+        // 3. 检查 ROOT 权限
+        if (!RootHelper.hasRootAccess()) {
+            Log.e(TAG, "Failed to obtain root access")
+            ProxyServiceBridge.updateState(
+                ProxyServiceStatus(ProxyState.Error, errorMessage = getString(R.string.error_root_failed), tunMode = tunMode)
+            )
+            stopServiceQuietly(op)
+            return
+        }
+
+        // 3.3 TPROXY submode 需要内核支持 xt_TPROXY；不具备时直接失败，不做静默降级
+        if (submode == Submode.Tproxy) {
+            if (!RootTproxyApplier.probeTproxySupport()) {
+                storage.putString(StorageKeys.ROOT_TPROXY_KERNEL_CAPABLE, "false")
+                Log.e(TAG, "xt_TPROXY unsupported, cannot start ROOT TPROXY mode")
                 ProxyServiceBridge.updateState(
-                    ProxyServiceStatus(ProxyState.Error, errorMessage = getString(R.string.error_root_failed), tunMode = tunMode)
+                    ProxyServiceStatus(ProxyState.Error, errorMessage = getString(R.string.error_tproxy_unsupported), tunMode = tunMode)
                 )
-                stopSelf()
-                return@launch
+                stopServiceQuietly(op)
+                return
             }
+            storage.putString(StorageKeys.ROOT_TPROXY_KERNEL_CAPABLE, "true")
+        }
 
-            // 3.3 TPROXY submode 需要内核支持 xt_TPROXY；不具备时直接失败，不做静默降级
-            if (submode == Submode.Tproxy) {
-                if (!RootTproxyApplier.probeTproxySupport()) {
-                    storage.putString(StorageKeys.ROOT_TPROXY_KERNEL_CAPABLE, "false")
-                    Log.e(TAG, "xt_TPROXY unsupported, cannot start ROOT TPROXY mode")
-                    ProxyServiceBridge.updateState(
-                        ProxyServiceStatus(ProxyState.Error, errorMessage = getString(R.string.error_tproxy_unsupported), tunMode = tunMode)
-                    )
-                    stopSelf()
-                    return@launch
-                }
-                storage.putString(StorageKeys.ROOT_TPROXY_KERNEL_CAPABLE, "true")
-            }
-
-            // 3.5 准备 runtime/{uuid}/ 沙箱：从 imported/{uuid}/ 复制，mihomo 在此以 root 写入
-            //     不污染 imported/，保证更新/删除始终在 app UID 下工作
-            if (subscriptionId != null) {
-                try {
-                    val epoch = RootRuntimeCache.prepare(this@MishkaRootService, subscriptionId)
-                    bindRuntimeEpoch(epoch)
-                    preparedRuntime = PreparedRuntime(coroutineContext.job, subscriptionId, epoch)
-                } catch (e: CancellationException) {
-                    // 停止抢占了启动。吞掉会发布 Error 并 stopSelf，用户点停止却看到「启动失败」
-                    throw e
-                } catch (e: Exception) {
-                    Log.e(TAG, "Failed to prepare runtime sandbox", e)
-                    ProxyServiceBridge.updateState(
-                        ProxyServiceStatus(
-                            ProxyState.Error,
-                            errorMessage = getString(R.string.error_generic_start_failed, e.message ?: e.javaClass.simpleName),
-                            tunMode = tunMode,
-                        )
-                    )
-                    stopSelf()
-                    return@launch
-                }
-            }
-
-            // 4. 装配 override.run.json
-            // secret / extCtl 走 CLI flag 不进 JSON
-            val userOverride = overrideStore.load()
-            val secret = ConfigGenerator.resolveSecret(this@MishkaRootService, userOverride, subscriptionId)
-            val extCtl = userOverride.resolveExternalController()
-            // 仅 TUN submode 且用户选 PROXY 时才探测 xt_TPROXY 为 RootTetherHijacker 开 tproxy-port 入站；
-            // 探测结果同步写入 StorageKeys.ROOT_TPROXY_KERNEL_CAPABLE，UI 据此决定是否显示降级告警
-            val userWantsProxy = submode == Submode.Tun &&
-                    tetherModeRequested == RootTetherHijacker.Mode.PROXY.storageValue
-            val tproxyForTether = if (userWantsProxy) {
-                val supported = RootTetherHijacker.probeTproxySupport()
-                if (!supported) Log.w(TAG, "xt_TPROXY unavailable, PROXY degraded to userspace TUN")
-                storage.putString(StorageKeys.ROOT_TPROXY_KERNEL_CAPABLE, if (supported) "true" else "false")
-                supported
-            } else {
-                // 非 PROXY 路径不显示 TPROXY 告警；但 TPROXY submode 前面已写入探测结果，别清掉
-                if (submode == Submode.Tun) {
-                    storage.putString(StorageKeys.ROOT_TPROXY_KERNEL_CAPABLE, "")
-                }
-                false
-            }
-            val viaProxy = storage.getString(StorageKeys.SUBSCRIPTION_UPDATE_VIA_PROXY, "true") == "true"
-            val transformPlan = try {
-                prepareRuntimeTransform(this@MishkaRootService, subscriptionId, subscriptionRepository, transformWriter)
+        // 3.5 准备 runtime/{uuid}/ 沙箱：从 imported/{uuid}/ 复制，mihomo 在此以 root 写入
+        //     不污染 imported/，保证更新/删除始终在 app UID 下工作
+        if (subscriptionId != null) {
+            try {
+                val epoch = RootRuntimeCache.prepare(this@MishkaRootService, subscriptionId)
+                bindRuntimeEpoch(epoch)
+                preparedRuntime = PreparedRuntime(currentCoroutineContext().job, subscriptionId, epoch)
             } catch (e: CancellationException) {
+                // 停止抢占了启动。吞掉会发布 Error 并 stopSelf，用户点停止却看到「启动失败」
                 throw e
             } catch (e: Exception) {
-                Log.e(TAG, "Failed to prepare subscription transform", e)
+                Log.e(TAG, "Failed to prepare runtime sandbox", e)
                 ProxyServiceBridge.updateState(
                     ProxyServiceStatus(
                         ProxyState.Error,
@@ -417,86 +498,125 @@ class MishkaRootService : Service() {
                         tunMode = tunMode,
                     )
                 )
-                stopSelf()
-                return@launch
+                stopServiceQuietly(op)
+                return
             }
-            val overrideFile = RuntimeOverrideBuilder.buildAndWriteForRun(
-                context = this@MishkaRootService,
-                userOverride = userOverride,
-                tunFd = -1,
-                tunMode = submode.tunMode,
-                subscriptionUpdateViaProxy = viaProxy,
-                subscriptionMixedPort = transformPlan.mixedPort,
-                tproxyForTether = tproxyForTether,
-            )
-            try {
-                RootDnsApplier.prepare(rootTetherInterfaces(storage))
-            } catch (e: CancellationException) {
-                withContext(NonCancellable) { teardownAllRootRules() }
-                throw e
-            } catch (e: Exception) {
-                failRootRouting(storage, tunMode, e)
-                return@launch
+        }
+
+        // 4. 装配 override.run.json
+        // secret / extCtl 走 CLI flag 不进 JSON
+        val userOverride = overrideStore.load()
+        val secret = ConfigGenerator.resolveSecret(this@MishkaRootService, userOverride, subscriptionId)
+        val extCtl = userOverride.resolveExternalController()
+        // 仅 TUN submode 且用户选 PROXY 时才探测 xt_TPROXY 为 RootTetherHijacker 开 tproxy-port 入站；
+        // 探测结果同步写入 StorageKeys.ROOT_TPROXY_KERNEL_CAPABLE，UI 据此决定是否显示降级告警
+        val userWantsProxy = submode == Submode.Tun &&
+                tetherModeRequested == RootTetherHijacker.Mode.PROXY.storageValue
+        val tproxyForTether = if (userWantsProxy) {
+            val supported = RootTetherHijacker.probeTproxySupport()
+            if (!supported) Log.w(TAG, "xt_TPROXY unavailable, PROXY degraded to userspace TUN")
+            storage.putString(StorageKeys.ROOT_TPROXY_KERNEL_CAPABLE, if (supported) "true" else "false")
+            supported
+        } else {
+            // 非 PROXY 路径不显示 TPROXY 告警；但 TPROXY submode 前面已写入探测结果，别清掉
+            if (submode == Submode.Tun) {
+                storage.putString(StorageKeys.ROOT_TPROXY_KERNEL_CAPABLE, "")
             }
-
-            // 5. 以 root 启动 mihomo
-            // 端口必须在启动前选定并持久化；attach 时复用它，否则新进程会选到另一个端口，
-            // 规则 DNAT 到无人监听的端口。
-            val rootDnsPort = RootDnsApplier.allocatePort()
-            storage.putString(StorageKeys.ROOT_DNS_PORT, rootDnsPort.toString())
-            // age 加密订阅：runtime/ 保持密文，密钥与覆写选择来自同一份 imported DB 快照。
-            val success = runner.start(
-                subscriptionId = subscriptionId,
-                useRoot = true,
-                overrideJsonPath = overrideFile.absolutePath,
-                secret = secret,
-                externalController = extCtl,
-                ageSecretKey = transformPlan.ageSecretKey,
-                transformPath = transformPlan.transformPath,
-                preferTransformMixedPort = transformPlan.transformPath != null && viaProxy && userOverride.mixedPort == null,
-                rootDnsPort = rootDnsPort,
-            )
-            if (!success) {
-                if (!teardownRootRulesOrReport(tunMode)) return@launch
-                val errorMsg = runner.errorMessage.ifBlank { getString(R.string.error_start_failed) }
-                Log.e(TAG, "Failed to start mihomo (ROOT): $errorMsg")
-                ProxyServiceBridge.updateState(
-                    ProxyServiceStatus(ProxyState.Error, errorMessage = errorMsg, tunMode = tunMode)
-                )
-                stopSelf()
-                return@launch
-            }
-
-            // 6. 持久化 PID、secret、启动时间、订阅 ID（用于 app 重启后重连 + 订阅一致性校验）
-            val startTime = Clock.System.now().toEpochMilliseconds()
-            persistState(storage, runner.secret, startTime, subscriptionId)
-            // 保存本次启动时生效的 tether mode / submode 快照；attach 路径据此判断用户是否改过设置
-            storage.putString(StorageKeys.ROOT_TETHER_MODE_ACTIVE, tetherModeRequested)
-            storage.putString(StorageKeys.ROOT_SUBMODE_ACTIVE, submode.storageValue)
-
-            if (!applyRootRules(storage, submode, tproxyForTether, attach = false)) return@launch
-
-            // 7. 更新状态和通知
+            false
+        }
+        val viaProxy = storage.getString(StorageKeys.SUBSCRIPTION_UPDATE_VIA_PROXY, "true") == "true"
+        val transformPlan = try {
+            prepareRuntimeTransform(this@MishkaRootService, subscriptionId, subscriptionRepository, transformWriter)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to prepare subscription transform", e)
             ProxyServiceBridge.updateState(
                 ProxyServiceStatus(
-                    ProxyState.Running,
-                    secret = runner.secret,
-                    externalController = extCtl,
+                    ProxyState.Error,
+                    errorMessage = getString(R.string.error_generic_start_failed, e.message ?: e.javaClass.simpleName),
                     tunMode = tunMode,
-                    startTime = startTime,
-                    mihomoPid = runner.pid
                 )
             )
-            dynamicNotification.startOrFallbackStatic(storage, tunMode)
-            storage.putString(StorageKeys.SERVICE_WAS_RUNNING, "true")
-            Log.i(TAG, "Proxy running (ROOT $submode)")
-
-            val workDir = if (subscriptionId != null) ProfileFileOps.getRuntimeDir(
-                this@MishkaRootService,
-                subscriptionId
-            ) else ConfigGenerator.getWorkDir(this@MishkaRootService)
-            startProcessMonitor(workDir, subscriptionId)
+            stopServiceQuietly(op)
+            return
         }
+        val overrideFile = RuntimeOverrideBuilder.buildAndWriteForRun(
+            context = this@MishkaRootService,
+            userOverride = userOverride,
+            tunFd = -1,
+            tunMode = submode.tunMode,
+            subscriptionUpdateViaProxy = viaProxy,
+            subscriptionMixedPort = transformPlan.mixedPort,
+            tproxyForTether = tproxyForTether,
+        )
+        try {
+            RootDnsApplier.prepare(rootTetherInterfaces(storage))
+        } catch (e: CancellationException) {
+            withContext(NonCancellable) { teardownAllRootRules() }
+            throw e
+        } catch (e: Exception) {
+            failRootRouting(storage, tunMode, e, op)
+            return
+        }
+
+        // 5. 以 root 启动 mihomo
+        // 端口必须在启动前选定并持久化；attach 时复用它，否则新进程会选到另一个端口，
+        // 规则 DNAT 到无人监听的端口。
+        val rootDnsPort = RootDnsApplier.allocatePort()
+        storage.putString(StorageKeys.ROOT_DNS_PORT, rootDnsPort.toString())
+        // age 加密订阅：runtime/ 保持密文，密钥与覆写选择来自同一份 imported DB 快照。
+        val success = runner.start(
+            subscriptionId = subscriptionId,
+            useRoot = true,
+            overrideJsonPath = overrideFile.absolutePath,
+            secret = secret,
+            externalController = extCtl,
+            ageSecretKey = transformPlan.ageSecretKey,
+            transformPath = transformPlan.transformPath,
+            preferTransformMixedPort = transformPlan.transformPath != null && viaProxy && userOverride.mixedPort == null,
+            rootDnsPort = rootDnsPort,
+        )
+        if (!success) {
+            if (!teardownRootRulesOrReport(tunMode, op)) return
+            val errorMsg = runner.errorMessage.ifBlank { getString(R.string.error_start_failed) }
+            Log.e(TAG, "Failed to start mihomo (ROOT): $errorMsg")
+            ProxyServiceBridge.updateState(
+                ProxyServiceStatus(ProxyState.Error, errorMessage = errorMsg, tunMode = tunMode)
+            )
+            stopServiceQuietly(op)
+            return
+        }
+
+        // 6. 持久化 PID、secret、启动时间、订阅 ID（用于 app 重启后重连 + 订阅一致性校验）
+        val startTime = Clock.System.now().toEpochMilliseconds()
+        persistState(storage, runner.secret, startTime, subscriptionId)
+        // 保存本次启动时生效的 tether mode / submode 快照；attach 路径据此判断用户是否改过设置
+        storage.putString(StorageKeys.ROOT_TETHER_MODE_ACTIVE, tetherModeRequested)
+        storage.putString(StorageKeys.ROOT_SUBMODE_ACTIVE, submode.storageValue)
+
+        if (!applyRootRules(storage, submode, tproxyForTether, attach = false, op = op)) return
+
+        // 7. 更新状态和通知
+        ProxyServiceBridge.updateState(
+            ProxyServiceStatus(
+                ProxyState.Running,
+                secret = runner.secret,
+                externalController = extCtl,
+                tunMode = tunMode,
+                startTime = startTime,
+                mihomoPid = runner.pid
+            )
+        )
+        dynamicNotification.startOrFallbackStatic(storage, tunMode)
+        storage.putString(StorageKeys.SERVICE_WAS_RUNNING, "true")
+        Log.i(TAG, "Proxy running (ROOT $submode)")
+
+        val workDir = if (subscriptionId != null) ProfileFileOps.getRuntimeDir(
+            this@MishkaRootService,
+            subscriptionId
+        ) else ConfigGenerator.getWorkDir(this@MishkaRootService)
+        startProcessMonitor(workDir, subscriptionId)
     }
 
     private suspend fun applyRootRules(
@@ -504,6 +624,7 @@ class MishkaRootService : Service() {
         submode: Submode,
         tproxyForTether: Boolean,
         attach: Boolean,
+        op: ActiveOp,
     ): Boolean {
         try {
             when (submode) {
@@ -531,7 +652,7 @@ class MishkaRootService : Service() {
             }
             throw e
         } catch (e: Exception) {
-            failRootRouting(storage, submode.tunMode, e)
+            failRootRouting(storage, submode.tunMode, e, op)
             return false
         }
     }
@@ -540,7 +661,7 @@ class MishkaRootService : Service() {
         storage.getString(StorageKeys.ROOT_TETHER_IFACES, RootTetherHijacker.DEFAULT_IFACES)
     )
 
-    private suspend fun failRootRouting(storage: PlatformStorage, tunMode: TunMode, error: Exception) {
+    private suspend fun failRootRouting(storage: PlatformStorage, tunMode: TunMode, error: Exception, op: ActiveOp) {
         Log.e(TAG, "Failed to install ROOT routing", error)
         withContext(NonCancellable) {
             runner.stop()
@@ -559,7 +680,7 @@ class MishkaRootService : Service() {
                     tunMode = tunMode,
                 )
             )
-            stopSelf()
+            stopServiceQuietly(op)
         }
     }
 
@@ -619,7 +740,7 @@ class MishkaRootService : Service() {
         }
     }
 
-    private suspend fun teardownRootRulesOrReport(tunMode: TunMode): Boolean {
+    private suspend fun teardownRootRulesOrReport(tunMode: TunMode, op: ActiveOp? = null): Boolean {
         try {
             teardownAllRootRules()
             return true
@@ -627,10 +748,12 @@ class MishkaRootService : Service() {
             throw e
         } catch (e: Exception) {
             Log.e(TAG, "ROOT routing cleanup failed", e)
-            ProxyServiceBridge.updateState(
-                ProxyServiceStatus(ProxyState.Error, errorMessage = e.describe(), tunMode = tunMode)
-            )
-            stopServiceQuietly()
+            if (currentCoroutineContext().isActive) {
+                ProxyServiceBridge.updateState(
+                    ProxyServiceStatus(ProxyState.Error, errorMessage = e.describe(), tunMode = tunMode)
+                )
+                stopServiceQuietly(op)
+            }
             return false
         }
     }
@@ -713,9 +836,24 @@ class MishkaRootService : Service() {
 
     private fun isCurrentInstance(serial: Int): Boolean = instanceSerial == serial
 
-    private fun stopServiceQuietly() {
+    private fun stopServiceQuietly(op: ActiveOp? = null) {
         if (destroyed) return
         try {
+            if (op != null) {
+                val startId = synchronized(opLock) {
+                    // 若本操作已被更新的操作取代或已关门，绝不能重复 stopSelf 或杀掉接替者
+                    if (activeOp !== op || op.closed) return
+                    op.closed = true
+                    op.stopStartId
+                }
+                if (startId > 0) {
+                    // 有尚未进入 onStartCommand 的更新 START/RESTART 时 stopSelfResult 返回 false，不撤前台
+                    if (stopSelfResult(startId)) {
+                        stopForeground(STOP_FOREGROUND_REMOVE)
+                    }
+                    return
+                }
+            }
             stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf()
         } catch (e: Exception) {
@@ -776,92 +914,202 @@ class MishkaRootService : Service() {
         RootTetherHijacker.apply(mode, ifaces, tproxySupported)
     }
 
-    private fun restartProxy(subscriptionId: String?) {
-        Log.i(TAG, "Restarting proxy (ROOT)...")
+    private fun restartProxy(subscriptionId: String?, onlyIfAlive: Boolean, startId: Int) {
+        Log.i(TAG, "Restarting proxy (ROOT, onlyIfAlive=$onlyIfAlive)...")
+        val submode = currentSubmode
+        val tunMode = submode.tunMode
+        val serial = createdSerial
+        val op = ActiveOp(kind = OpKind.Restart, onlyIfAlive = onlyIfAlive, initialStartId = startId)
+        val inFlightOp = synchronized(opLock) {
+            val existing = activeOp?.takeIf { !it.closed && it.job?.isActive == true }
+            activeOp = op
+            existing
+        }
+        val inFlightJob = inFlightOp?.job
+        inFlightJob?.cancel()
         val superseded = supersedeMonitor()
-        ProxyServiceBridge.updateState(ProxyServiceStatus(ProxyState.Stopping, tunMode = currentSubmode.tunMode))
-        dynamicNotification.stop()
         // 代次在 join 前记下。join 会等已进入 NonCancellable 的 release 跑完，不能改读它退休后的代次。
         val ownedEpoch = ownedRuntimeEpoch()
-        launchPostDeathCleanup(superseded, ownedEpoch, afterRelease = { storage ->
-            clearPersistedState(storage)
-            if (destroyed) {
-                storage.putString(StorageKeys.SERVICE_WAS_RUNNING, "false")
-                return@launchPostDeathCleanup
+        val wakeLock = TransitionWakeLock.acquire(
+            this,
+            WAKELOCK_TAG_RESTART,
+            TransitionWakeLock.SERVICE_START_TIMEOUT_MS,
+        )
+        val job = scope.launch {
+            try {
+                superseded.forEach { it.join() }
+                inFlightJob?.join()
+                if (!isCurrentInstance(serial)) return@launch
+                currentCoroutineContext().ensureActive()
+
+                // 在 join 之后再读 confirmedAlive：若被抢占的 attachOnly/onlyIfAlive 已确认过存活进程
+                // （即使随后在取消清理里把旧进程停掉），这里也必须继续完成重启而非误判为已死跳过。
+                val wasActiveOp = inFlightOp?.confirmedAlive == true
+                val storage = PlatformStorage(this@MishkaRootService)
+                val runningSubscriptionId = storage.getString(StorageKeys.ROOT_ACTIVE_SUBSCRIPTION_ID, "").ifEmpty { null }
+                val persistedPid = storage.getString(StorageKeys.ROOT_MIHOMO_PID, "").toIntOrNull()
+                val adopted = persistedPid?.let { runner.adoptForStop(it) } == true
+                val hadTrackedPid = runner.pid > 0
+
+                if (onlyIfAlive && !wasActiveOp && !adopted && !runner.isRunning) {
+                    Log.i(TAG, "Restart (onlyIfAlive) skipped: no live root mihomo found")
+                    if (!teardownRootRulesOrReport(tunMode, op)) return@launch
+                    // teardown 走 NonCancellable，取消后仍正常返回；收尾前必须复核活跃与实例归属
+                    if (!currentCoroutineContext().isActive || !isCurrentInstance(serial)) return@launch
+                    clearPersistedState(storage)
+                    storage.putString(StorageKeys.SERVICE_WAS_RUNNING, "false")
+                    if (!destroyed) {
+                        ProxyServiceBridge.markStopped(tunMode)
+                        stopServiceQuietly(op)
+                    }
+                    // 仅按 ownedEpoch 释放当前归属沙箱，绝不异步调用无代次校验的 releaseAll 误删新沙箱
+                    if (runningSubscriptionId != null) {
+                        cleanupScope.launch {
+                            RootRuntimeCache.release(
+                                this@MishkaRootService,
+                                runningSubscriptionId,
+                                subscriptionRepository,
+                                ownedEpoch,
+                            )
+                        }
+                    }
+                    return@launch
+                }
+                op.confirmedAlive = true
+
+                ProxyServiceBridge.updateState(ProxyServiceStatus(ProxyState.Stopping, tunMode = tunMode))
+                dynamicNotification.stop()
+
+                val prepared = preparedRuntime?.takeIf { inFlightJob != null && it.job === inFlightJob }
+                val targets = buildMap {
+                    runningSubscriptionId?.let { put(it, ownedEpoch) }
+                    prepared?.let { put(it.uuid, it.epoch) }
+                }
+
+                val confirmedDead = runner.stop()
+                if (!teardownRootRulesOrReport(tunMode, op)) return@launch
+                targets.forEach { (uuid, epoch) ->
+                    RootRuntimeCache.release(this@MishkaRootService, uuid, subscriptionRepository, epoch)
+                }
+                if (!currentCoroutineContext().isActive || !isCurrentInstance(serial)) return@launch
+                if (destroyed) {
+                    if (confirmedDead) {
+                        clearPersistedState(storage)
+                        storage.putString(StorageKeys.SERVICE_WAS_RUNNING, "false")
+                    }
+                    return@launch
+                }
+                clearPersistedState(storage)
+                // 已在串行 IO 协程内完成停机清理，直接进入启动，避免切回 Main Looper 受后台调度阻塞，
+                // 也跳过刚验证干净的重复 cleanupOrphanedMihomo 与二次 3×su teardown。
+                runStartProxy(
+                    subscriptionId = subscriptionId,
+                    submode = submode,
+                    attachOnly = false,
+                    op = op,
+                    alreadyCleaned = confirmedDead && hadTrackedPid,
+                )
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.e(TAG, "ROOT restart failed", e)
+                withContext(NonCancellable) {
+                    runner.stop()
+                    runCatching { teardownAllRootRules() }
+                }
+                if (!destroyed && isCurrentInstance(serial)) {
+                    ProxyServiceBridge.updateState(
+                        ProxyServiceStatus(
+                            ProxyState.Error,
+                            errorMessage = getString(R.string.error_generic_start_failed, e.describe()),
+                            tunMode = tunMode,
+                        )
+                    )
+                    stopServiceQuietly(op)
+                }
             }
-            withContext(Dispatchers.Main) {
-                startProxy(subscriptionId)
-            }
-        })
+        }
+        op.job = job
+        job.invokeOnCompletion { wakeLock.releaseQuietly() }
     }
 
-    private fun stopProxy() {
+    private fun stopProxy(startId: Int) {
         Log.i(TAG, "Stopping proxy (ROOT)...")
+        val tunMode = currentSubmode.tunMode
+        val serial = createdSerial
+        val op = ActiveOp(kind = OpKind.Stop, initialStartId = startId)
+        val inFlightOp = synchronized(opLock) {
+            val existing = activeOp?.takeIf { !it.closed && it.job?.isActive == true }
+            activeOp = op
+            existing
+        }
+        val inFlightJob = inFlightOp?.job
+        inFlightJob?.cancel()
         val superseded = supersedeMonitor()
-        ProxyServiceBridge.updateState(ProxyServiceStatus(ProxyState.Stopping, tunMode = currentSubmode.tunMode))
+        ProxyServiceBridge.updateState(ProxyServiceStatus(ProxyState.Stopping, tunMode = tunMode))
         dynamicNotification.stop()
         val ownedEpoch = ownedRuntimeEpoch()
-        // mihomo 已死、规则已撤就算停完。回写要等 processLock，订阅下载可能占它几分钟，
-        // 「停止中」不能陪着等；回写没做完进程就被回收的话，下一次启动的 releaseAll 会补上。
-        launchPostDeathCleanup(superseded, ownedEpoch, beforeRelease = { storage, confirmedDead ->
-            // 没确认杀掉就保留 PID/secret 与 was-running 标记：清掉之后残留进程再也定位不到，
-            // 下次 TOGGLE 还会把「有进程在跑」误判成「没在跑」而去启一个新的
-            if (confirmedDead) {
-                clearPersistedState(storage)
-                storage.putString(StorageKeys.SERVICE_WAS_RUNNING, "false")
+        val wakeLock = TransitionWakeLock.acquire(
+            this,
+            WAKELOCK_TAG_STOP,
+            TransitionWakeLock.SERVICE_COMMAND_TIMEOUT_MS,
+        )
+        // 确认要停掉 mihomo 之后的回写挂在 cleanupScope，onDestroy 的 cancel 丢不掉。
+        // mihomo 已死、规则已撤就算停完；回写要等 processLock，「停止中」不能陪着等。
+        val job = cleanupScope.launch {
+            try {
+                superseded.forEach { it.join() }
+                inFlightJob?.join()
+                if (!isCurrentInstance(serial)) return@launch
+                val storage = PlatformStorage(this@MishkaRootService)
+                val runningSubscriptionId = storage.getString(StorageKeys.ROOT_ACTIVE_SUBSCRIPTION_ID, "").ifEmpty { null }
+                val prepared = preparedRuntime?.takeIf { inFlightJob != null && it.job === inFlightJob }
+                val targets = buildMap {
+                    runningSubscriptionId?.let { put(it, ownedEpoch) }
+                    prepared?.let { put(it.uuid, it.epoch) }
+                }
+                // app 进程被杀后 root mihomo 仍存活，本实例的 runner 从没 start 也没 attach，
+                // childPid 为空会让 stop() 整段跳过 —— 先按持久化 PID 认领，否则杀不掉还会清掉线索
+                storage.getString(StorageKeys.ROOT_MIHOMO_PID, "").toIntOrNull()
+                    ?.let { runner.adoptForStop(it) }
+                val confirmedDead = runner.stop()
+                if (!teardownRootRulesOrReport(tunMode, op)) return@launch
+                // 若期间被新的 fresh START/RESTART 抢占取消，或已被新 Service 实例接管，不得覆盖状态或清持久化
+                if (!currentCoroutineContext().isActive || !isCurrentInstance(serial)) return@launch
+                // 没确认杀掉就保留 PID/secret 与 was-running 标记：清掉之后残留进程再也定位不到，
+                // 下次 TOGGLE 还会把「有进程在跑」误判成「没在跑」而去启一个新的
+                if (confirmedDead) {
+                    clearPersistedState(storage)
+                    storage.putString(StorageKeys.SERVICE_WAS_RUNNING, "false")
+                }
+                if (!destroyed) {
+                    ProxyServiceBridge.markStopped(tunMode)
+                    stopServiceQuietly(op)
+                }
+                // 回写缓存后再清沙箱，下轮 start 从 imported/ 复制才能跳过未过期的 HTTP 拉取。
+                // 上方可能已 stopSelf，新实例的 prepare 由沙箱代次挡住，不会被这里删掉。
+                targets.forEach { (uuid, epoch) ->
+                    RootRuntimeCache.release(this@MishkaRootService, uuid, subscriptionRepository, epoch)
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.e(TAG, "ROOT stop failed", e)
+                if (!destroyed && isCurrentInstance(serial)) {
+                    ProxyServiceBridge.updateState(
+                        ProxyServiceStatus(ProxyState.Error, errorMessage = e.describe(), tunMode = tunMode)
+                    )
+                    stopServiceQuietly(op)
+                }
             }
-            if (destroyed) return@launchPostDeathCleanup
-            ProxyServiceBridge.markStopped(currentSubmode.tunMode)
-            stopServiceQuietly()
-        })
-    }
-
-    /**
-     * 确认要停掉 mihomo 之后的回写。挂在 [cleanupScope]，onDestroy 的 cancel 丢不掉。
-     * 新实例出现后不再改全局状态，避免把后一次启动的 PID 清掉。
-     * [beforeRelease] 在杀进程、撤规则之后、等锁回写之前执行；[afterRelease] 等回写完成。
-     */
-    private fun launchPostDeathCleanup(
-        superseded: List<Job>,
-        ownedEpoch: Long,
-        beforeRelease: suspend (PlatformStorage, Boolean) -> Unit = { _, _ -> },
-        afterRelease: suspend (PlatformStorage) -> Unit = {},
-    ) {
-        val serial = createdSerial
-        cleanupScope.launch {
-            superseded.forEach { it.join() }
-            // 用户在启动过程中按停止：先中止启动协程，避免它继续把状态写回 Running
-            val start = startJob
-            start?.cancelAndJoin()
-            if (!isCurrentInstance(serial)) return@launch
-            val storage = PlatformStorage(this@MishkaRootService)
-            val runningSubscriptionId = storage.getString(StorageKeys.ROOT_ACTIVE_SUBSCRIPTION_ID, "").ifEmpty { null }
-            // ownedEpoch 是调用方在 cancel 前记下的；被取消的启动若已 prepare，那份沙箱的代次更新，
-            // 订阅 ID 也可能还没来得及持久化。按 job 认领，不读全局代次，免得认领别的启动。
-            val prepared = preparedRuntime?.takeIf { start != null && it.job === start }
-            val targets = buildMap {
-                runningSubscriptionId?.let { put(it, ownedEpoch) }
-                prepared?.let { put(it.uuid, it.epoch) }
-            }
-            // app 进程被杀后 root mihomo 仍存活，本实例的 runner 从没 start 也没 attach，
-            // childPid 为空会让 stop() 整段跳过 —— 先按持久化 PID 认领，否则杀不掉还会清掉线索
-            storage.getString(StorageKeys.ROOT_MIHOMO_PID, "").toIntOrNull()
-                ?.let { runner.adoptForStop(it) }
-            val confirmedDead = runner.stop()
-            if (!teardownRootRulesOrReport(currentSubmode.tunMode)) return@launch
-            beforeRelease(storage, confirmedDead)
-            // 回写缓存后再清沙箱，下轮 start 从 imported/ 复制才能跳过未过期的 HTTP 拉取。
-            // beforeRelease 可能已 stopSelf，新实例的 prepare 由沙箱代次挡住，不会被这里删掉。
-            targets.forEach { (uuid, epoch) ->
-                RootRuntimeCache.release(this@MishkaRootService, uuid, subscriptionRepository, epoch)
-            }
-            if (!isCurrentInstance(serial)) return@launch
-            afterRelease(storage)
         }
+        op.job = job
+        job.invokeOnCompletion { wakeLock.releaseQuietly() }
     }
 
     override fun onDestroy() {
         destroyed = true
+        foregroundReady = false
         notificationRefreshJob?.cancel()
         // 只停还在轮询的监控。已经确认进程死亡的回写在 cleanupScope，不能在这里 cancel。
         monitorJob?.cancel()
@@ -888,6 +1136,10 @@ class MishkaRootService : Service() {
         const val ACTION_RESTART = "top.yukonga.mishka.ROOT_RESTART"
         const val EXTRA_SUBMODE = "submode"
         const val EXTRA_ATTACH_ONLY = "attach_only"
+        const val EXTRA_ONLY_IF_ALIVE = "only_if_alive"
+        private const val WAKELOCK_TAG_START = "mishka:root-start"
+        private const val WAKELOCK_TAG_RESTART = "mishka:root-restart"
+        private const val WAKELOCK_TAG_STOP = "mishka:root-stop"
 
         /** TunMode 对应的 [EXTRA_SUBMODE] 取值；VPN 模式不归本 Service 管，返回 null。 */
         fun submodeExtra(mode: TunMode): String? =
